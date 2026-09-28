@@ -5,6 +5,9 @@ membaca file CSV, TSV, XLSX, XLS, ODS atau JSON langsung di browser dan membangu
 File juga bisa di-*drag & drop* ke halaman. Data tidak dikirim ke server mana pun.
 
 - `index.html` – deck siap pakai (buka langsung di browser).
+- **Unduh PPTX** membuat file PowerPoint asli (16:9, grafik & tabel native yang bisa diedit) dari data yang sedang tampil.
+- **Google Slides** memandu impor: unduh PPTX → upload ke Google Drive → *Buka dengan Google Slide*.
+- `src/export-pptx.js` – pembuat PPTX (pptxgenjs), disisipkan ke `index.html` saat build.
 - `src/deck.html` – sumber deck; gambar template ditulis sebagai `{{IMG:nama}}`.
 - `src/sample-data.json` – data contoh (tanpa nama & nomor telepon leads).
 - `assets/` – gambar dari template PPTX (dikompresi).

@@ -9,5 +9,6 @@ def img(m):
 html = re.sub(r"\{\{IMG:([\w.-]+)\}\}", img, html)
 sample = json.loads((root / "src/sample-data.json").read_text())
 html = html.replace("/*SAMPLE_DATA*/null", json.dumps(sample, ensure_ascii=False))
+html = html.replace("/*EXPORT_PPTX*/", (root / "src/export-pptx.js").read_text())
 (root / "index.html").write_text(html)
 print("wrote", root / "index.html", f"{len(html)/1e6:.2f} MB")

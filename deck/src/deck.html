@@ -150,6 +150,16 @@ main{padding-block:20px 60px;padding-inline:16px}
 .qflag{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--body);line-height:1.4}
 .qflag i{flex:none;width:22px;height:22px;border-radius:50%;background:#FBEFC4;color:#6B4F00;font-style:normal;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
 
+.modal{position:fixed;inset:0;z-index:70;background:rgba(18,24,16,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+.sheet-box{background:#fff;color:var(--ink);border-radius:16px;max-width:540px;width:100%;padding:24px 24px 20px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.sheet-box h3{margin:0 0 8px;font-size:20px;color:var(--green-dk)}
+.sheet-box p{margin:0 0 12px;line-height:1.5;color:var(--body)}
+.sheet-box ol{margin:0 0 12px;padding-left:20px;line-height:1.6;color:var(--ink)}
+.sheet-box .alt{font-size:13px}
+.sheet-box .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.sheet-box .btn.ghost{color:var(--green-dk);border-color:var(--line);text-decoration:none}
+.sheet-box .btn.ghost:hover{background:var(--tint)}
+.btn[disabled]{opacity:.6;cursor:progress}
 .tip{position:fixed;z-index:60;pointer-events:none;background:#1F2A19;color:#fff;font-size:12.5px;padding:7px 10px;border-radius:8px;max-width:260px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .tip b{color:var(--yellow)}
 @media (prefers-reduced-motion:no-preference){.seg,.bar-v{transition:filter .15s}}
@@ -166,6 +176,10 @@ main{padding-block:20px 60px;padding-inline:16px}
     <button class="btn" id="resetBtn" type="button" hidden><span class="t">Pakai data contoh</span><span aria-hidden="true">↺</span></button>
     <button class="btn" id="presentBtn" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span class="t">Presentasi</span></button>
+    <button class="btn" id="pptxBtn" type="button" title="Unduh sebagai PowerPoint (.pptx)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg><span class="t">Unduh PPTX</span></button>
+    <button class="btn" id="gslidesBtn" type="button" title="Buka hasil di Google Slides">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg><span class="t">Google Slides</span></button>
     <input type="file" id="fileIn" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,.json" hidden>
   </div>
 </header>
@@ -177,11 +191,29 @@ main{padding-block:20px 60px;padding-inline:16px}
   <div class="ctrl"><button class="btn" id="pPrev" type="button" aria-label="Slide sebelumnya">‹</button><span id="pCount">1 / 1</span><button class="btn" id="pNext" type="button" aria-label="Slide berikutnya">›</button><button class="btn" id="pClose" type="button">Tutup</button></div>
 </div>
 <div class="tip" id="tip" hidden></div>
+<div class="modal" id="gsModal" hidden role="dialog" aria-modal="true" aria-labelledby="gsTitle">
+  <div class="sheet-box">
+    <h3 id="gsTitle">Buka di Google Slides</h3>
+    <p>Deck disimpan sebagai file PowerPoint, lalu diimpor ke Google Slides. Semua teks, tabel, dan grafik tetap bisa diedit.</p>
+    <ol>
+      <li>Klik <b>Unduh PPTX</b> di bawah dan simpan filenya.</li>
+      <li>Buka Google Drive, klik <b>Baru → Upload file</b>, lalu pilih file .pptx tadi.</li>
+      <li>Klik kanan file tersebut → <b>Buka dengan → Google Slide</b>.</li>
+    </ol>
+    <p class="alt">Untuk menambahkan ke presentasi yang sudah ada: buka presentasinya di Google Slides → <b>File → Impor slide</b>.</p>
+    <div class="row">
+      <button class="btn primary" id="gsDl" type="button">Unduh PPTX</button>
+      <a class="btn ghost" href="https://drive.google.com/drive/my-drive" target="_blank" rel="noopener">Google Drive ↗</a>
+      <a class="btn ghost" href="https://docs.google.com/presentation/u/0/" target="_blank" rel="noopener">Google Slides ↗</a>
+      <button class="btn ghost" id="gsClose" type="button">Tutup</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const IMG = {cover:"{{IMG:cover.jpg}}", divider:"{{IMG:divider.jpg}}", closing:"{{IMG:closing.jpg}}", logo:"{{IMG:logo.png}}",
-  wm:"{{IMG:wordmark.png}}", palm:"{{IMG:palm.png}}", think:"{{IMG:mascot-think.png}}", point:"{{IMG:mascot-point.png}}"};
+  wm:"{{IMG:wordmark.png}}", panel:"{{IMG:panel.jpg}}", palm:"{{IMG:palm.png}}", think:"{{IMG:mascot-think.png}}", point:"{{IMG:mascot-point.png}}"};
 const SAMPLE = /*SAMPLE_DATA*/null;
 
 /* ================= Column detection ================= */
@@ -468,7 +500,7 @@ function insights(A){
 let SLIDES=[], state={ds:null, book:null};
 const deckEl=document.getElementById("deck");
 function render(){
-  const A=analyse(state.ds);
+  const A=analyse(state.ds); state.A=A;
   SLIDES=buildSlides(A,state.ds);
   deckEl.innerHTML=SLIDES.map((s,i)=>`<section class="frame" aria-label="Slide ${i+1}">${s}</section>`).join("");
   document.getElementById("srcName").textContent=`${state.ds.name}${state.ds.sheet?` · ${state.ds.sheet}`:""} · ${nf.format(A.n)} baris`;
@@ -547,6 +579,8 @@ document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElemen
 const tip=document.getElementById("tip");
 addEventListener("pointermove",e=>{ const t=e.target.closest?.("[data-tip]"); if(!t){tip.hidden=true;return}
   tip.innerHTML=t.dataset.tip; tip.hidden=false; const w=tip.offsetWidth; tip.style.left=Math.min(innerWidth-w-8,e.clientX+14)+"px"; tip.style.top=(e.clientY+16)+"px"; });
+
+/*EXPORT_PPTX*/
 
 /* ================= Boot ================= */
 let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data")||"null") }catch(e){}
