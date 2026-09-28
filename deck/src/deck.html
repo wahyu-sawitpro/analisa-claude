@@ -1,0 +1,555 @@
+<title>SawitPRO Leads Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --green:#4A653B; --green-dk:#274E13; --green-ink:#2E4424; --yellow:#F5D347;
+  --amber:#D9A21B; --sage:#9DAE8F; --ink:#2B2F28; --body:#535353; --muted:#7A8373;
+  --line:#DCE2D6; --paper:#FFFFFF; --page:#EEF1EA; --tint:#F4F6F1;
+  --font:"Plus Jakarta Sans", "Segoe UI", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--font);font-size:14px}
+button,select{font-family:inherit}
+:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+
+/* ---------- Toolbar ---------- */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--green-dk);color:#fff;
+  padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.bar .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.01em;margin-right:auto}
+.bar .brand img{width:34px;height:34px}
+.bar .src{font-size:12px;color:#D8E3CF;display:flex;flex-direction:column;line-height:1.35;min-width:0}
+.bar .src b{color:#fff;font-weight:600;overflow-wrap:anywhere}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{appearance:none;border:1px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:999px;
+  padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.btn:hover{background:rgba(255,255,255,.1)}
+.btn.primary{background:var(--yellow);color:var(--green-dk);border-color:var(--yellow)}
+.btn.primary:hover{background:#FFE06A}
+.btn svg{width:16px;height:16px}
+select.sheet{border-radius:999px;border:1px solid rgba(255,255,255,.35);background:var(--green-dk);color:#fff;padding:7px 10px;font-size:13px}
+.notice{margin:12px auto 0;max-width:1100px;padding:10px 14px;border-radius:10px;font-size:13px;background:#FFF6D1;color:#5A4600;border:1px solid #EFD77A}
+.notice.err{background:#FBE4E0;color:#7A2016;border-color:#EDB1A7}
+
+/* ---------- Deck (scroll view) ---------- */
+main{padding-block:20px 60px;padding-inline:16px}
+.deck{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.frame{width:100%;aspect-ratio:16/9;max-width:100%;position:relative;overflow:hidden;border-radius:6px;
+  box-shadow:0 1px 2px rgba(30,45,20,.12),0 8px 28px rgba(30,45,20,.12);background:#fff}
+.slide{position:absolute;left:0;top:0;width:1280px;height:720px;transform-origin:0 0;overflow:hidden;background:#fff;color:var(--ink)}
+.drop-hint{position:fixed;inset:0;z-index:50;background:rgba(39,78,19,.82);color:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:24px;font-weight:700;border:4px dashed var(--yellow)}
+
+/* ---------- Present mode ---------- */
+.present{position:fixed;inset:0;z-index:40;background:#121810;display:flex;align-items:center;justify-content:center}
+.present .stage{position:relative;overflow:hidden;background:#fff}
+.present .ctrl{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;
+  background:rgba(0,0,0,.55);padding:6px 10px;border-radius:999px;color:#fff;font-size:13px;font-variant-numeric:tabular-nums}
+.present .ctrl .btn{padding:6px 12px}
+
+/* ---------- Slide primitives (1280x720 canvas) ---------- */
+.content{background:#fff}
+.content .panel{position:absolute;left:38px;top:38px;width:1204px;height:644px;background:#F3F4F2 url({{IMG:panel.jpg}}) center/cover;
+  border-radius:0 110px 0 50px}
+.content .ybar{position:absolute;left:38px;top:655px;width:1154px;height:13px;background:var(--yellow)}
+.content .palm{position:absolute;left:1188px;top:606px;width:84px;height:88px}
+.content .logo{position:absolute;left:1152px;top:30px;width:94px;height:94px}
+.content .foot{position:absolute;top:690px;left:40px;right:40px;display:flex;justify-content:space-between;font-size:10px;color:var(--muted);letter-spacing:.06em}
+.content .foot .pg{font-weight:700;color:var(--green)}
+.content h2{position:absolute;left:80px;top:88px;width:1040px;margin:0;font-size:34px;line-height:1.12;font-weight:800;color:var(--green);text-wrap:balance;letter-spacing:-.01em}
+.content .kicker{position:absolute;left:82px;top:64px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.content .body{position:absolute;left:80px;top:180px;width:1080px;height:460px}
+.lead{font-size:19px;line-height:1.5;color:var(--body);margin:0;max-width:62ch}
+
+.cover .bg,.closing .bg,.divider .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cover .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.25),rgba(0,0,0,0) 45%)}
+.cover .wm{position:absolute;left:66px;top:62px;width:247px}
+.cover .band{position:absolute;left:498px;top:362px;width:782px;height:257px;background:var(--green)}
+.cover .disc{position:absolute;left:371px;top:362px;width:257px;height:257px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center}
+.cover .disc img{width:222px;height:222px}
+.cover .eyebrow,.divider .eyebrow{font-size:40px;font-weight:800;color:var(--yellow);line-height:1.1;margin:0}
+.cover .title,.divider .title{font-size:56px;font-weight:800;color:#fff;line-height:1.08;margin:6px 0 0;text-wrap:balance;letter-spacing:-.01em}
+.cover .txt{position:absolute;left:652px;top:378px;width:590px}
+.cover .title{font-size:50px}
+.cover .meta{position:absolute;left:652px;top:630px;color:#fff;font-size:15px;font-weight:600;text-shadow:0 1px 6px rgba(0,0,0,.5)}
+.divider .txt{position:absolute;left:131px;top:330px;width:760px}
+.divider .num{position:absolute;right:90px;bottom:60px;font-size:180px;font-weight:800;color:rgba(255,255,255,.12);line-height:1}
+.closing .shade{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,.45),rgba(0,0,0,.1) 70%)}
+.closing .wm{position:absolute;left:66px;top:62px;width:247px}
+.closing .box{position:absolute;left:0;right:0;top:290px;text-align:center;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.45)}
+.closing .box h2{font-size:84px;font-weight:800;margin:0;line-height:1}
+.closing .box p{font-size:34px;font-weight:700;color:var(--yellow);margin:14px 0 0}
+.closing .lg{position:absolute;right:66px;top:48px;width:120px}
+
+/* TOC */
+.toc{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:18px 60px;width:1000px}
+.toc li{display:flex;gap:18px;align-items:baseline;font-size:22px;font-weight:600;color:var(--green-dk);border-bottom:1px solid var(--line);padding-bottom:12px}
+.toc li span{font-size:15px;font-weight:800;color:var(--amber);min-width:34px;font-variant-numeric:tabular-nums}
+.toc li small{display:block;font-size:14px;font-weight:500;color:var(--muted);margin-top:2px}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.kpi{background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 1px 2px rgba(30,45,20,.08)}
+.kpi .v{font-size:46px;font-weight:800;color:var(--green-dk);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi .v small{font-size:22px;font-weight:700;margin-left:4px;color:var(--green)}
+.kpi .l{font-size:14px;color:var(--body);margin-top:10px;line-height:1.35}
+.kpi.hot{background:var(--green)} .kpi.hot .v,.kpi.hot .v small{color:#fff} .kpi.hot .l{color:#E4ECDD}
+
+/* Bars */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.card{background:#fff;border-radius:14px;padding:20px 24px;box-shadow:0 1px 2px rgba(30,45,20,.08)}
+.card h3{margin:0 0 4px;font-size:18px;font-weight:700;color:var(--green-dk)}
+.card .sub{font-size:13px;color:var(--muted);margin:0 0 16px}
+.hbars{display:flex;flex-direction:column;gap:12px}
+.hb .top{display:flex;justify-content:space-between;gap:12px;font-size:14px;color:var(--ink);margin-bottom:5px}
+.hb .top .n{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hb .top .n em{font-style:normal;font-weight:500;color:var(--muted);margin-left:6px}
+.hb .top .k{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.track{height:14px;background:#E9EDE5;border-radius:4px;display:flex;gap:2px;overflow:hidden}
+.seg{height:100%;border-radius:0}
+.seg:last-child{border-radius:0 4px 4px 0}
+.seg:hover{filter:brightness(1.12)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--body);margin-bottom:14px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.stack-big{height:44px;border-radius:8px;display:flex;gap:2px;overflow:hidden}
+.stack-big .seg{display:flex;align-items:center;padding-left:14px;color:#fff;font-weight:700;font-size:15px;white-space:nowrap}
+.stack-big .seg.lt{color:var(--green-dk)}
+
+/* Columns (daily) */
+.cols{display:flex;align-items:flex-end;gap:10px;height:250px;border-bottom:1px solid var(--line);padding-top:24px}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.col .bar-v{width:70%;max-width:56px;border-radius:4px 4px 0 0;display:flex;flex-direction:column-reverse;gap:2px;overflow:hidden}
+.col .val{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;font-variant-numeric:tabular-nums}
+.col-lbls{display:flex;gap:10px;margin-top:8px}
+.col-lbls span{flex:1;text-align:center;font-size:12px;color:var(--muted);min-width:0;overflow:hidden;white-space:nowrap}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:14px;background:#fff;border-radius:12px;overflow:hidden}
+.tbl th{background:var(--green);color:#fff;text-align:left;font-weight:600;padding:10px 12px;font-size:13px}
+.tbl td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink)}
+.tbl td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tfoot td{font-weight:700;background:var(--tint)}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.pill.warm{background:#FBEFC4;color:#6B4F00}
+.pill.cold{background:#E3E8DF;color:#3F4A38}
+
+/* Insight list */
+.ins{display:flex;flex-direction:column;gap:14px}
+.ins .it{display:flex;gap:16px;align-items:flex-start;background:#fff;border-radius:12px;padding:14px 18px}
+.ins .dot{flex:none;width:34px;height:34px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+.ins .dot.y{background:var(--yellow);color:var(--green-dk)}
+.ins .it b{display:block;font-size:17px;color:var(--green-dk);margin-bottom:3px}
+.ins .it p{margin:0;font-size:14.5px;line-height:1.45;color:var(--body)}
+.mascot{position:absolute;right:60px;bottom:70px;width:190px}
+.empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:18px;text-align:center;padding:40px;background:rgba(255,255,255,.6);border-radius:14px}
+.qflag{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--body);line-height:1.4}
+.qflag i{flex:none;width:22px;height:22px;border-radius:50%;background:#FBEFC4;color:#6B4F00;font-style:normal;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
+
+.tip{position:fixed;z-index:60;pointer-events:none;background:#1F2A19;color:#fff;font-size:12.5px;padding:7px 10px;border-radius:8px;max-width:260px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.tip b{color:var(--yellow)}
+@media (prefers-reduced-motion:no-preference){.seg,.bar-v{transition:filter .15s}}
+@media (max-width:600px){.bar .brand span{display:none}.btn .t{display:none}.btn{padding:8px 11px}}
+</style>
+
+<header class="bar">
+  <div class="brand"><img src="{{IMG:logo.png}}" alt=""><span>Deck Analisa Leads</span></div>
+  <div class="src"><span>Sumber data</span><b id="srcName">–</b></div>
+  <div class="actions">
+    <select class="sheet" id="sheetSel" hidden aria-label="Pilih sheet"></select>
+    <button class="btn primary" id="uploadBtn" type="button" title="CSV, XLSX, XLS, ODS, TSV atau JSON">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg><span class="t">Unggah data</span></button>
+    <button class="btn" id="resetBtn" type="button" hidden><span class="t">Pakai data contoh</span><span aria-hidden="true">↺</span></button>
+    <button class="btn" id="presentBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span class="t">Presentasi</span></button>
+    <input type="file" id="fileIn" accept=".csv,.tsv,.txt,.xlsx,.xls,.xlsm,.ods,.json" hidden>
+  </div>
+</header>
+<div id="notice" class="notice" hidden></div>
+<main><div class="deck" id="deck"></div></main>
+<div class="drop-hint" id="dropHint" hidden>Lepaskan file untuk memperbarui deck</div>
+<div class="present" id="present" hidden>
+  <div class="stage" id="stage"></div>
+  <div class="ctrl"><button class="btn" id="pPrev" type="button" aria-label="Slide sebelumnya">‹</button><span id="pCount">1 / 1</span><button class="btn" id="pNext" type="button" aria-label="Slide berikutnya">›</button><button class="btn" id="pClose" type="button">Tutup</button></div>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const IMG = {cover:"{{IMG:cover.jpg}}", divider:"{{IMG:divider.jpg}}", closing:"{{IMG:closing.jpg}}", logo:"{{IMG:logo.png}}",
+  wm:"{{IMG:wordmark.png}}", palm:"{{IMG:palm.png}}", think:"{{IMG:mascot-think.png}}", point:"{{IMG:mascot-point.png}}"};
+const SAMPLE = /*SAMPLE_DATA*/null;
+
+/* ================= Column detection ================= */
+// Order matters: more specific keys first. Each header is claimed by one key only.
+const FIELDS = [
+  ["reasonOther", /alasan\s*lain|other\s*reason|reason.*other/],
+  ["fieldPic",    /pic.*lapang|field\s*(pic|officer)|tim\s*lapang/],
+  ["closing",     /closing|estimasi\s*tanggal/],
+  ["ffb",         /ffb|tbs|\(mt\)|tonase/],
+  ["potential",   /potential\s*sales|potensi|nilai|revenue|value|\(idr\)|omzet/],
+  ["reason",      /alasan|reason|penyebab/],
+  ["status",      /status/],
+  ["pic",         /pic|sales\s*(rep|person)|owner|petugas/],
+  ["channel",     /tipe\s*engag|jenis\s*engag|channel|metode|media\s*kontak/],
+  ["date",        /tanggal|date|tgl|waktu/],
+  ["location",    /lokasi|kabupat|kecamatan|location|wilayah|area|region|kota/],
+  ["source",      /sumber|source/],
+  ["purpose",     /tujuan|program|layanan|segment/],
+  ["product",     /produk|product|sku|item/],
+  ["id",          /^id$|lead\s*id|^no\.?$|kode/],
+  ["note",        /keterangan|catatan|note|remark/],
+];
+const PII = /nama\s*leads|^nama$|name|telf|telp|phone|hp|whats?app\s*no|contact|kontak|email|alamat/;
+const LABEL = {pic:"PIC", channel:"Tipe engagement", date:"Tanggal", location:"Lokasi", source:"Sumber leads", fieldPic:"PIC lapangan",
+  purpose:"Tujuan engagement", potential:"Potensi sales (IDR)", ffb:"Potensi FFB (MT)", product:"Produk", status:"Status leads",
+  reason:"Alasan tidak tertarik", reasonOther:"Alasan lainnya", closing:"Estimasi closing", id:"ID", note:"Keterangan"};
+
+function norm(s){return String(s??"").toLowerCase().replace(/[_\-]+/g," ").replace(/\s+/g," ").trim()}
+function detect(headers){
+  const map={}, used=new Set();
+  for(const [key,re] of FIELDS){
+    const h = headers.find(h=>!used.has(h) && re.test(norm(h)) && !(key!=="id" && PII.test(norm(h)) && !/pic/.test(norm(h))));
+    if(h){map[key]=h;used.add(h)}
+  }
+  return map;
+}
+
+/* ================= Value cleaning ================= */
+const blank = v => v===null || v===undefined || (typeof v==="string" && v.trim()==="") || (typeof v==="number" && isNaN(v));
+function clean(v){ if(blank(v)) return null; return String(v).replace(/\s+/g," ").trim(); }
+function canonStatus(v){
+  const s=norm(v); if(!s) return null;
+  if(/tidak|ga?k\s*minat|not\s*interest|tolak|reject|lost/.test(s)) return "Tidak tertarik";
+  if(/timbang|pikir|consider|follow|nego|ragu/.test(s)) return "Mempertimbangkan";
+  if(/tertarik|minat|interest|hot|warm/.test(s)) return "Tertarik";
+  if(/closing|deal|won|beli/.test(s)) return "Closing";
+  return clean(v).replace(/^./,c=>c.toUpperCase());
+}
+function toNum(v){
+  if(blank(v)) return null; if(typeof v==="number") return v;
+  let s=String(v).replace(/rp|idr|\s/gi,"");
+  if(/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s=s.replace(/\./g,"").replace(",",".");
+  else s=s.replace(/,/g,"");
+  const n=parseFloat(s); return isNaN(n)?null:n;
+}
+function toDate(v){
+  if(blank(v)) return null;
+  let d=null;
+  if(v instanceof Date) d=new Date(Math.round(v.getTime()/60000)*60000);
+  else if(typeof v==="number" && v>20000 && v<80000) d=new Date(Math.round((v-25569)*864e5)+new Date().getTimezoneOffset()*6e4);
+  else { const s=String(v).trim(); let m;
+    if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})( 00:00(:00)?)?$/))) d=new Date(+m[1],+m[2]-1,+m[3]);
+    else if((m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/))) d=new Date(+(m[3].length===2?"20"+m[3]:m[3]),+m[2]-1,+m[1]);
+    else { const t=Date.parse(s); if(!isNaN(t)) d=new Date(t); } }
+  if(!d||isNaN(d)) return null;
+  return new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+
+/* ================= Analysis ================= */
+function countBy(rows,f){const m=new Map();for(const r of rows){const k=f(r);if(k===null)continue;m.set(k,(m.get(k)||0)+1)}return [...m].sort((a,b)=>b[1]-a[1])}
+function analyse(ds){
+  const headers=ds.headers, map=detect(headers);
+  const rows=ds.rows.map(r=>{
+    const o={_raw:r};
+    for(const k in map){const v=r[map[k]];
+      o[k]= k==="potential"||k==="ffb" ? toNum(v) : k==="date"||k==="closing" ? toDate(v) : k==="status" ? canonStatus(v) : clean(v);}
+    return o;
+  }).filter(o=>Object.values(o._raw).some(v=>!blank(v)));
+  const A={rows,map,headers,n:rows.length};
+  A.status=map.status?countBy(rows,r=>r.status):[];
+  A.rawStatus=map.status?countBy(rows,r=>clean(r._raw[map.status])):[];
+  const statusOrder=["Tidak tertarik","Mempertimbangkan","Tertarik","Closing"];
+  A.statusKeys=A.status.map(s=>s[0]).sort((a,b)=>{const ia=statusOrder.indexOf(a),ib=statusOrder.indexOf(b);return (ia<0?9:ia)-(ib<0?9:ib)});
+  const reasonOf=r=>r.reason && r.reasonOther && /lain|other/i.test(r.reason)? r.reasonOther : r.reason;
+  A.reasons=map.reason?countBy(rows,reasonOf):[];
+  A.reasonOther=map.reasonOther?rows.filter(r=>r.reasonOther).length:0;
+  for(const k of ["pic","channel","location","source","purpose","product","fieldPic"]) A[k]=map[k]?countBy(rows,r=>r[k]):[];
+  A.dates=map.date?rows.map(r=>r.date).filter(Boolean).sort((a,b)=>a-b):[];
+  A.warm=rows.filter(r=>r.status && r.status!=="Tidak tertarik");
+  A.potTotal=rows.reduce((s,r)=>s+(r.potential||0),0);
+  A.potWarm=A.warm.reduce((s,r)=>s+(r.potential||0),0);
+  A.fill=headers.filter(h=>!PII.test(norm(h))).map(h=>[h,rows.filter(r=>!blank(r._raw[h])).length/(rows.length||1)]);
+  A.typos=A.rawStatus.filter(([raw])=>raw && canonStatus(raw)!==raw).map(([raw,c])=>[raw,canonStatus(raw),c]);
+  return A;
+}
+
+/* ================= Formatting ================= */
+const nf=new Intl.NumberFormat("id-ID");
+const pct=(a,b)=>b?Math.round(a/b*100):0;
+function rp(n){ if(!n) return "Rp0"; if(n>=1e9) return "Rp"+(n/1e9).toLocaleString("id-ID",{maximumFractionDigits:2})+" M";
+  if(n>=1e6) return "Rp"+(n/1e6).toLocaleString("id-ID",{maximumFractionDigits:2})+" jt"; return "Rp"+nf.format(n); }
+function rpParts(n){const m=rp(n).replace("Rp","").match(/^(.*?)(?: (jt|M))?$/);return [m[1],m[2]?" "+m[2]:""]}
+const MON=["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+const DAY=["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
+const fd=d=>d?`${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`:"–";
+const fds=d=>`${DAY[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()]}`;
+function period(A){ if(!A.dates.length) return "Periode tidak tercantum";
+  const a=A.dates[0], b=A.dates[A.dates.length-1];
+  if(+a===+b) return fd(a);
+  if(a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth()) return `${a.getDate()}–${b.getDate()} ${MON[b.getMonth()]} ${b.getFullYear()}`;
+  return `${fd(a)} – ${fd(b)}`; }
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const STATUS_COLOR={"Tidak tertarik":"#8E9C84","Mempertimbangkan":"#D9A21B","Tertarik":"#4A653B","Closing":"#274E13"};
+const EXTRA=["#5B7F95","#A8653A","#6E5A8A","#3F8C7A"];
+function sColor(k,A){ if(STATUS_COLOR[k]) return STATUS_COLOR[k]; const i=A.statusKeys.filter(x=>!STATUS_COLOR[x]).indexOf(k); return EXTRA[i%EXTRA.length]; }
+const lightSeg=k=>k==="Mempertimbangkan";
+
+/* ================= Chart builders ================= */
+function hbars(list,{total,max=6,color="#4A653B",fmt}={}){
+  if(!list.length) return `<div class="empty">Kolom belum tersedia di data ini</div>`;
+  let items=list.slice(0,max);
+  if(list.length>max){const rest=list.slice(max).reduce((s,x)=>s+x[1],0); items=[...items,[`Lainnya (${list.length-max})`,rest]];}
+  const top=Math.max(...items.map(x=>x[1]));
+  return `<div class="hbars">${items.map(([k,v])=>`<div class="hb"><div class="top"><span class="k" title="${esc(k)}">${esc(k)}</span>
+    <span class="n">${fmt?fmt(v):nf.format(v)}${total?`<em>${pct(v,total)}%</em>`:""}</span></div>
+    <div class="track"><div class="seg" style="width:${v/top*100}%;background:${color}" data-tip="<b>${esc(k)}</b><br>${nf.format(v)} leads${total?` · ${pct(v,total)}%`:""}"></div></div></div>`).join("")}</div>`;
+}
+function stackedBy(A,field,max=5){
+  if(!A.map[field]) return `<div class="empty">Kolom ${LABEL[field]} belum tersedia</div>`;
+  if(!A.statusKeys.length) return hbars(A[field],{total:A.n,max});
+  const groups=A[field].slice(0,max), top=Math.max(...groups.map(g=>g[1]));
+  return `<div class="hbars">${groups.map(([g,tot])=>{
+    const segs=A.statusKeys.map(s=>[s,A.rows.filter(r=>r[field]===g&&r.status===s).length]).filter(x=>x[1]);
+    return `<div class="hb"><div class="top"><span class="k" title="${esc(g)}">${esc(g)}</span><span class="n">${nf.format(tot)}<em>${pct(tot,A.n)}%</em></span></div>
+      <div class="track" style="width:${tot/top*100}%">${segs.map(([s,c])=>`<div class="seg" style="flex:${c};background:${sColor(s,A)}" data-tip="<b>${esc(g)}</b><br>${esc(s)}: ${c} leads"></div>`).join("")}</div></div>`}).join("")}</div>`;
+}
+function legend(A){return A.statusKeys.length?`<div class="legend">${A.statusKeys.map(s=>`<span><i style="background:${sColor(s,A)}"></i>${esc(s)}</span>`).join("")}</div>`:""}
+
+/* ================= Slides ================= */
+function contentSlide(n,{kicker="",title,body}){
+  return `<div class="slide content"><div class="panel"></div><div class="ybar"></div><img class="palm" src="${IMG.palm}" alt=""><img class="logo" src="${IMG.logo}" alt="SawitPRO">
+  ${kicker?`<div class="kicker">${esc(kicker)}</div>`:""}<h2>${title}</h2><div class="body">${body}</div>
+  <div class="foot"><span>MATERI MILIK SAWITPRO</span><span class="pg">${n}</span><span>Dilarang mempergunakan dan menyebarkan isi materi ini tanpa izin dari pihak SawitPRO</span></div></div>`;
+}
+function dividerSlide(no,label,title){
+  return `<div class="slide divider"><img class="bg" src="${IMG.divider}" alt=""><div class="txt"><p class="eyebrow">${esc(label)}</p><p class="title">${title}</p></div><div class="num">${String(no).padStart(2,"0")}</div></div>`;
+}
+
+function buildSlides(A,ds){
+  const S=[]; const P=period(A);
+  const tt=A.status.find(s=>s[0]==="Tidak tertarik")?.[1]||0;
+  const warmN=A.warm.length;
+  const topReason=A.reasons[0], topPic=A.pic[0], topCh=A.channel[0], topLoc=A.location[0], topPurpose=A.purpose[0];
+
+  // 1 Cover
+  S.push(`<div class="slide cover"><img class="bg" src="${IMG.cover}" alt=""><div class="shade"></div><img class="wm" src="${IMG.wm}" alt="SawitPRO.id">
+    <div class="band"></div><div class="disc"><img src="${IMG.logo}" alt=""></div>
+    <div class="txt"><p class="eyebrow">Plantation Team</p><p class="title">Analisa Alasan Penolakan Leads</p></div>
+    <div class="meta">${esc(P)} · ${nf.format(A.n)} leads</div></div>`);
+
+  // 2 TOC
+  const toc=[["Ringkasan status leads","Berapa leads yang menolak dan yang masih hangat"],["Alasan penolakan","Apa yang membuat leads tidak lanjut"],
+    ["PIC & channel engagement","Siapa dan lewat apa leads dihubungi"],["Produk, sumber & lokasi","Di mana dan untuk produk apa"],
+    ["Leads yang masih hangat","Daftar tindak lanjut prioritas"],["Kualitas data & rekomendasi","Perbaikan input dan langkah berikutnya"]];
+  S.push(contentSlide(2,{title:"Daftar isi",body:`<ol class="toc">${toc.map((t,i)=>`<li><span>${String(i+1).padStart(2,"0")}</span><div>${t[0]}<small>${t[1]}</small></div></li>`).join("")}</ol>`}));
+
+  S.push(dividerSlide(1,"Bagian 1","Gambaran data leads minggu ini"));
+
+  // 4 KPI
+  const kp=[
+    [nf.format(A.n),"","Total leads tercatat",false],
+    [pct(tt,A.n),"%",`${nf.format(tt)} leads berstatus tidak tertarik`,false],
+    [nf.format(warmN),"",`Leads masih mempertimbangkan / hangat`,true],
+    [...rpParts(A.potWarm),`Potensi sales (IDR) dari leads hangat${A.map.potential?"":" – kolom tidak ada"}`,false]];
+  const stack=A.statusKeys.map(s=>[s,A.status.find(x=>x[0]===s)[1]]);
+  S.push(contentSlide(4,{kicker:"Ringkasan",title:`${pct(tt,A.n)}% leads menolak, ${nf.format(warmN)} leads masih bisa dikejar`,body:`
+    <div class="kpis">${kp.map(k=>`<div class="kpi${k[3]?" hot":""}"><div class="v">${k[0]}<small>${k[1]}</small></div><div class="l">${k[2]}</div></div>`).join("")}</div>
+    <div class="card" style="margin-top:26px"><h3>Komposisi status leads</h3><p class="sub">Status dinormalisasi dari input asli (${A.typos.length?`${A.typos.length} variasi penulisan diperbaiki`:"tanpa koreksi"})</p>
+    ${stack.length?`<div class="stack-big">${stack.map(([s,c])=>`<div class="seg${lightSeg(s)?" lt":""}" style="flex:${c};background:${sColor(s,A)}" data-tip="<b>${esc(s)}</b><br>${c} leads · ${pct(c,A.n)}%">${c/A.n>.08?`${esc(s)} · ${c}`:""}</div>`).join("")}</div>
+    <div class="legend" style="margin:12px 0 0">${stack.map(([s,c])=>`<span><i style="background:${sColor(s,A)}"></i>${esc(s)}: ${c} (${pct(c,A.n)}%)</span>`).join("")}</div>`:`<div class="empty">Kolom status tidak ditemukan</div>`}</div>`}));
+
+  // 5 Reasons
+  const rTitle=topReason?`“${esc(topReason[0])}” jadi alasan ${pct(topReason[1],A.n)}% penolakan`:"Alasan penolakan";
+  S.push(contentSlide(5,{kicker:"Alasan penolakan",title:rTitle,body:`<div class="grid2" style="grid-template-columns:1.35fr 1fr">
+    <div class="card"><h3>Alasan tidak tertarik</h3><p class="sub">Jumlah leads per alasan</p>${hbars(A.reasons,{total:A.n,max:6})}</div>
+    <div class="card"><h3>Alasan × status</h3><p class="sub">Apakah alasan yang sama muncul di status berbeda</p>${legend(A)}${reasonByStatus(A)}</div></div>
+    ${A.map.reasonOther?`<p class="lead" style="margin-top:18px;font-size:15px">Kolom “Alasan lainnya” terisi di ${A.reasonOther} dari ${A.n} baris.</p>`:""}`}));
+
+  // 6 PIC & channel
+  S.push(contentSlide(6,{kicker:"PIC & channel",title:topPic?`${esc(topPic[0])} menangani ${pct(topPic[1],A.n)}% leads yang tercatat`:"PIC & channel engagement",body:`
+    ${legend(A)}<div class="grid2"><div class="card"><h3>Per PIC plantation team</h3><p class="sub">Jumlah leads dan statusnya</p>${stackedBy(A,"pic")}</div>
+    <div class="card"><h3>Per tipe engagement</h3><p class="sub">Cara leads dihubungi</p>${stackedBy(A,"channel")}</div></div>`}));
+
+  // 7 Product / source
+  S.push(contentSlide(7,{kicker:"Produk & sumber",title:topPurpose?`${esc(topPurpose[0])} mendominasi dengan ${pct(topPurpose[1],A.n)}% leads`:"Produk & sumber leads",body:`
+    ${legend(A)}<div class="grid2"><div class="card"><h3>Tujuan engagement</h3><p class="sub">Lini produk / layanan yang ditawarkan</p>${stackedBy(A,"purpose")}</div>
+    <div class="card"><h3>Sumber leads</h3><p class="sub">Dari mana leads berasal</p>${stackedBy(A,"source")}</div></div>`}));
+
+  // 8 Location & daily
+  S.push(contentSlide(8,{kicker:"Lokasi & waktu",title:topLoc?`${pct(topLoc[1],A.n)}% leads berasal dari ${esc(topLoc[0])}`:"Lokasi & aktivitas harian",body:`
+    <div class="grid2" style="grid-template-columns:1fr 1.1fr"><div class="card"><h3>Lokasi (kabupaten – kecamatan)</h3><p class="sub">Top lokasi leads</p>${hbars(A.location,{total:A.n,max:5})}</div>
+    <div class="card"><h3>Engagement per hari</h3><p class="sub">Jumlah leads per tanggal engagement</p>${legend(A)}${daily(A)}</div></div>`}));
+
+  S.push(dividerSlide(2,"Bagian 2","Temuan & tindak lanjut"));
+
+  // 10 warm leads
+  const cols=[["id","ID"],["date","Tanggal"],["pic","PIC"],["product","Produk"],["location","Lokasi"],["reason","Alasan"],["potential","Potensi"]].filter(c=>A.map[c[0]]||c[0]==="date"&&A.map.date);
+  const wl=A.warm.slice().sort((a,b)=>(b.potential||0)-(a.potential||0)), shown=wl.slice(0,7);
+  S.push(contentSlide(10,{kicker:"Prioritas follow-up",title:warmN?`${nf.format(warmN)} leads hangat senilai ${rp(A.potWarm)} perlu di-follow-up`:"Belum ada leads hangat pada data ini",body: warmN?`
+    <table class="tbl"><thead><tr>${cols.map(c=>`<th>${c[1]}</th>`).join("")}<th>Status</th></tr></thead><tbody>
+    ${shown.map(r=>`<tr>${cols.map(([k])=>k==="potential"?`<td class="num">${r.potential?rp(r.potential):"–"}</td>`:k==="date"?`<td style="white-space:nowrap">${r.date?fd(r.date):"–"}</td>`:`<td>${esc(k==="product"?(r.product||r.purpose||"–"):(r[k]||"–"))}</td>`).join("")}<td><span class="pill warm">${esc(r.status)}</span></td></tr>`).join("")}
+    </tbody>${A.map.potential?`<tfoot><tr><td colspan="${cols.length-1}">Total potensi ${wl.length>shown.length?`(${wl.length} leads, ${shown.length} ditampilkan)`:""}</td><td class="num">${rp(A.potWarm)}</td><td></td></tr></tfoot>`:""}</table>
+    <p class="lead" style="margin-top:14px;font-size:14px">Nama dan nomor telepon leads tidak ditampilkan di deck. Gunakan ID untuk mencarinya di CRM.</p>`
+    :`<div class="empty">Semua leads pada data ini berstatus tidak tertarik atau kolom status belum ada.</div>`}));
+
+  // 11 Data quality
+  const keyCols=A.fill.slice().sort((a,b)=>a[1]-b[1]);
+  const poor=keyCols.filter(x=>x[1]<.5);
+  S.push(contentSlide(11,{kicker:"Kualitas data",title:poor.length?`${poor.length} dari ${keyCols.length} kolom terisi kurang dari separuh`:"Kelengkapan data sudah baik",body:`
+    <div class="grid2" style="grid-template-columns:1.2fr 1fr"><div class="card"><h3>Kelengkapan per kolom</h3><p class="sub">Persentase baris yang terisi (kolom data pribadi tidak ditampilkan)</p>
+    ${hbars(keyCols.slice(0,9).map(([h,f])=>[h,Math.round(f*100)]),{max:9,fmt:v=>v+"%",color:"#9DAE8F"})}</div>
+    <div class="card"><h3>Catatan input</h3><p class="sub">Hal yang perlu dirapikan di form</p><div style="display:flex;flex-direction:column;gap:12px">${qualityNotes(A).map(t=>`<div class="qflag"><i>!</i><span>${t}</span></div>`).join("")}</div></div></div>`}));
+
+  // 12 insights
+  S.push(contentSlide(12,{kicker:"Insight & rekomendasi",title:"Apa yang perlu dilakukan minggu depan",body:`<div class="ins" style="width:880px">${insights(A).map((t,i)=>`<div class="it"><div class="dot${i%2?" y":""}">${i+1}</div><div><b>${t[0]}</b><p>${t[1]}</p></div></div>`).join("")}</div>`})
+    .replace('<div class="foot">',`<img class="mascot" src="${IMG.point}" alt="">`+'<div class="foot">'));
+
+  // 13 closing
+  S.push(`<div class="slide closing"><img class="bg" src="${IMG.closing}" alt=""><div class="shade"></div><img class="wm" src="${IMG.wm}" alt="SawitPRO.id"><img class="lg" src="${IMG.logo}" alt="">
+    <div class="box"><h2>Terima Kasih</h2><p>#TerusTumbuh</p></div></div>`);
+  return S;
+}
+
+function reasonByStatus(A){
+  if(!A.reasons.length) return `<div class="empty">Kolom alasan belum tersedia</div>`;
+  const groups=A.reasons.slice(0,5), top=Math.max(...groups.map(g=>g[1]));
+  const reasonOf=r=>r.reason && r.reasonOther && /lain|other/i.test(r.reason)? r.reasonOther : r.reason;
+  return `<div class="hbars">${groups.map(([g,tot])=>{
+    const segs=(A.statusKeys.length?A.statusKeys:["_"]).map(s=>[s,A.rows.filter(r=>reasonOf(r)===g&&(s==="_"||r.status===s)).length]).filter(x=>x[1]);
+    return `<div class="hb"><div class="top"><span class="k" title="${esc(g)}">${esc(g)}</span><span class="n">${tot}</span></div>
+    <div class="track" style="width:${tot/top*100}%">${segs.map(([s,c])=>`<div class="seg" style="flex:${c};background:${s==="_"?"#4A653B":sColor(s,A)}" data-tip="<b>${esc(g)}</b><br>${esc(s)}: ${c}"></div>`).join("")}</div></div>`}).join("")}</div>`;
+}
+function daily(A){
+  if(!A.dates.length) return `<div class="empty">Kolom tanggal belum tersedia</div>`;
+  const byDay=new Map(); for(const r of A.rows){ if(!r.date) continue; const k=+r.date; if(!byDay.has(k)) byDay.set(k,[]); byDay.get(k).push(r); }
+  let days=[...byDay.keys()].sort((a,b)=>a-b);
+  let agg=null;
+  if(days.length>10){ // aggregate by week
+    agg=new Map(); for(const k of days){const d=new Date(k); const m=new Date(d); m.setDate(d.getDate()-((d.getDay()+6)%7)); const w=+m; if(!agg.has(w)) agg.set(w,[]); agg.get(w).push(...byDay.get(k));}
+    days=[...agg.keys()].sort((a,b)=>a-b).slice(-10);
+  }
+  const src=agg||byDay, max=Math.max(...days.map(k=>src.get(k).length)), keys=A.statusKeys.length?A.statusKeys:["_"];
+  return `<div class="cols">${days.map(k=>{const rs=src.get(k); return `<div class="col"><div class="val">${rs.length}</div><div class="bar-v" style="height:${rs.length/max*85}%">
+    ${keys.map(s=>[s,rs.filter(r=>s==="_"||r.status===s).length]).filter(x=>x[1]).map(([s,c])=>`<div class="seg" style="flex:${c};background:${s==="_"?"#4A653B":sColor(s,A)}" data-tip="<b>${agg?"Minggu "+fds(new Date(k)):fds(new Date(k))}</b><br>${esc(s==="_"?"Leads":s)}: ${c}"></div>`).join("")}</div></div>`}).join("")}</div>
+    <div class="col-lbls">${days.map(k=>`<span>${agg?"Mg "+new Date(k).getDate()+" "+MON[new Date(k).getMonth()]:fds(new Date(k))}</span>`).join("")}</div>`;
+}
+function qualityNotes(A){
+  const out=[];
+  if(A.typos.length) out.push(`Status ditulis tidak baku: ${A.typos.slice(0,2).map(t=>`“${esc(t[0])}” (${t[2]}×)`).join(", ")}. Gunakan dropdown agar konsisten.`);
+  const empt=A.fill.filter(x=>x[1]===0).map(x=>x[0]);
+  if(empt.length) out.push(`${empt.length} kolom kosong total: ${empt.slice(0,4).map(esc).join(", ")}.`);
+  if(A.map.potential){const miss=A.rows.filter(r=>!r.potential).length; if(miss) out.push(`${miss} dari ${A.n} leads (${pct(miss,A.n)}%) tanpa estimasi potensi sales, sehingga nilai pipeline yang hilang tidak terukur.`);}
+  if(A.map.product){const miss=A.rows.filter(r=>!r.product).length; if(miss) out.push(`${miss} leads tanpa produk yang ditawarkan${A.purpose[0]?`, mayoritas dari ${esc(A.purpose[0][0])}`:""}.`);}
+  if(A.reasons[0] && /belum ada|tidak jelas|lainnya|other/i.test(A.reasons[0][0])) out.push(`Alasan “${esc(A.reasons[0][0])}” terlalu umum untuk ditindaklanjuti. Perlu opsi alasan yang lebih spesifik.`);
+  if(!out.length) out.push("Tidak ada masalah kualitas data yang menonjol.");
+  return out.slice(0,5);
+}
+function insights(A){
+  const I=[]; const tt=A.status.find(s=>s[0]==="Tidak tertarik")?.[1]||0;
+  const tp=A.pic[0], tc=A.channel[0], tr=A.reasons[0], tu=A.purpose[0];
+  if(tp && tp[1]/A.n>=.6){
+    const same=A.rows.filter(r=>r.pic===tp[0]); const ch=countBy(same,r=>r.channel)[0], pu=countBy(same,r=>r.purpose)[0];
+    I.push(["Penolakan terkonsentrasi di satu pola kerja",`${pct(tp[1],A.n)}% leads berasal dari ${esc(tp[0])}${ch?` via ${esc(ch[0])}`:""}${pu?` untuk ${esc(pu[0])}`:""}. Evaluasi skrip dan target list channel ini sebelum volume ditambah.`]);
+  } else if(tc) I.push(["Channel paling banyak dipakai",`${esc(tc[0])} menyumbang ${pct(tc[1],A.n)}% engagement. Bandingkan konversinya dengan channel lain.`]);
+  if(tr) I.push(["Perjelas alasan penolakan",`“${esc(tr[0])}” muncul di ${tr[1]} leads (${pct(tr[1],A.n)}%). Pecah menjadi opsi seperti harga, belum butuh, sudah punya vendor, tidak bisa dihubungi.`]);
+  if(A.warm.length) I.push(["Kejar leads hangat",`${A.warm.length} leads masih mempertimbangkan dengan potensi ${rp(A.potWarm)}. Jadwalkan follow-up 7–14 hari dan isi estimasi tanggal closing.`]);
+  if(A.map.channel){const vis=A.channel.filter(c=>!/chat|whats|wa\b/i.test(c[0])); const warmVis=A.warm.filter(r=>r.channel && !/chat|whats|wa\b/i.test(r.channel)).length;
+    if(vis.length && warmVis && A.warm.length && warmVis/A.warm.length>=.6) I.push(["Kunjungan & telepon lebih efektif",`${warmVis} dari ${A.warm.length} leads hangat datang dari engagement non-chat. Prioritaskan kunjungan atau telepon untuk leads bernilai tinggi.`]);}
+  I.push(["Lengkapi form engagement","Wajibkan potensi sales, produk, dan PIC lapangan diisi agar pipeline yang hilang bisa dihitung per minggu."]);
+  return I.slice(0,5);
+}
+
+/* ================= Render & scaling ================= */
+let SLIDES=[], state={ds:null, book:null};
+const deckEl=document.getElementById("deck");
+function render(){
+  const A=analyse(state.ds);
+  SLIDES=buildSlides(A,state.ds);
+  deckEl.innerHTML=SLIDES.map((s,i)=>`<section class="frame" aria-label="Slide ${i+1}">${s}</section>`).join("");
+  document.getElementById("srcName").textContent=`${state.ds.name}${state.ds.sheet?` · ${state.ds.sheet}`:""} · ${nf.format(A.n)} baris`;
+  const missing=["status","reason","pic"].filter(k=>!A.map[k]);
+  if(missing.length && state.ds!==SAMPLE_DS) note(`Kolom ${missing.map(k=>LABEL[k]).join(", ")} tidak ditemukan. Slide terkait tampil kosong. Pastikan judul kolom memuat kata seperti “Status”, “Alasan”, atau “PIC”.`);
+  fit();
+}
+function fit(){ for(const f of deckEl.querySelectorAll(".frame")){ f.firstElementChild.style.transform=`scale(${f.clientWidth/1280})`; } if(!presentEl.hidden) showP(); }
+new ResizeObserver(fit).observe(deckEl);
+
+function note(msg,err){const n=document.getElementById("notice"); if(!msg){n.hidden=true;return} n.textContent=msg; n.className="notice"+(err?" err":""); n.hidden=false;}
+
+/* ================= File loading ================= */
+const SAMPLE_DS={name:SAMPLE?.name||"Data contoh", sheet:SAMPLE?.sheet, headers:SAMPLE?Object.keys(SAMPLE.rows[0]):[], rows:SAMPLE?.rows||[]};
+function sheetToDs(wb,name,sheet){
+  const ws=wb.Sheets[sheet];
+  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,blankrows:false});
+  // header row = first row with >=2 non-empty cells
+  let hi=aoa.findIndex(r=>r.filter(v=>!blank(v)).length>=2); if(hi<0) hi=0;
+  const headers=(aoa[hi]||[]).map((h,i)=>blank(h)?`Kolom ${i+1}`:String(h).trim());
+  const rows=aoa.slice(hi+1).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??null])));
+  return {name,sheet,headers,rows};
+}
+async function loadFile(file){
+  note("");
+  try{
+    const ext=file.name.split(".").pop().toLowerCase();
+    let ds;
+    if(ext==="json"){
+      const j=JSON.parse(await file.text()); const rows=Array.isArray(j)?j:(j.rows||j.data||Object.values(j).find(Array.isArray));
+      if(!Array.isArray(rows)||!rows.length) throw new Error("File JSON harus berisi array baris.");
+      const headers=[...new Set(rows.flatMap(r=>Object.keys(r)))]; ds={name:file.name,headers,rows}; state.book=null;
+    } else {
+      if(typeof XLSX==="undefined") throw new Error("Pembaca spreadsheet gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.");
+      const wb= ["csv","tsv","txt"].includes(ext)
+        ? XLSX.read(await file.text(),{type:"string",cellDates:true,raw:false, FS: ext==="tsv"?"\t":undefined})
+        : XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true});
+      state.book={wb,name:file.name};
+      const best=wb.SheetNames.map(s=>[s,XLSX.utils.sheet_to_json(wb.Sheets[s],{header:1,blankrows:false}).length]).sort((a,b)=>b[1]-a[1])[0][0];
+      ds=sheetToDs(wb,file.name,best);
+      const sel=document.getElementById("sheetSel");
+      sel.innerHTML=wb.SheetNames.map(s=>`<option ${s===best?"selected":""}>${esc(s)}</option>`).join(""); sel.hidden=wb.SheetNames.length<2;
+    }
+    if(!ds.rows.length) throw new Error("File tidak berisi baris data.");
+    state.ds=ds; document.getElementById("resetBtn").hidden=false; render();
+    try{localStorage.setItem("sp-deck-data",JSON.stringify(ds))}catch(e){}
+  }catch(e){ note(`File “${file.name}” tidak bisa dibaca: ${e.message}`,true); }
+}
+document.getElementById("uploadBtn").onclick=()=>document.getElementById("fileIn").click();
+document.getElementById("fileIn").onchange=e=>{const f=e.target.files[0]; if(f) loadFile(f); e.target.value="";};
+document.getElementById("sheetSel").onchange=e=>{ if(!state.book) return; state.ds=sheetToDs(state.book.wb,state.book.name,e.target.value); note(""); render();
+  try{localStorage.setItem("sp-deck-data",JSON.stringify(state.ds))}catch(err){} };
+document.getElementById("resetBtn").onclick=()=>{ state.ds=SAMPLE_DS; state.book=null; document.getElementById("sheetSel").hidden=true; document.getElementById("resetBtn").hidden=true; note("");
+  try{localStorage.removeItem("sp-deck-data")}catch(e){} render(); };
+let dragN=0; const hint=document.getElementById("dropHint");
+addEventListener("dragenter",e=>{if([...e.dataTransfer.types].includes("Files")){dragN++;hint.hidden=false}});
+addEventListener("dragleave",()=>{dragN=Math.max(0,dragN-1); if(!dragN) hint.hidden=true});
+addEventListener("dragover",e=>e.preventDefault());
+addEventListener("drop",e=>{e.preventDefault(); dragN=0; hint.hidden=true; const f=e.dataTransfer.files[0]; if(f) loadFile(f);});
+
+/* ================= Present mode ================= */
+const presentEl=document.getElementById("present"), stage=document.getElementById("stage"); let cur=0;
+function showP(){ const s=Math.min(innerWidth/1280,(innerHeight-70)/720); stage.style.width=1280*s+"px"; stage.style.height=720*s+"px";
+  stage.innerHTML=SLIDES[cur]; stage.firstElementChild.style.transform=`scale(${s})`; document.getElementById("pCount").textContent=`${cur+1} / ${SLIDES.length}`; }
+function go(d){ cur=Math.max(0,Math.min(SLIDES.length-1,cur+d)); showP(); }
+document.getElementById("presentBtn").onclick=()=>{ const frames=[...deckEl.children]; const y=frames.findIndex(f=>f.getBoundingClientRect().bottom>90); cur=Math.max(0,y);
+  presentEl.hidden=false; showP(); presentEl.requestFullscreen?.().catch(()=>{}); };
+function closeP(){ presentEl.hidden=true; if(document.fullscreenElement) document.exitFullscreen?.().catch(()=>{}); }
+document.getElementById("pPrev").onclick=()=>go(-1); document.getElementById("pNext").onclick=()=>go(1); document.getElementById("pClose").onclick=closeP;
+stage.onclick=e=>go(e.clientX>innerWidth/2?1:-1);
+addEventListener("keydown",e=>{ if(presentEl.hidden) return; if(["ArrowRight","PageDown"," "].includes(e.key)){e.preventDefault();go(1)} else if(["ArrowLeft","PageUp"].includes(e.key)){e.preventDefault();go(-1)} else if(e.key==="Escape") closeP(); });
+addEventListener("resize",()=>{ if(!presentEl.hidden) showP(); });
+document.addEventListener("fullscreenchange",()=>{ if(!document.fullscreenElement && !presentEl.hidden) showP(); });
+
+/* ================= Tooltip ================= */
+const tip=document.getElementById("tip");
+addEventListener("pointermove",e=>{ const t=e.target.closest?.("[data-tip]"); if(!t){tip.hidden=true;return}
+  tip.innerHTML=t.dataset.tip; tip.hidden=false; const w=tip.offsetWidth; tip.style.left=Math.min(innerWidth-w-8,e.clientX+14)+"px"; tip.style.top=(e.clientY+16)+"px"; });
+
+/* ================= Boot ================= */
+let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data")||"null") }catch(e){}
+if(saved && saved.rows?.length){ state.ds=saved; document.getElementById("resetBtn").hidden=false; } else state.ds=SAMPLE_DS;
+render();
+</script>
