@@ -1,36 +1,37 @@
-# Deck Analisa Leads – SawitPRO
+# SawitPRO Lead Rejection Deck
 
-Deck presentasi interaktif (HTML) berbasis template *Deck Template SawitPRO*. Tombol **Unggah data** di toolbar
-membaca file CSV, TSV, XLSX, XLS, ODS atau JSON langsung di browser dan membangun ulang seluruh slide dari data baru.
-File juga bisa di-*drag & drop* ke halaman. Data tidak dikirim ke server mana pun.
+A concise, 7-slide English analysis deck in the SawitPRO template. The deck is an HTML page that rebuilds itself from any
+uploaded CSV, TSV, XLSX, XLS, ODS or JSON file. Parsing happens in the browser; data is not sent anywhere.
 
-- `index.html` – deck siap pakai (buka langsung di browser).
-- **Unduh PPTX** membuat file PowerPoint asli (16:9, grafik & tabel native yang bisa diedit) dari data yang sedang tampil.
-- **Google Slides** memandu impor: unduh PPTX → upload ke Google Drive → *Buka dengan Google Slide*.
-- `src/export-pptx.js` – pembuat PPTX (pptxgenjs), disisipkan ke `index.html` saat build.
-- `src/deck.html` – sumber deck; gambar template ditulis sebagai `{{IMG:nama}}`.
-- `src/sample-data.json` – data contoh (tanpa nama & nomor telepon leads).
-- `assets/` – gambar dari template PPTX (dikompresi).
-- `build.py` – `python3 deck/build.py` menyisipkan gambar + data contoh ke `index.html`.
+| Button | What it does |
+|---|---|
+| Upload data | Reads a new file (or drag and drop) and recomputes every slide |
+| Present | Full-screen slide mode (arrow keys, Esc) |
+| Download PPTX | Builds a native, editable 16:9 PowerPoint (real charts and tables) from the current data |
+| Open in Google Slides | Uploads the PPTX to the viewer's Google Drive through the Google Drive connector, which converts it to Google Slides, then links to it. Falls back to manual import steps when Drive isn't available |
 
-## Format data
-Kolom dikenali dari judulnya (tidak harus persis sama): `Status`, `Alasan`, `PIC`, `Tipe engagement`, `Tanggal`,
-`Lokasi`, `Sumber`, `Tujuan`, `Produk`, `Potential sales (IDR)`, `ID`. Variasi penulisan status seperti
-"Tidak tertark" atau "Mempetimbangkan" dinormalisasi otomatis. Kolom nama/telepon/kontak tidak ditampilkan.
-Untuk file dengan banyak sheet, pilih sheet dari dropdown di toolbar.
+## Slides
+1. Cover
+2. Executive summary: KPIs, key findings, bottom line
+3. What drives the outcome: best-separating dimension (Gini gain) and a rejected vs. in-play cohort profile, with a confounding check
+4. Why leads say no: translated reasons by status, reason-quality score, proposed reason taxonomy
+5. Pipeline at stake: value, average value, closing-date coverage, and the leads still in play
+6. Next steps: owner and timing for each action, plus data gaps
+7. Thank you
 
-## Ringkasan analisa (data 21–25 Sep 2026, 34 leads)
-1. **88% (30) tidak tertarik, 12% (4) masih mempertimbangkan.** Keempat leads hangat bernilai potensi Rp9,99 jt
-   (3× benih Topaz Rp2,8 jt, 1× uji daun Rp1,59 jt), alasan: belum butuh dalam waktu dekat.
-2. **Penolakan terkonsentrasi di satu pola:** semua 30 penolakan dari satu PIC (Naya Huwaidah), via WhatsApp chat,
-   produk KebunPRO, lokasi Kota Pekanbaru – Payung Sekaki, sumber Field Team, pada 21–23 Sep. Ini terlihat seperti
-   blast chat ke satu daftar kontak, bukan penolakan organik.
-3. **Alasan terlalu umum:** "Belum ada ketertarikan yang jelas" (88%) tidak bisa ditindaklanjuti.
-4. **Engagement tatap muka/telepon menghasilkan semua leads hangat** (Khoirul Huda: 3 visit onsite + 1 telepon).
-5. **Kualitas data:** status salah ketik, 4 kolom kosong total (Potential FFB, Alasan lainnya, Estimasi closing,
-   Keterangan), 88% baris tanpa potensi sales & produk. Di file asli juga ada 1 lead tanpa `ID on contact`,
-   1 lead dengan dua nomor, dan 1 lead yang namanya berbeda dengan kontak (PSEN-1737 "tono" vs "Anton S").
+## Files
+- `index.html`: built deck, ready to open
+- `src/deck.html`: page, analysis and HTML slides (images written as `{{IMG:name}}`)
+- `src/export-pptx.js`: PPTX builder (pptxgenjs) and Google Drive upload, inlined at build time
+- `src/sample-data.json`: sample dataset with lead names and phone numbers removed
+- `assets/`: compressed images taken from the template
+- `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
-Rekomendasi: evaluasi skrip & target list WA KebunPRO, pecah alasan penolakan jadi opsi spesifik (harga, belum butuh,
-sudah punya vendor, tidak bisa dihubungi), follow-up 4 leads hangat dalam 7–14 hari, dan jadikan potensi sales,
-produk, serta PIC lapangan sebagai field wajib.
+## Findings on the sample (21–25 Sep 2026, 34 leads)
+- 88% (30) not interested; 4 leads are still in play, worth Rp9.99M.
+- Engagement channel fully separates outcomes: WhatsApp chat 0/30 progressed, on-site visits and phone calls 4/4.
+- The effect is confounded. All 30 rejections share one PIC, product line (KebunPRO), location and lead source, and were
+  logged over 3 days, so this reads as one failed campaign. A controlled re-contact test is needed to isolate the channel.
+- 100% of rejections use the catch-all reason "No clear interest yet". There is no diagnostic signal.
+- All in-play leads cite timing ("no need in the near term"), and none have a closing date.
+- 88% of rows have no potential-sales value or product, so lost value can't be sized.
