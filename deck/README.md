@@ -5,10 +5,17 @@ uploaded CSV, TSV, XLSX, XLS, ODS or JSON file. Parsing happens in the browser; 
 
 | Button | What it does |
 |---|---|
-| Upload data | Reads a new file (or drag and drop) and recomputes every slide |
+| Upload files | Adds one or many files at once (or drag and drop). Each file, and each lead-like sheet in a workbook, becomes a data source; all sources are merged into one analysis. Toggle or remove sources in the bar under the toolbar |
 | Present | Full-screen slide mode (arrow keys, Esc) |
 | Download PPTX | Builds a native, editable 16:9 PowerPoint (real charts and tables) from the current data |
 | Open in Google Slides | Uploads the PPTX to the viewer's Google Drive through the Google Drive connector, which converts it to Google Slides, then links to it. Falls back to manual import steps when Drive isn't available |
+
+## Multiple files
+- Columns are detected per file, so files can use different header names (e.g. `Status Leads` vs `Status`).
+- Rows are merged; a lead ID that appears in more than one file is counted once (the latest source wins).
+- Workbook sheets without lead columns (e.g. a notes sheet) are skipped.
+- With more than one source, an extra **Across data sources** slide compares leads, rejection rate, leads in play, value and period per source, and "Data source" is tested as an outcome driver.
+- With one file the deck is the same 7 slides.
 
 ## Slides
 1. Cover

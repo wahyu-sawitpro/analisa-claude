@@ -22,7 +22,7 @@ function buildPptx(A,N){
   const base={catAxisLabelFontFace:FONT,valAxisLabelFontFace:FONT,dataLabelFontFace:FONT,legendFontFace:FONT,catAxisLabelColor:"535353",catAxisLabelFontSize:10.5,
     dataLabelFontSize:10.5,dataLabelColor:"2B2F28",valGridLine:{style:"none"},catGridLine:{style:"none"},catAxisLineShow:false,valAxisLineShow:false,valAxisHidden:true};
   function content(no,kicker,title){
-    const sl=pres.addSlide(); sl.background={color:"FFFFFF"};
+    const sl=pres.addSlide(); sl.background={color:"FFFFFF"}; no=pres.slides.length;
     sl.addImage({data:imgData(IMG.panel),x:X(38),y:X(38),w:X(1204),h:X(644),sizing:{type:"cover",w:X(1204),h:X(644)}});
     sl.addShape(pres.shapes.RECTANGLE,{x:X(38),y:X(655),w:X(1154),h:X(13),fill:{color:"F5D347"},line:{color:"F5D347",width:0}});
     sl.addImage({data:imgData(IMG.palm),x:X(1188),y:X(606),w:X(84),h:X(88)});
@@ -48,7 +48,7 @@ function buildPptx(A,N){
     sl.addImage({data:imgData(IMG.logo),x:X(388),y:X(379),w:X(222),h:X(222)});
     txt(sl,"Plantation Team",{x:X(652),y:X(380),w:X(590),h:0.5,fontSize:26,bold:true,color:"F5D347"});
     txt(sl,"Why Leads Say No",{x:X(652),y:X(430),w:X(590),h:0.9,fontSize:38,bold:true,color:"FFFFFF"});
-    txt(sl,`Lead rejection analysis · ${N.period} · ${nf.format(A.n)} leads`,{x:X(652),y:X(630),w:X(600),h:0.3,fontSize:12,bold:true,color:"FFFFFF"}); }
+    txt(sl,`Lead rejection analysis · ${N.period} · ${nf.format(A.n)} leads${A.sources.length>1?` · ${A.sources.length} sources`:""}`,{x:X(652),y:X(630),w:X(600),h:0.3,fontSize:12,bold:true,color:"FFFFFF"}); }
 
   // 2 Executive summary
   { const sl=content(2,"Executive summary",N.summaryTitle);
@@ -61,6 +61,23 @@ function buildPptx(A,N){
     txt(sl,[{text:"BOTTOM LINE",options:{fontSize:9.5,bold:true,color:"F5D347",charSpacing:2,breakLine:true,paraSpaceAfter:8}},
       {text:N.bottom.p,options:{fontSize:16,bold:true,color:"FFFFFF",breakLine:true,paraSpaceAfter:10}},{text:N.bottom.s,options:{fontSize:10.5,color:"D8E3CF"}}],
       {x:X(774),y:X(338),w:X(362),h:X(286),fit:"shrink"}); }
+
+  // Across data sources (only when several files/sheets are combined)
+  if(A.sources.length>1){ const sl=content(0,"Across data sources",N.srcTitle), src=A.sources.slice(0,8);
+    box(sl,80,180,470,462); heading(sl,100,196,430,"Leads per source, by status","Each uploaded file or sheet");
+    const g=src.slice().reverse();
+    sl.addChart(pres.charts.BAR,A.statusKeys.map(k=>({name:k,labels:g.map(x=>x.name.length>34?x.name.slice(0,33)+"…":x.name),values:g.map(x=>x.status.find(s=>s[0]===k)[1])})),
+      {...base,x:X(96),y:X(250),w:X(438),h:X(380),barDir:"bar",barGrouping:"stacked",chartColors:A.statusKeys.map(k=>H(A.color(k))),showValue:true,dataLabelPosition:"ctr",
+        dataLabelColor:"FFFFFF",dataLabelFormatCode:"0;;;",showLegend:A.statusKeys.length>1,legendPos:"t",legendFontSize:10,legendColor:"535353",barGapWidthPct:50,catAxisLabelFontSize:9});
+    box(sl,570,180,590,462);
+    const hd=(t,o)=>({text:t,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:9.5,...o}}), r_={align:"right"};
+    const rows=[[hd("Source"),hd("Leads",r_),hd("Not int.",r_),hd("In play",r_),hd("Potential",r_),hd("Period")]];
+    src.forEach(x=>rows.push([{text:x.name},{text:String(x.n),options:r_},{text:pct(x.rej,x.n)+"%",options:r_},{text:String(x.warm),options:r_},{text:x.pot?rp(x.pot):"–",options:r_},{text:span(x.dates)}]));
+    const ft={bold:true,fill:{color:"F4F6F1"}};
+    rows.push([{text:"All sources",options:ft},{text:String(A.n),options:{...ft,...r_}},{text:pct(A.rej.length,A.n)+"%",options:{...ft,...r_}},{text:String(A.warm.length),options:{...ft,...r_}},
+      {text:A.potWarm?rp(A.potWarm):"–",options:{...ft,...r_}},{text:N.period,options:ft}]);
+    sl.addTable(rows,{x:X(586),y:X(196),w:X(558),colW:[X(178),X(54),X(62),X(56),X(78),X(130)],fontFace:FONT,fontSize:9,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.04,autoPage:false});
+    txt(sl,N.srcNote,{x:X(586),y:X(600),w:X(558),h:0.3,fontSize:9,color:"7A8373"}); }
 
   // 3 Outcome driver
   { const D=N.driver, sl=content(3,"What drives the outcome",D?N.driverTitle:"Outcome drivers");
