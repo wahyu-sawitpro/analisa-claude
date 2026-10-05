@@ -155,6 +155,19 @@ function buildPptx(T,DX){
      A.has.crm?{v:String(A.noCrm.length),u:`/${O.length}`,l:`orders with no CRM engagement (${rp(ncG)})`}:{v:String(pct(A.top2,A.gmv)),u:"%",l:"of GMV from the top 2 orders"}].filter(Boolean)
      .forEach((k,i)=>kpi(s2,932,180+i*158,228,146,k)); }
 
+  // Sales: order size and timing
+  if(N.oqNotes){ const sl=content(pre+"Sales last week · order size and timing",N.oqTitle), days=A.daily.filter(d=>d.orders||d.eng), nh=N.oqNotes.length?118:0;
+    box(sl,80,180,410,462-nh-(nh?14:0)); heading(sl,100,196,370,"GMV by day",`Rp million; orders${A.has.crm?" · CRM engagements":""} in brackets`);
+    hbar(sl,days.map(d=>({k:`${DAY[d.d.getDay()]} ${fds(d.d)} (${d.orders} ord.${A.has.crm?` · ${d.eng} CRM`:""})`,v:Math.round(d.gmv/1e5)/10})),96,248,378,384-nh-(nh?14:0),{fmt:'0.0"M"'});
+    box(sl,506,180,410,462-nh-(nh?14:0)); heading(sl,526,196,370,"Orders by size","Number of orders; share of GMV in brackets");
+    hbar(sl,A.bands.map(b=>({k:`${b.k} (${pct(b.gmv,A.gmv)}% GMV)`,v:b.n})),522,248,378,384-nh-(nh?14:0),{colors:["6E8F5A"]});
+    const kh=nh?(462-nh-14-24)/3:146;
+    [A.customers>=6?{v:String(Math.round(A.top3Share*100)),u:"%",l:`of GMV from the top 3 of ${A.customers} customers`,hot:true}:{v:String(pct(A.custAgg[0]?.gmv||0,A.gmv)),u:"%",l:`of GMV from the largest of ${A.customers} customers`,hot:true},
+     A.cycle.n?{v:String(A.cycle.median),u:" days",l:`median from CRM engagement to order (${A.cycle.n} matched wins)`}:{v:rpParts(A.gmv/(A.orders.length||1))[0],u:rpParts(A.gmv/(A.orders.length||1))[1],l:"average order value"},
+     A.discount>0?{v:(A.discount/(A.gmv||1)*100).toFixed(1),u:"%",l:`of GMV given as discount (${rp(A.discount)}, ${A.discOrders.length} orders)`}:{v:String(A.multiOrderCust),u:`/${A.customers}`,l:"customers who ordered more than once"}]
+     .forEach((k,i)=>kpi(sl,932,180+i*(kh+12),228,kh,k));
+    if(nh){ box(sl,80,642-nh,1080,nh,"FBEFC4"); txt(sl,N.oqNotes.map((t,i)=>({text:strip(t),options:{breakLine:i<N.oqNotes.length-1,paraSpaceAfter:4}})),{x:X(98),y:X(642-nh+10),w:X(1044),h:X(nh-20),fontSize:9.5,color:"5A4600",fit:"shrink"}); } }
+
   // Rejection reasons in detail
   if(A.reasonRows.length){ const sl=content(pre+"Rejection reasons last week",N.rrTitle), RL=A.reasonList.slice(0,7), dims=A.reasonDims;
     box(sl,80,180,520,462); heading(sl,100,196,480,"Every reason given",`${A.reasonRows.length} engagements that did not order`);
@@ -185,6 +198,19 @@ function buildPptx(T,DX){
     const cw=Math.floor(504/A.cohorts.length);
     table(sl,["Most common",...A.cohorts.map(([c,rs])=>`${c} (${rs.length})`)],A.profile.map(p=>[{text:LABEL[p.k],options:{bold:true,color:"7A8373"}},...p.vals.map(v=>`${v.v}  ${Math.round(v.share*100)}%`)]),512,196,632,[128,...A.cohorts.map(()=>cw)]);
     box(sl,80,536,1080,104,"FBEFC4"); txt(sl,strip(N.caveat),{x:X(100),y:X(548),w:X(1040),h:X(80),fontSize:10.5,color:"5A4600",valign:"middle",fit:"shrink"}); }
+
+  // Team performance: funnel and PIC scorecard
+  if(N.pf){ const sl=content(pre+"Team performance · funnel and PIC scorecard",N.pfTitle), FU=A.funnel, hasC=A.has.crm, hasS=A.has.sales, nh=N.pfNotes.length?118:0, ch=462-nh-(nh?14:0);
+    box(sl,80,180,380,ch); heading(sl,100,196,340,"CRM funnel","Engagements at each step; step conversion in brackets");
+    if(hasC) hbar(sl,FU.map((f,i)=>({k:i?`${f[0]} (${pct(f[1],FU[i-1][1])}%)`:f[0],v:f[1]})),96,248,348,ch-80,{max:FU[0][1]||1});
+    else txt(sl,"Upload a CRM file to see the funnel",{x:X(100),y:X(180+ch/2),w:X(340),h:0.3,fontSize:11,color:"7A8373",align:"center"});
+    box(sl,476,180,684,ch);
+    const head=["PIC",...(hasC?["CRM eng.","Reached","Won · warm · lost"]:[]),...(hasS?["Orders","GMV"]:[]),...(hasC&&hasS?["Orders in CRM"]:[])];
+    const rows=A.picCard.slice(0,7).map(g=>[g.p,...(hasC?[g.eng||"–",g.eng?`${pct(g.reached,g.eng)}%`:"–",g.eng?`${g.won} · ${g.warm} · ${g.lost}`:"–"]:[]),...(hasS?[g.orders||"–",g.orders?rp(g.gmv):"–"]:[]),
+      ...(hasC&&hasS?[g.orders?(g.inCrm?`${g.inCrm} of ${g.orders}`:{text:`0 of ${g.orders}`,options:{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}}):"–"]:[])].map((c,i)=>i?(typeof c==="object"?{...c,options:{...c.options,align:"right"}}:{text:String(c),options:R}):c));
+    const rest=652-170, cw=head.length>1?rest/(head.length-1):rest;
+    table(sl,head,rows,490,196,656,[170,...head.slice(1).map(()=>cw)]);
+    if(nh){ box(sl,80,642-nh,1080,nh,"FBEFC4"); txt(sl,N.pfNotes.map((t,i)=>({text:strip(t),options:{breakLine:i<N.pfNotes.length-1,paraSpaceAfter:4}})),{x:X(98),y:X(642-nh+10),w:X(1044),h:X(nh-20),fontSize:9.5,color:"5A4600",fit:"shrink"}); } }
 
   // Recoverable demand
   if(A.warm.length){ const sl=content(pre+"Recoverable demand",N.warmTitle), SL=Object.fromEntries(SIGNALS.map(s=>[s[0],s[1]]));

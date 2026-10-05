@@ -40,10 +40,14 @@ With one team it is the single-team deck.
    basket size and common product pairs, price gaps on the same SKU
 5. Sales · who bought and how: GMV and customers by region (regency/city, normalised) and province, order value by
    ordering channel and new vs repeat, sales PIC, unpaid amounts on partially paid orders, open orders, orders missing from the CRM
+   Sales · order size and timing: GMV, orders and CRM engagements per day, orders by size band, customer concentration,
+   days from CRM engagement to order, discounts and shipping, how late CRM entries were written (`Last Modified Date`)
 6. Rejection reasons last week: every reason (English, with the original CRM wording), split by status, a heat table against
    the two dimensions that best predict the reason (e.g. lead type, PIC), and notes on logging quality and location hot spots
 7. What the reasons mean: reasons grouped by the fix they need, plus signals read from the discussion notes
 8. What separates winners: the dimension that best separates orders from the rest, cohort profile, confounding caveat
+   Team performance: CRM funnel (logged → reached → showed interest → ordered) and a PIC scorecard joining each PIC's
+   CRM activity to the orders they closed, flagging sellers whose orders never appear in the CRM
 9. Recoverable demand: leads still in play and what they are asking
 10. Next steps: up to six actions with owner and timing
 11. Thank you
@@ -71,11 +75,18 @@ With one team it is the single-team deck.
 - 15 of 17 "not interested" leads are locked into a shop, KUD or agent (2 buy on credit, 3 already fertilized this season).
 - 10 of 11 leads still in play asked about the warehouse, delivery or prices; 6 could not be reached by phone.
 - 3 leads stalled on stock or a 7–14 day delivery (AC AKP, KCL Mahkota, NPK).
-- 10 of 19 orders (Rp390M) have no CRM engagement, and CRM wins carry no GMV.
+- 10 of 19 orders (Rp390M) have no CRM engagement. 4 sellers (7 orders, Rp356M, 53% of GMV) logged no CRM engagement at all.
+- Funnel: 39 logged, 33 reached, 21 showed interest, 10 ordered. 6 of 29 calls didn't connect.
+- Rudi Nirwana turns 9 of 10 engagements into orders (on-site); Merita Syarif 0 of 10 so far (WhatsApp, 9 still considering).
+- 9 of 19 orders are above Rp20M and make 83% of GMV; the top 3 of 19 customers are 50%.
+- 9 of 10 wins are dated the same day as their order, and wins were last edited a median 4 days after the engagement,
+  so the CRM records sales after the fact rather than tracking leads.
+- Discounts: Rp11.8M (1.8% of GMV) on 6 orders; shipping charged Rp22.6M on 10 orders.
 
 ## Plantation (28 Sep – 2 Oct 2026)
 - Rp53.1M from 4 orders (7% of combined GMV). Seeds are 77% of GMV from a single 40-pack Topaz order.
 - All 3 CRM wins are confirmed in sales (Rp43.2M): one by phone, one by name and PIC, one by value and date.
   All 3 are still marked "Prospek" in the CRM although the notes say closing.
+- Wins ordered a median 2 days after the engagement. One seller (1 order, Rp9.9M) has no CRM engagement.
 - 2 leaf and soil test (Dokter Sawit) customers are the obvious follow-up for fertilizer orders.
 - The plantation sales export has no region or customer-status columns, and the seed line has no product category.

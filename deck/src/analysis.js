@@ -5,6 +5,7 @@ const CRM_FIELDS=[
   ["reasonOther",[/alasan\s*lain|other\s*reason/]],
   ["fieldPic",[/assign\s*field|pic.*lapang|field\s*(team|pic|officer)|tim\s*lapang/]],
   ["closing",[/closing/]],
+  ["modified",[/last\s*modified|modified\s*date|updated\s*at/]],
   ["fertDate",[/tanggal\s*pemupukan/]],
   ["followDate",[/tanggal\s*follow/]],
   ["followPlan",[/rencana\s*follow|recana\s*follow/]],
@@ -162,7 +163,7 @@ const shortItem=s=>String(s||"").replace(/\s*\(\d+\s*butir\)/i,"").replace(/\s+-
 /* ================= Analysis ================= */
 function canonCrm(r,map,src){ const o={_raw:r,_src:src};
   for(const k in map){ const v=r[map[k]];
-    o[k]=k==="potential"||k==="ffb"||k==="needKg"?toNum(v):k==="date"||k==="closing"||k==="fertDate"||k==="followDate"?toDate(v):k==="status"?canonStatus(v)
+    o[k]=k==="potential"||k==="ffb"||k==="needKg"?toNum(v):k==="date"||k==="closing"||k==="modified"||k==="fertDate"||k==="followDate"?toDate(v):k==="status"?canonStatus(v)
       :k==="channel"?trChannel(v):k==="reason"?trReason(v):k==="custType"?(clean(v)||"").replace(/[^\p{L}\p{N} \/-]/gu,"").trim()||null:clean(v); }
   if(o.reason==="Other"&&o.reasonOther) o.reason=trReason(o.reasonOther);
   o.reasonRaw=map.reason?clean(r[map.reason]):null;
@@ -263,6 +264,41 @@ function analyse(sources){
   A.linkedGmv=A.linkedOrders.reduce((s,o)=>s+o.gmv,0);
   A.noCrm=O.filter(o=>!o.crm);
   A.wonCustomers=new Set(A.won.map(r=>r.ph||r.nk||r.id)).size;
+
+  // ---- Funnel: logged -> reached -> showed interest -> ordered
+  const reached=r=>!/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"");
+  A.calls=C.filter(r=>r.callResp||/phone/i.test(r.channel||"")); A.callsMissed=A.calls.filter(r=>!reached(r)).length;
+  A.funnel=[["Engagements logged",C.length],["Reached the lead",C.filter(reached).length],["Showed interest",A.won.length+A.warm.length],["Ordered",A.won.length]];
+
+  // ---- PIC scorecard: CRM activity next to the orders each PIC closed
+  const pk=v=>(clean(v)||"").toLowerCase()||null, pm=new Map();
+  const pg=v=>{ const k=pk(v); if(!k) return null; if(!pm.has(k)) pm.set(k,{p:clean(v),eng:0,reached:0,won:0,warm:0,lost:0,orders:0,gmv:0,inCrm:0,ch:[]}); return pm.get(k); };
+  for(const r of C){ const g=pg(r.pic); if(!g) continue; g.eng++; if(reached(r)) g.reached++; if(r.outcome==="Won") g.won++; else if(r.outcome==="Warm") g.warm++; else if(r.outcome==="Lost") g.lost++; if(r.channel) g.ch.push(r.channel); }
+  for(const o of O){ const g=pg(o.pic); if(!g) continue; g.orders++; g.gmv+=o.gmv; if(o.crm) g.inCrm++; }
+  A.picCard=[...pm.values()].map(g=>({...g,topCh:countBy(g.ch,x=>x)[0]?.[0]||null})).sort((a,b)=>b.gmv-a.gmv||b.eng-a.eng);
+  A.notLogging=A.has.crm?A.picCard.filter(g=>g.orders&&!g.eng):[];
+
+  // ---- Speed: days from CRM engagement to the order, and how late CRM entries were written
+  const dd=(a,b)=>Math.round((a-b)/864e5), med=a=>{ if(!a.length) return null; const s=a.slice().sort((x,y)=>x-y), m=s.length>>1; return s.length%2?s[m]:(s[m-1]+s[m])/2; };
+  const cyc=A.won.filter(r=>r.date&&r.orders.some(o=>o.date)).map(r=>dd(Math.min(...r.orders.filter(o=>o.date).map(o=>+o.date)),r.date));
+  A.cycle={n:cyc.length,median:med(cyc),sameDay:cyc.filter(x=>x===0).length,before:cyc.filter(x=>x<0).length,max:cyc.length?Math.max(...cyc):null};
+  const lag=C.filter(r=>r.date&&r.modified).map(r=>({d:dd(r.modified,r.date),won:r.outcome==="Won"}));
+  A.logLag={n:lag.length,median:med(lag.map(x=>x.d)),late:lag.filter(x=>x.d>=3).length,wonMedian:med(lag.filter(x=>x.won).map(x=>x.d)),restMedian:med(lag.filter(x=>!x.won).map(x=>x.d))};
+
+  // ---- Daily rhythm: CRM engagements, orders and GMV per day
+  const dm=new Map(), dg=d=>{ const k=+d; if(!dm.has(k)) dm.set(k,{d,eng:0,won:0,orders:0,gmv:0}); return dm.get(k); };
+  C.forEach(r=>{ if(r.date){ const g=dg(r.date); g.eng++; if(r.outcome==="Won") g.won++; } });
+  O.forEach(o=>{ if(o.date){ const g=dg(o.date); g.orders++; g.gmv+=o.gmv; } });
+  A.daily=[...dm.values()].sort((a,b)=>a.d-b.d);
+
+  // ---- Order quality: size bands, customer concentration, discounts and shipping
+  const BANDS=[["Under Rp1M",0,1e6],["Rp1–5M",1e6,5e6],["Rp5–20M",5e6,2e7],["Rp20–50M",2e7,5e7],["Rp50M and up",5e7,Infinity]];
+  A.bands=BANDS.map(([k,lo,hi])=>{ const os=O.filter(o=>o.gmv>=lo&&o.gmv<hi); return {k,lo,hi,n:os.length,gmv:os.reduce((s,o)=>s+o.gmv,0)}; }).filter(b=>b.n);
+  const cm=new Map(); O.forEach(o=>{ const k=o.ph||o.nk||o.no; if(!cm.has(k)) cm.set(k,{n:0,gmv:0}); const g=cm.get(k); g.n++; g.gmv+=o.gmv; });
+  A.custAgg=[...cm.values()].sort((a,b)=>b.gmv-a.gmv);
+  A.top3Share=A.custAgg.slice(0,3).reduce((s,c)=>s+c.gmv,0)/(A.gmv||1);
+  A.multiOrderCust=A.custAgg.filter(c=>c.n>1).length;
+  A.discOrders=O.filter(o=>o.lines.some(l=>l.discount>0)); A.shipOrders=O.filter(o=>o.lines.some(l=>l.shipping>0));
 
   // ---- Reasons and notes for leads that did not order
   A.reasons=countBy(A.notWon,r=>r.reason);
