@@ -97,8 +97,22 @@ function buildPptx(A,N){
      A.partial.length?{v:String(A.partial.length),u:"",l:`Partially paid orders worth ${rp(parG)}`}:{v:String(pct(A.top2,A.gmv)),u:"%",l:"of GMV from the top 2 orders"}]
      .forEach((k,i)=>kpi(sl,882,180+i*158,278,146,k)); }
 
+  // Rejection reasons in detail
+  if(A.reasonRows.length){ const sl=content("Rejection reasons last week",N.rrTitle), RL=A.reasonList.slice(0,7), dims=A.reasonDims;
+    box(sl,80,180,520,462); heading(sl,100,196,480,"Every reason given",`${A.reasonRows.length} engagements that did not order`);
+    hbar(sl,RL.map(r=>({k:r.k,s:[r.lost,r.warm,r.other]})),96,248,488,380,{stacked:true,names:["Not interested","Considering / prospect","No status"],colors:["8E9C84","D9A21B","C9CFC3"],legend:true});
+    const cols=dims.flatMap(k=>countBy(A.reasonRows.filter(r=>r[k]),r=>r[k]).slice(0,3).map(([g])=>({k,g})));
+    if(cols.length){ const v=(r,c)=>A.reasonRows.filter(x=>x.reason===r.k&&x[c.k]===c.g).length, mx=Math.max(1,...RL.flatMap(r=>cols.map(c=>v(r,c))));
+      const shade=n=>{ if(!n) return "FFFFFF"; const t=.15+.85*n/mx, mix=(a,b)=>Math.round(a+(b-a)*t).toString(16).padStart(2,"0"); return (mix(255,74)+mix(255,101)+mix(255,59)).toUpperCase(); };
+      const hd=t=>({text:t,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:8.5,align:"center"}});
+      const rows=[[{text:"Reason",options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:8.5}},...cols.map(c=>hd(`${LABEL[c.k]}: ${c.g}`))],
+        ...RL.map(r=>[{text:r.k,options:{fontSize:8.5}},...cols.map(c=>{const n=v(r,c);return {text:n?String(n):"",options:{align:"center",bold:true,fill:{color:shade(n)},color:n/mx>.5?"FFFFFF":"2B2F28"}};})])];
+      box(sl,620,180,540,300);
+      sl.addTable(rows,{x:X(632),y:X(192),w:X(516),colW:[X(156),...cols.map(()=>X(360/cols.length))],fontFace:FONT,fontSize:8.5,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.04,autoPage:false}); }
+    if(N.rrNotes.length){ box(sl,620,494,540,148,"FBEFC4"); txt(sl,N.rrNotes.map((t,i)=>({text:strip(t),options:{breakLine:i<N.rrNotes.length-1,paraSpaceAfter:5}})),{x:X(638),y:X(506),w:X(504),h:X(124),fontSize:9.5,color:"5A4600",fit:"shrink"}); } }
+
   // Why leads say no
-  if(A.notWon.length){ const sl=content("Why leads say no",N.reasonTitle);
+  if(A.notWon.length){ const sl=content("What the reasons mean",N.reasonTitle);
     box(sl,80,180,520,462); heading(sl,100,196,480,"Reasons, grouped by what would fix them",`${A.notWon.length} engagements that did not order`);
     hbar(sl,A.themes.slice().sort((a,b)=>b.n-a.n).map(t=>({k:t.t,s:[t.lost,t.warm]})),96,248,488,380,{stacked:true,names:["Not interested","Considering / prospect"],colors:["8E9C84","D9A21B"],legend:true});
     box(sl,620,180,540,462); heading(sl,640,196,500,"What the discussion notes say","Signals read from the CRM notes, by lead status");

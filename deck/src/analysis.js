@@ -158,6 +158,7 @@ function canonCrm(r,map,src){ const o={_raw:r,_src:src};
     o[k]=k==="potential"||k==="ffb"||k==="needKg"?toNum(v):k==="date"||k==="closing"||k==="fertDate"||k==="followDate"?toDate(v):k==="status"?canonStatus(v)
       :k==="channel"?trChannel(v):k==="reason"?trReason(v):k==="custType"?(clean(v)||"").replace(/[^\p{L}\p{N} \/-]/gu,"").trim()||null:clean(v); }
   if(o.reason==="Other"&&o.reasonOther) o.reason=trReason(o.reasonOther);
+  o.reasonRaw=map.reason?clean(r[map.reason]):null;
   o.ph=phoneKey(o.phone); o.nk=nameKey(o.name);
   o.ref=(String(o.detail||"").match(/#?B2C\d{4,}/i)||[])[0]?.replace(/^#?/,"#").toUpperCase()||null;
   const txt=norm(o.detail); o.signals=SIGNALS.filter(([,,re])=>re.test(txt)).map(s=>s[0]);
@@ -223,6 +224,22 @@ function analyse(sources){
   A.stockRows=A.notWon.filter(r=>r.theme==="Stock & delivery"||r.signals.includes("stock"));
   A.intentWarm=A.warm.filter(r=>r.signals.some(s=>s==="logistics"||s==="price"));
 
+  // ---- Rejection reasons in detail: which dimension predicts the reason given
+  const RR=A.notWon.filter(r=>r.reason); A.reasonRows=RR;
+  A.reasonList=countBy(RR,r=>r.reason).map(([k,n])=>({k,n,raw:countBy(RR.filter(r=>r.reason===k),r=>r.reasonRaw)[0]?.[0]||k,
+    lost:RR.filter(r=>r.reason===k&&r.outcome==="Lost").length,warm:RR.filter(r=>r.reason===k&&r.outcome==="Warm").length,other:RR.filter(r=>r.reason===k&&!r.outcome).length}));
+  const RD=["leadType","channel","source","custType","location","pic"].filter(k=>RR.filter(r=>r[k]).length>=RR.length*.6);
+  A.reasonSplit=RD.map(k=>{ const rs=RR.filter(r=>r[k]), groups=countBy(rs,r=>r[k]).filter(([,n])=>n>=3).map(([g,n])=>{
+      const sub=rs.filter(r=>r[k]===g), t=countBy(sub,r=>r.theme)[0]; return {g,n,theme:t[0],tn:t[1]}; });
+    const cov=groups.reduce((s,x)=>s+x.n,0);
+    const purity=cov?groups.reduce((s,x)=>s+x.tn,0)/cov:0, distinct=new Set(groups.map(x=>x.theme)).size;
+    return {k,groups,purity:groups.length>=2&&distinct>=2?purity*(cov/RR.length):0}; }).filter(x=>x.purity>0)
+    .sort((a,b)=>Math.abs(b.purity-a.purity)>.05?b.purity-a.purity:RD.indexOf(a.k)-RD.indexOf(b.k));
+  A.reasonDims=A.reasonSplit.slice(0,2).map(x=>x.k);
+  A.askUnreach=RR.filter(r=>r.theme==="Just asking"&&/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"")).length;
+  A.askTotal=RR.filter(r=>r.theme==="Just asking").length;
+  A.locHot=countBy(RR,r=>r.location).filter(([,n])=>n>=4).map(([g,n])=>{const t=countBy(RR.filter(r=>r.location===g),r=>r.theme)[0];return {g,n,theme:t[0],tn:t[1]}}).filter(x=>x.tn/x.n>=.75)[0]||null;
+
   // ---- Which dimension separates winners (or warm leads) from the rest
   const DIMS=["source","channel","leadType","pic","custType","location"].filter(k=>C.some(r=>r[k]));
   const pos=A.won.length?r=>r.outcome==="Won":r=>r.outcome==="Warm";
@@ -234,6 +251,8 @@ function analyse(sources){
     const gain=base-groups.reduce((s,x)=>s+x.n/scored.length*gini(x.w,x.n),0); return {k,groups,gain}; })
     .sort((a,b)=>b.gain-a.gain);
   // Near-ties (within 10% of the top gain) go to the most actionable lever: how and where leads are sourced, not who called them.
+  // A dimension only counts when at least two of its groups have 3+ engagements (no "1 of 1" findings).
+  A.dims=A.dims.filter(d=>{ const g=d.groups.filter(x=>x.n>=3&&x.g!=="(not filled)"); return g.length>=2&&Math.max(...g.map(x=>x.rate))-Math.min(...g.map(x=>x.rate))>=.2; });
   const PREF=["source","channel","leadType","custType","location","pic"], top=A.dims[0]?.gain||0;
   A.best=P&&P<scored.length&&top>0?A.dims.filter(d=>d.gain>=top*.9).sort((a,b)=>PREF.indexOf(a.k)-PREF.indexOf(b.k))[0]:null;
   const dom=(rs,k)=>{const c=countBy(rs,r=>r[k]??"(not filled)");return c.length?{v:c[0][0],share:c[0][1]/rs.length}:{v:"–",share:0}};

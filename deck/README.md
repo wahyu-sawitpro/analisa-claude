@@ -28,11 +28,13 @@ Parsing and analysis happen in the browser; data is not sent anywhere.
 2. Executive summary: KPIs, findings, bottom line
 3. Success story: how CRM wins happened (channel, source) and the sales orders they became
 4. Sales last week: GMV by product and PIC, repeat vs new, orders missing from the CRM, partial payments
-5. Why leads say no: reasons grouped by the fix they need, plus signals read from the discussion notes
-6. What separates winners: the dimension that best separates orders from the rest, cohort profile, confounding caveat
-7. Recoverable demand: leads still in play and what they are asking
-8. Next steps: up to four actions with owner and timing
-9. Thank you
+5. Rejection reasons last week: every reason (English, with the original CRM wording), split by status, a heat table against
+   the two dimensions that best predict the reason (e.g. lead type, PIC), and notes on logging quality and location hot spots
+6. What the reasons mean: reasons grouped by the fix they need, plus signals read from the discussion notes
+7. What separates winners: the dimension that best separates orders from the rest, cohort profile, confounding caveat
+8. Recoverable demand: leads still in play and what they are asking
+9. Next steps: up to four actions with owner and timing
+10. Thank you
 
 ## Files
 - `index.html`: built deck, ready to open
@@ -46,6 +48,8 @@ Parsing and analysis happen in the browser; data is not sent anywhere.
 - Rp669M GMV from 19 orders (19 customers, 4 new); the top 2 orders are 39% of GMV.
 - All 10 CRM wins are confirmed in sales (9 orders, Rp279M). 9 of 10 came from one PIC's on-site canvassing.
 - Lead source separates outcomes: canvassing 8 of 9 ordered, database 0 of 23.
+- Lead type predicts the rejection reason: existing leads 15 of 17 locked into a shop, KUD or agent; new leads 7 of 12 "just asking".
+- 5 of 8 "just asking" reasons were logged when the call didn't connect. Pelalawan - Kerumutan: 11 of 12 engagements locked in.
 - 15 of 17 "not interested" leads are locked into a shop, KUD or agent (2 buy on credit, 3 already fertilized this season).
 - 10 of 11 leads still in play asked about the warehouse, delivery or prices; 6 could not be reached by phone.
 - 3 leads stalled on stock or a 7–14 day delivery (AC AKP, KCL Mahkota, NPK).

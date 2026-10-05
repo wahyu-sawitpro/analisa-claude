@@ -24,7 +24,7 @@ function narrative(A){
 
   // Driver: which dimension separates the positive cohort (ordered, else still in play)
   const B=A.best;
-  if(B){ const g=B.groups.filter(x=>x.g!=="(not filled)"), hi=g.slice().sort((a,b)=>b.rate-a.rate||b.n-a.n)[0], lo=g.slice().sort((a,b)=>a.rate-b.rate||b.n-a.n)[0];
+  if(B){ const g=B.groups.filter(x=>x.g!=="(not filled)"&&x.n>=3), hi=g.slice().sort((a,b)=>b.rate-a.rate||b.n-a.n)[0], lo=g.slice().sort((a,b)=>a.rate-b.rate||b.n-a.n)[0];
     N.driver={k:B.k,dim:LABEL[B.k],hi,lo};
     N.driverTitle=`${hi.g}: ${hi.w} of ${hi.n} ${A.posLabel}. ${lo.g}: ${lo.w} of ${lo.n}.`;
     const tog=A.together.filter(k=>k!==B.k).map(k=>LABEL[k]);
@@ -38,6 +38,19 @@ function narrative(A){
   const sig=k=>A.signals.find(x=>x.k===k)||{lost:0,warm:0,n:0};
   N.reasonTitle=tTop&&lost&&tTop.lost/lost>=.4?`${pct(tTop.lost,lost)}% of “not interested” leads are ${tTop.t==="Locked in elsewhere"?"locked into a supplier, KUD or agent":tTop.t.toLowerCase()}`
     :A.themes[0]?`${A.themes[0].t} is the most common reason (${A.themes[0].n} of ${nw})`:"Why leads say no";
+
+  // Rejection reasons in detail
+  const sp=A.reasonSplit[0], TL={"Locked in elsewhere":"locked into a shop, KUD or agent","Just asking":"just asking","Stock & delivery":"stalled on stock or delivery","Price":"put off by price","Not a fit":"not a fit","Timing":"not buying yet"};
+  if(A.reasonRows.length){
+    const r0=A.reasonList[0];
+    N.rrTitle=sp?sp.groups.slice(0,2).map(g=>`${g.g}: ${g.tn} of ${g.n} ${TL[g.theme]||lc(g.theme)}`).join(". ")+"."
+      :`“${r0.k}” is the most common reason (${r0.n} of ${A.reasonRows.length})`;
+    N.rrNotes=[
+      sp&&`<b>${esc(LABEL[sp.k])} predicts the reason.</b> ${esc(sp.groups.map(g=>`${g.g} (${g.n}): mostly ${TL[g.theme]||lc(g.theme)}`).join("; "))}. The answer depends on which list is being worked, so fix the list, not the pitch.`,
+      A.askTotal>=3&&A.askUnreach&&`<b>“Just asking” is partly a logging habit.</b> ${A.askUnreach} of ${A.askTotal} were recorded when the call didn't connect, so no reason was actually heard.`,
+      A.locHot&&`<b>${esc(A.locHot.g)}</b>: ${A.locHot.tn} of ${A.locHot.n} engagements there are ${esc(TL[A.locHot.theme]||lc(A.locHot.theme))}.`
+    ].filter(Boolean);
+  }
 
   // Success
   const wonDom=k=>{const c=countBy(A.won,r=>r[k]);return c[0]?{v:c[0][0],n:c[0][1]}:null};
@@ -122,6 +135,19 @@ function buildSlides(A,N){
       <div class="card"><div class="findings">${N.findings.map(f=>`<div class="find"><span class="mk"></span><div><b>${esc(f[0])}</b><p>${esc(f[1])}</p></div></div>`).join("")}</div></div>
       <div class="bottom"><span class="lb">Bottom line</span><p>${esc(N.bottom.p)}</p><small>${esc(N.bottom.s)}</small></div></div>`));
 
+  // Rejection reasons in detail
+  const sp=A.reasonSplit[0], TL={"Locked in elsewhere":"locked into a shop, KUD or agent","Just asking":"just asking","Stock & delivery":"stalled on stock or delivery","Price":"put off by price","Not a fit":"not a fit","Timing":"not buying yet"};
+  if(A.reasonRows.length){
+    const r0=A.reasonList[0];
+    N.rrTitle=sp?sp.groups.slice(0,2).map(g=>`${g.g}: ${g.tn} of ${g.n} ${TL[g.theme]||lc(g.theme)}`).join(". ")+"."
+      :`“${r0.k}” is the most common reason (${r0.n} of ${A.reasonRows.length})`;
+    N.rrNotes=[
+      sp&&`<b>${esc(LABEL[sp.k])} predicts the reason.</b> ${esc(sp.groups.map(g=>`${g.g} (${g.n}): mostly ${TL[g.theme]||lc(g.theme)}`).join("; "))}. The answer depends on which list is being worked, so fix the list, not the pitch.`,
+      A.askTotal>=3&&A.askUnreach&&`<b>“Just asking” is partly a logging habit.</b> ${A.askUnreach} of ${A.askTotal} were recorded when the call didn't connect, so no reason was actually heard.`,
+      A.locHot&&`<b>${esc(A.locHot.g)}</b>: ${A.locHot.tn} of ${A.locHot.n} engagements there are ${esc(TL[A.locHot.theme]||lc(A.locHot.theme))}.`
+    ].filter(Boolean);
+  }
+
   // Success story
   if(A.won.length){
     const mini=k=>{const c=countBy(A.won,r=>r[k]);return c.length?`<div class="mini"><h4>${esc(LABEL[k])}</h4>${hbars(c.slice(0,3).map(([g,v])=>({k:g,v})),{scale:A.won.length,right:i=>pct(i.v,A.won.length)+"%"})}</div>`:""};
@@ -152,11 +178,29 @@ function buildSlides(A,N){
         </div></div>`));
   }
 
+  // Rejection reasons in detail
+  if(A.reasonRows.length){
+    const RL=A.reasonList.slice(0,7), dims=A.reasonDims, more=A.reasonList.length-RL.length;
+    const cols=dims.flatMap(k=>countBy(A.reasonRows.filter(r=>r[k]),r=>r[k]).slice(0,3).map(([g])=>({k,g})));
+    const mx=Math.max(1,...RL.flatMap(r=>cols.map(c=>A.reasonRows.filter(x=>x.reason===r.k&&x[c.k]===c.g).length)));
+    const cell=v=>`<td class="heat" style="background:rgba(74,101,59,${v?(.12+.78*v/mx).toFixed(2):0});color:${v/mx>.5?"#fff":"var(--ink)"}">${v||""}</td>`;
+    S.push(contentSlide(next(),"Rejection reasons last week",N.rrTitle,`
+      <div style="display:grid;grid-template-columns:1fr 1.05fr;gap:18px;align-items:start">
+        <div class="card" style="padding:16px 20px"><h3>Every reason given</h3><p class="sub" style="margin-bottom:8px">${A.reasonRows.length} engagements that did not order; original CRM wording in grey${more>0?`; ${more} rarer reasons not shown`:""}</p>${legendOf([["Not interested","#8E9C84"],["Considering / prospect","#D9A21B"]])}
+          <div class="hbars rr">${RL.map(r=>`<div class="hb"><div class="top"><span class="k">${esc(r.k)}<small>${esc(r.raw)}</small></span><span class="n">${r.n}<em>${pct(r.n,A.reasonRows.length)}%</em></span></div>
+            <div class="track">${[[r.lost,"#8E9C84","not interested"],[r.warm,"#D9A21B","considering / prospect"],[r.other,"#C9CFC3","no status"]].filter(x=>x[0]).map(x=>`<div class="seg" style="flex:0 0 ${x[0]/RL[0].n*100}%;background:${x[1]}" data-tip="${esc(`${r.k} · ${x[2]}: ${x[0]}`)}"></div>`).join("")}</div></div>`).join("")}</div></div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          ${cols.length?`<div class="card" style="padding:14px 16px"><table class="tbl heatt"><thead><tr><th>Reason</th>${dims.map(k=>`<th colspan="${cols.filter(c=>c.k===k).length}" class="grp">${esc(LABEL[k])}</th>`).join("")}</tr>
+            <tr class="sub2"><th></th>${cols.map(c=>`<th>${esc(c.g)}</th>`).join("")}</tr></thead>
+            <tbody>${RL.map(r=>`<tr><td>${esc(r.k)}</td>${cols.map(c=>cell(A.reasonRows.filter(x=>x.reason===r.k&&x[c.k]===c.g).length)).join("")}</tr>`).join("")}</tbody></table></div>`:""}
+          ${N.rrNotes.length?`<div class="caveat tight">${N.rrNotes.join("<br>")}</div>`:""}</div></div>`));
+  }
+
   // Why leads say no
   if(A.notWon.length){
     const tb=A.themes.slice().sort((a,b)=>b.n-a.n).map(t=>({k:t.t,v:t.n,segs:[[t.lost,"#8E9C84",`${t.t} · not interested: ${t.lost}`],[t.warm,"#D9A21B",`${t.t} · considering / prospect: ${t.warm}`]],
       tip:A.reasons.filter(([r])=>themeOf(r)===t.t).map(([r,c])=>`${r} (${c})`).join(", ")}));
-    S.push(contentSlide(next(),"Why leads say no",N.reasonTitle,`
+    S.push(contentSlide(next(),"What the reasons mean",N.reasonTitle,`
       <div style="display:grid;grid-template-columns:1fr 1.1fr;gap:18px">
         <div class="card"><h3>Reasons, grouped by what would fix them</h3><p class="sub">${A.notWon.length} engagements that did not order; hover a bar for the original reasons</p>${legendOf([["Not interested","#8E9C84"],["Considering / prospect","#D9A21B"]])}${hbars(tb,{right:i=>pct(i.v,A.notWon.length)+"%"})}</div>
         <div class="card"><h3>What the discussion notes say</h3><p class="sub">Signals read from “Detail pembahasan”, by lead status</p>${A.signals.length?legendOf([["Not interested","#8E9C84"],["Considering / prospect","#D9A21B"]])+hbars(A.signals.slice(0,6).map(x=>({k:x.label,v:x.n,segs:[[x.lost,"#8E9C84",`not interested: ${x.lost}`],[x.warm,"#D9A21B",`considering / prospect: ${x.warm}`]]})),{}):`<div class="empty">No discussion notes in this data</div>`}</div></div>`));
