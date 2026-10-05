@@ -37,10 +37,12 @@ const SALES_FIELDS=[
   ["phone",[/customer_?phone|phone|no\.?\s*hp/]],
   ["name",[/customer_?name|nama\s*customer/]],
   ["qty",[/^qty$|quantity|jumlah/]],
-  ["gmv",[/^gmv$/,/sales_?amount/,/nett_?sales/,/revenue/,/total/]],
+  ["gmv",[/^gmv$/,/gmv/,/sales_?amount/,/nett_?sales/,/revenue/,/^total$/]],
   ["salesAmount",[/sales_?amount/]],
   ["nett",[/nett_?sales|net\s*sales/]],
-  ["revenue",[/^revenue$|paid\s*amount|amount\s*paid/]],
+  ["revenue",[/^revenue$|paid\s*amount|amount\s*paid|total_?paid|paid_?with/]],
+  ["unitPrice",[/price_?per|unit_?price|harga_?satuan/]],
+  ["role",[/user_?role|customer_?role|buyer_?type/]],
   ["discount",[/discount|diskon/]],
   ["shipping",[/shipping|ongkir/]],
   ["item",[/item_?name|^item$|product_?name|^produk$/]],
@@ -131,7 +133,7 @@ function toDate(v){ if(blank(v)) return null; let d=null;
 const phoneKey=v=>{ if(blank(v)) return null; const s=String(v); if(/^P[0-9a-f]{8}$/.test(s)) return s;
   let d=s.split(/\s+-\s+/)[0].replace(/\D/g,""); if(d.startsWith("62")) d=d.slice(2); if(d.startsWith("0")) d=d.slice(1); return d.length>=8?d:null; };
 const nameKey=v=>{ const s=clean(v); if(!s) return null; if(/^customer [0-9a-f]{5}$/i.test(s)) return s.toLowerCase();
-  const t=s.toLowerCase().replace(/[^a-z ]/g,"").split(" ").filter(Boolean)[0]; return t&&t.length>=3?t:null; };
+  const t=s.toLowerCase().replace(/^(bu|ibu|pak|bapak|bpk)\.?\s+/,"").replace(/[^a-z ]/g,"").split(" ").filter(Boolean)[0]; const k=t?t.replace(/[aeiouhy]/g,""):""; return k.length>=3?k:(t&&t.length>=3?t:null); };
 const firstTok=v=>(clean(v)||"").toLowerCase().split(" ")[0]||null;
 const PERSON_RE=/^(phone|name)$/;
 
@@ -167,6 +169,7 @@ function canonCrm(r,map,src){ const o={_raw:r,_src:src};
   o.ph=phoneKey(o.phone); o.nk=nameKey(o.name);
   o.ref=(String(o.detail||"").match(/#?B2C\d{4,}/i)||[])[0]?.replace(/^#?/,"#").toUpperCase()||null;
   const txt=norm(o.detail); o.signals=SIGNALS.filter(([,,re])=>re.test(txt)).map(s=>s[0]);
+  if(o.status!==WON&&/(^|[^a-z])(closing|sudah order|already order|deal)\b/i.test(o.detail||"")&&!/(belum|tidak|gagal|batal|not)\s+(closing|order|deal)/i.test(o.detail||"")){ o.statusLogged=o.status; o.status=WON; }
   o.outcome=o.status===WON?"Won":WARM.has(o.status)?"Warm":o.status==="Not interested"?"Lost":null;
   o.theme=themeOf(o.reason);
   return o; }
@@ -174,10 +177,10 @@ function canonSale(r,map,src){ const o={_raw:r,_src:src};
   for(const k in map){ const v=r[map[k]]; o[k]=["qty","gmv","salesAmount","nett","revenue","discount","shipping"].includes(k)?toNum(v):k==="date"?toDate(v):clean(v); }
   o.ph=phoneKey(o.phone); o.nk=nameKey(o.name);
   o.family=familyOf(o.item); o.region=regionOf(o.city)||regionOf(o.province);
-  o.unit=o.qty?(o.salesAmount??o.gmv??0)/o.qty:null;
+  o.unit=o.unitPrice??(o.qty?(o.salesAmount??o.gmv??0)/o.qty:null);
   return o; }
 // Product family from the item name (fertilizer type), so "RP Mahkota" and "RP Sasco" count together.
-const FAMILIES=[["Seeds",/benih|seed|topaz|bibit/],["Rock phosphate (RP)",/\brp\b|rock\s*phos|fosfat/],["NPK",/\bnpk\b/],["KCL / MOP",/kcl|\bmop\b/],["Urea",/urea/],
+const FAMILIES=[["Leaf & soil tests",/uji\s*(daun|hara|tanah)|dokter\s*sawit|\blsu\b|\bssu\b|soil\s*test|leaf\s*test/],["Seeds",/benih|seed|topaz|bibit/],["Kieserite (Mg)",/kieserit|kiserit/],["Rock phosphate (RP)",/\brp\b|rock\s*phos|fosfat/],["NPK",/\bnpk\b/],["KCL / MOP",/kcl|\bmop\b/],["Urea",/urea/],
   ["ZA",/\bza\b/],["Borate",/borat|boron/],["Dolomite",/dolomit/],["TSP / SP-36",/\btsp\b|sp-?36/],["Herbicide & pesticide",/gramoxone|metsulindo|herbisida|herbicide|racun|insektisida|pestisida|round\s*up/]];
 const familyOf=v=>{ const s=norm(v); if(!s) return null; const f=FAMILIES.find(([,re])=>re.test(s)); return f?f[0]:clean(v).split(" ")[0]; };
 const regionOf=v=>{ const s=clean(v); if(!s) return null; const t=s.toUpperCase().replace(/^(KABUPATEN|KAB\.?|KOTA)\s+/,"").replace(/\s+CITY$/,"").trim();
@@ -206,17 +209,17 @@ function analyse(sources){
   A.orders=[...om.values()].map(o=>{ const L=o.lines, f=L[0];
     return {...o,pic:f.pic,ph:f.ph,nk:f.nk,date:f.date,city:f.city,app:f.app,gmv:L.reduce((s,l)=>s+(l.gmv||0),0),qty:L.reduce((s,l)=>s+(l.qty||0),0),
       items:[...new Set(L.map(l=>shortItem(l.item)).filter(Boolean))],cats:[...new Set(L.map(l=>l.category).filter(Boolean))],
-      isNew:L.some(l=>/new/i.test(l.custStatus||"")),partial:L.some(l=>/partial|unpaid|pending/i.test(l.payStatus||"")),team:f.team}; })
+      isNew:L.some(l=>/new/i.test(l.custStatus||"")),hasStatus:L.some(l=>l.custStatus),partial:L.some(l=>/partial|unpaid|pending/i.test(l.payStatus||"")),team:f.team}; })
     .sort((a,b)=>b.gmv-a.gmv);
   const O=A.orders; A.gmv=O.reduce((s,o)=>s+o.gmv,0);
   A.customers=new Set(O.map(o=>o.ph||o.nk||o.no)).size;
-  A.newOrders=O.filter(o=>o.isNew); A.partial=O.filter(o=>o.partial);
+  A.hasCustStatus=O.some(o=>o.hasStatus); A.newOrders=O.filter(o=>o.isNew); A.partial=O.filter(o=>o.partial);
   A.byItem=sumBy(lines,l=>shortItem(l.item)||null,l=>l.gmv||0);
   // What sold: product family, product category, basket and price consistency
   const grp=(key)=>{ const m=new Map(); for(const l of lines){ const k=key(l); if(!k) continue; if(!m.has(k)) m.set(k,{k,gmv:0,qty:0,orders:new Set(),cust:new Set()});
       const g=m.get(k); g.gmv+=l.gmv||0; g.qty+=l.qty||0; g.orders.add(l.orderNo||l.invoice||l); g.cust.add(l.ph||l.nk); }
     return [...m.values()].map(g=>({...g,orders:g.orders.size,cust:g.cust.size})).sort((a,b)=>b.gmv-a.gmv); };
-  A.byFamily=grp(l=>l.family); A.byCat=grp(l=>l.category); A.byRegion=grp(l=>l.region); A.byProvince=grp(l=>regionOf(l.province));
+  A.byFamily=grp(l=>l.family); A.byCat=A.lines.some(l=>l.category)?grp(l=>l.category||"(no category)"):[]; A.byRegion=grp(l=>l.region); A.byProvince=grp(l=>regionOf(l.province));
   A.qtyTotal=lines.reduce((s,l)=>s+(l.qty||0),0);
   A.itemsPerOrder=O.length?O.reduce((s,o)=>s+o.lines.length,0)/O.length:0;
   const pairs=new Map(); for(const o of O){ const f=[...new Set(o.lines.map(l=>l.family).filter(Boolean))].sort(); for(let i=0;i<f.length;i++) for(let j=i+1;j<f.length;j++){ const k=f[i]+" + "+f[j]; pairs.set(k,(pairs.get(k)||0)+1); } }
@@ -227,7 +230,9 @@ function analyse(sources){
   // How they bought: ordering channel, new vs repeat, sales PIC
   const seg=(f)=>{ const m=new Map(); for(const o of O){ const k=f(o); if(!k) continue; if(!m.has(k)) m.set(k,{k,n:0,gmv:0}); const g=m.get(k); g.n++; g.gmv+=o.gmv; }
     return [...m.values()].map(g=>({...g,aov:g.gmv/g.n})).sort((a,b)=>b.gmv-a.gmv); };
-  A.byApp=seg(o=>o.app); A.byCust=seg(o=>o.isNew?"New customer":"Repeat customer");
+  A.byApp=seg(o=>o.app); A.byCust=A.hasCustStatus?seg(o=>o.isNew?"New customer":"Repeat customer"):[];
+  // units are only comparable when one product type dominates the volume
+  A.unitsAnchor=A.byFamily[0]&&A.byFamily[0].qty/(A.qtyTotal||1)>=.5;
   // Money and fulfilment at risk
   const outLine=l=>/partial|unpaid|pending/i.test(l.payStatus||"")&&l.revenue!=null?Math.max(0,(l.nett??l.gmv??0)-l.revenue):0;
   A.outstanding=lines.reduce((s,l)=>s+outLine(l),0);
@@ -238,14 +243,21 @@ function analyse(sources){
   A.byCity=sumBy(O,o=>o.city,o=>o.gmv);
   A.top2=O.slice(0,2).reduce((s,o)=>s+o.gmv,0);
   A.team=countBy(lines,l=>l.team)[0]?.[0]||null;
+  A.byRole=(()=>{ const m=new Map(); for(const o of O){ const k=o.lines[0].role; if(!k) continue; if(!m.has(k)) m.set(k,{k,n:0,gmv:0}); const g=m.get(k); g.n++; g.gmv+=o.gmv; } return [...m.values()].map(g=>({...g,aov:g.gmv/g.n})).sort((a,b)=>b.gmv-a.gmv); })();
+  A.topOrderShare=O.length?O[0].gmv/(A.gmv||1):0;
 
   // ---- Link CRM to sales: phone, then order reference in notes, then first name + same PIC
   const picTok=p=>firstTok(p);
-  const findOrders=r=>{ let m=r.ph?O.filter(o=>o.ph===r.ph):[];
-    if(!m.length&&r.ref) m=O.filter(o=>o.no.toUpperCase()===r.ref);
-    if(!m.length&&r.nk) m=O.filter(o=>o.nk===r.nk&&picTok(o.pic)===picTok(r.pic));
-    return m; };
-  for(const r of C){ r.orders=A.has.sales?findOrders(r):[]; r.orders.forEach(o=>{ o.crm=o.crm||[]; o.crm.push(r); }); }
+  const near=(a,b,days)=>a&&b&&Math.abs(a-b)<=days*864e5;
+  const findOrders=r=>{ let m=r.ph?O.filter(o=>o.ph===r.ph):[]; if(m.length) return [m,"phone"];
+    if(r.ref){ m=O.filter(o=>o.no.toUpperCase()===r.ref); if(m.length) return [m,"order number"]; }
+    if(r.nk){ m=O.filter(o=>o.nk===r.nk&&picTok(o.pic)===picTok(r.pic)); if(m.length) return [m,"name and PIC"]; }
+    // last resort for won deals: same PIC, value within 2% of the CRM potential, ordered within 7 days
+    if(r.outcome==="Won"&&r.potential){ m=O.filter(o=>!o.crm&&picTok(o.pic)===picTok(r.pic)&&Math.abs(o.gmv-r.potential)<=r.potential*.02&&(!r.date||near(o.date,r.date,7))); if(m.length===1) return [m,"value and date"]; }
+    return [[],null]; };
+  for(const r of C){ const [m,how]=A.has.sales?findOrders(r):[[],null]; r.orders=m; r.matchBy=how; m.forEach(o=>{ o.crm=o.crm||[]; o.crm.push(r); }); }
+  A.matchCounts=countBy(C.filter(r=>r.matchBy),r=>r.matchBy);
+  A.wonFromNotes=A.won.filter(r=>r.statusLogged!==undefined);
   A.wonLinked=A.won.filter(r=>r.orders.length);
   A.linkedOrders=O.filter(o=>o.crm&&o.crm.some(r=>r.outcome==="Won"));
   A.linkedGmv=A.linkedOrders.reduce((s,o)=>s+o.gmv,0);
@@ -298,4 +310,31 @@ function analyse(sources){
   const posRows=scored.filter(pos), negRows=scored.filter(r=>!pos(r));
   A.together=DIMS.filter(k=>{ const p=dom(posRows,k), n=negRows.filter(r=>(r[k]??"(not filled)")===p.v).length/(negRows.length||1); return p.share>=.7&&p.v!=="(not filled)"&&n<=.3; });
   return A;
+}
+
+/* ================= Teams ================= */
+// Each source belongs to a team: an explicit choice, else a team column (sales), else its headers, else its file name.
+const TEAMS=[["Smallholder",/smallholder/i],["Plantation",/plantation|perkebunan/i]];
+const teamOf=v=>{ const t=TEAMS.find(([,re])=>re.test(String(v||""))); return t?t[0]:null; };
+function detectTeam(d){
+  if(d.team&&d.team!=="auto") return d.team;
+  const role=d.role&&d.role!=="auto"?d.role:detectRole(d.headers);
+  if(role==="sales"){ const col=detectSales(d.headers).team; if(col){ const c=countBy(d.rows,r=>teamOf(r[col])); if(c.length) return c[0][0]; } }
+  return teamOf(d.headers.join(" "))||teamOf(d.name)||null;
+}
+// Split the selected sources into one analysis per team. Sales files with a team column are split row by row.
+function analyseTeams(sources){
+  const parts=new Map(), add=(t,d)=>{ if(!parts.has(t)) parts.set(t,[]); parts.get(t).push(d); };
+  for(const d of sources){
+    const role=d.role&&d.role!=="auto"?d.role:detectRole(d.headers), col=role==="sales"&&(!d.team||d.team==="auto")?detectSales(d.headers).team:null;
+    const split=col?countBy(d.rows,r=>teamOf(r[col])):[];
+    if(split.length>1){ for(const [t] of split) add(t,{...d,role,rows:d.rows.filter(r=>teamOf(r[col])===t)}); }
+    else add(detectTeam(d)||"_",{...d,role});
+  }
+  // Sources with no recognisable team join the only named team, or form their own group.
+  const named=[...parts.keys()].filter(k=>k!=="_");
+  if(parts.has("_")&&named.length===1){ parts.get(named[0]).push(...parts.get("_")); parts.delete("_"); }
+  const order=["Smallholder","Plantation"];
+  return [...parts].sort((a,b)=>(order.indexOf(a[0])+1||9)-(order.indexOf(b[0])+1||9))
+    .map(([name,srcs])=>{ const A=analyse(srcs); return {name:name==="_"?(A.team?A.team.replace(/s$/,""):"Team"):name,A,sources:srcs}; });
 }

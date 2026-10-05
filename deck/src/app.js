@@ -6,11 +6,14 @@ function analyzeNow(){
   const on=state.sources.filter(x=>x.on);
   state.dirty=false; renderSources(); note("");
   if(!on.length){ deckEl.innerHTML=`<div class="card"><div class="empty">All data sources are switched off. Turn one on above, then click Analyze.</div></div>`; SLIDES=[]; state.A=null; return; }
-  const A=analyse(on), N=narrative(A); state.A=A; state.N=N;
-  SLIDES=buildSlides(A,N);
+  const T=analyseTeams(on).map(t=>({...t,N:narrative(t.A)})), X=deckNarrative(T);
+  state.T=T; state.X=X; state.A=T[0].A; state.N=T[0].N;
+  SLIDES=buildDeck(T,X);
   deckEl.innerHTML=SLIDES.map((s,i)=>`<section class="frame" aria-label="Slide ${i+1}">${s}</section>`).join("");
   const files=new Set(on.map(x=>x.name)).size;
-  document.getElementById("srcName").textContent=`${files} file${files>1?"s":""} · ${[A.crm.length&&`${nf.format(A.crm.length)} CRM rows`,A.has.sales&&`${nf.format(A.orders.length)} orders`].filter(Boolean).join(" · ")}`;
+  const crmN=T.reduce((s,t)=>s+t.A.crm.length,0), ordN=T.reduce((s,t)=>s+t.A.orders.length,0);
+  document.getElementById("srcName").textContent=`${files} file${files>1?"s":""} · ${T.length>1?`${T.map(t=>t.name).join(" + ")} · `:""}${[crmN&&`${nf.format(crmN)} CRM rows`,ordN&&`${nf.format(ordN)} orders`].filter(Boolean).join(" · ")}`;
+  const A=T[0].A;
   if(!state.sample){ const miss=[]; if(A.has.crm&&!A.crmMap.status) miss.push("a lead status column (e.g. “Respon Pengguna” or “Status”)"); if(A.has.crm&&!A.crmMap.reason) miss.push("a reason column (“Alasan …”)");
     if(miss.length) note(`Some slides are thin because the CRM data has no ${miss.join(" and no ")}.`); }
   fit(); save();
@@ -22,12 +25,12 @@ function note(msg,err,html){ const n=document.getElementById("notice"); if(!msg)
 
 /* ================= File loading ================= */
 const ROLE_SHORT={crm:"CRM",sales:"Sales"};
-const SAMPLE_SRCS=(SAMPLE?.sources||[]).map(s=>({...s,on:true,role:"auto"}));
+const SAMPLE_SRCS=(SAMPLE?.sources||[]).map(s=>({...s,on:true,role:"auto",team:"auto"}));
 function sheetToDs(wb,name,sheet){
   const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,raw:true,defval:null,blankrows:false});
   let hi=aoa.findIndex(r=>r.filter(v=>!blank(v)).length>=2); if(hi<0) hi=0;
   const headers=(aoa[hi]||[]).map((h,i)=>blank(h)?`Column ${i+1}`:String(h).replace(/^﻿/,"").trim());
-  return {name,sheet,headers,rows:aoa.slice(hi+1).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??null]))).filter(r=>Object.values(r).some(v=>!blank(v))),on:true,role:"auto"};
+  return {name,sheet,headers,rows:aoa.slice(hi+1).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??null]))).filter(r=>Object.values(r).some(v=>!blank(v))),on:true,role:"auto",team:"auto"};
 }
 // Guess the delimiter of a text file from its header line (Indonesian Excel exports often use semicolons).
 const sniffFS=t=>{ const line=t.split(/\r?\n/,1)[0]; const c=[",",";","\t","|"].map(d=>[d,line.split(d).length]).sort((a,b)=>b[1]-a[1]); return c[0][1]>1?c[0][0]:","; };
@@ -36,7 +39,7 @@ async function readFile(file){
   const ext=file.name.split(".").pop().toLowerCase();
   if(ext==="json"){ const j=JSON.parse(await file.text()); const rows=Array.isArray(j)?j:(j.rows||j.data||Object.values(j).find(Array.isArray));
     if(!Array.isArray(rows)||!rows.length) throw new Error("the JSON file must contain an array of rows");
-    return [{name:file.name,sheet:null,headers:[...new Set(rows.flatMap(r=>Object.keys(r)))],rows,on:true,role:"auto"}]; }
+    return [{name:file.name,sheet:null,headers:[...new Set(rows.flatMap(r=>Object.keys(r)))],rows,on:true,role:"auto",team:"auto"}]; }
   if(typeof XLSX==="undefined") throw new Error("the spreadsheet reader didn't load. Check your connection and reload the page");
   let wb;
   if(["csv","tsv","txt"].includes(ext)){ const t=(await file.text()).replace(/^﻿/,""); wb=XLSX.read(t,{type:"string",raw:true,FS:ext==="tsv"?"\t":sniffFS(t)}); }
@@ -49,7 +52,7 @@ async function readFile(file){
   if(wb.SheetNames.length===1) keep.forEach(d=>d.sheet=null);
   return keep;
 }
-const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v4"):localStorage.setItem("sp-deck-data-v4",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
+const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v5"):localStorage.setItem("sp-deck-data-v5",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
 async function loadFiles(list){
   const files=[...list]; if(!files.length) return;
   note(""); const failed=[], added=[];
@@ -67,6 +70,7 @@ function renderSources(){
     return `<span class="src-chip${d.on?"":" off"}">
       <label><input type="checkbox" data-i="${i}" ${d.on?"checked":""} aria-label="Include ${esc(srcLabel(d))}"> ${esc(srcLabel(d))} <em>${nf.format(d.rows.length)}</em></label>
       <select data-role="${i}" aria-label="Data type of ${esc(srcLabel(d))}">${["auto","crm","sales"].map(r=>`<option value="${r}" ${(d.role||"auto")===r?"selected":""}>${r==="auto"?`${ROLE_SHORT[auto]} (auto)`:ROLE_SHORT[r]}</option>`).join("")}</select>
+      <select data-team="${i}" aria-label="Team of ${esc(srcLabel(d))}">${["auto","Smallholder","Plantation"].map(t=>`<option value="${t}" ${(d.team||"auto")===t?"selected":""}>${t==="auto"?`${detectTeam({...d,team:"auto"})||"Team"} (auto)`:t}</option>`).join("")}</select>
       ${state.sample?"":`<button type="button" data-rm="${i}" aria-label="Remove ${esc(srcLabel(d))}">×</button>`}</span>`; }).join("");
   box.innerHTML=`<span class="lbl">${state.sample?"Sample data":"Data sources"}</span>${chips}
     <button class="link" type="button" id="addMore">+ Add files</button>${state.sample?"":`<button class="link" type="button" id="clearAll">Use sample data</button>`}
@@ -78,7 +82,8 @@ function renderSources(){
 const src=document.getElementById("sources");
 src.addEventListener("change",e=>{ const t=e.target;
   if(t.dataset.i!==undefined){ state.sources[+t.dataset.i].on=t.checked; markDirty(); }
-  if(t.dataset.role!==undefined){ state.sources[+t.dataset.role].role=t.value; markDirty(); } });
+  if(t.dataset.role!==undefined){ state.sources[+t.dataset.role].role=t.value; markDirty(); }
+  if(t.dataset.team!==undefined){ state.sources[+t.dataset.team].team=t.value; markDirty(); } });
 src.addEventListener("click",e=>{ const t=e.target;
   const rm=t.closest("[data-rm]"); if(rm){ state.sources.splice(+rm.dataset.rm,1); if(!state.sources.length){ state.sources=SAMPLE_SRCS.map(s=>({...s})); state.sample=true; analyzeNow(); } else markDirty(); return; }
   if(t.id==="addMore") document.getElementById("fileIn").click();

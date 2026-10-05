@@ -179,6 +179,16 @@ main{padding-block:14px 60px;padding-inline:16px}
 .tbl.seg td,.tbl.seg th{padding:5px 8px;font-size:12px}
 .mini-h{margin:2px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .act.act3{grid-template-columns:repeat(3,1fr);gap:14px}.act.act3 .card{padding:14px 16px}.act.act3 .card p{font-size:12.5px}.act.act3 .card h3{font-size:15px}
+.divider .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.divider .txt{position:absolute;left:131px;top:300px;width:820px}
+.divider .eyebrow{font-size:34px;font-weight:800;color:var(--yellow);line-height:1.1;margin:0}
+.divider .title{font-size:72px;font-weight:800;color:#fff;line-height:1.05;margin:8px 0 0;letter-spacing:-.01em}
+.divider .dmeta{font-size:20px;font-weight:600;color:#E4ECDD;margin:16px 0 0}
+.divider .num{position:absolute;right:90px;bottom:60px;font-size:180px;font-weight:800;color:rgba(255,255,255,.12);line-height:1}
+.stack-big{height:40px;border-radius:8px;display:flex;gap:2px;overflow:hidden}
+.stack-big .seg{display:flex;align-items:center;padding-left:14px;color:#fff;font-weight:700;font-size:14px;white-space:nowrap}
+.tbl.cmp td,.tbl.cmp th{padding:7px 12px;font-size:13px}.tbl.cmp th{font-size:13px}
+.act .meta span.team{background:var(--green);color:#fff}
 .stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .tbl th .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;border:1.5px solid #fff}
 </style>
@@ -227,7 +237,7 @@ main{padding-block:14px 60px;padding-inline:16px}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-const IMG={cover:"{{IMG:cover.jpg}}",closing:"{{IMG:closing.jpg}}",logo:"{{IMG:logo.png}}",wm:"{{IMG:wordmark.png}}",palm:"{{IMG:palm.png}}",panel:"{{IMG:panel.jpg}}"};
+const IMG={cover:"{{IMG:cover.jpg}}",closing:"{{IMG:closing.jpg}}",logo:"{{IMG:logo.png}}",wm:"{{IMG:wordmark.png}}",palm:"{{IMG:palm.png}}",divider:"{{IMG:divider.jpg}}",panel:"{{IMG:panel.jpg}}"};
 const SAMPLE=/*SAMPLE_DATA*/null;
 /*INCLUDE:analysis.js*/
 /*INCLUDE:slides.js*/
@@ -235,7 +245,7 @@ const SAMPLE=/*SAMPLE_DATA*/null;
 /*INCLUDE:export-pptx.js*/
 
 /* ================= Boot ================= */
-let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data-v4")||"null") }catch(e){}
+let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data-v5")||"null") }catch(e){}
 if(saved&&Array.isArray(saved.sources)&&saved.sources.some(d=>d.rows?.length)){
   state.sources=saved.sources; state.sample=false;
   if(saved.dirty){ state.dirty=true; renderSources(); deckEl.innerHTML=`<div class="card"><div class="empty">Your files are loaded. Click <b>&nbsp;Analyze&nbsp;</b> to build the deck.</div></div>`; }
