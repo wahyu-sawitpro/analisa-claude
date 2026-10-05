@@ -1,44 +1,52 @@
-# SawitPRO Lead Rejection Deck
+# SawitPRO Sales & Leads Deck
 
-A concise, 7-slide English analysis deck in the SawitPRO template. The deck is an HTML page that rebuilds itself from any
-uploaded CSV, TSV, XLSX, XLS, ODS or JSON file. Parsing happens in the browser; data is not sent anywhere.
+An English deck in the SawitPRO template that turns weekly CRM and sales exports into a short, insight-led review.
+It is an HTML page: upload any number of files, check the detected data type of each one, then click **Analyze**.
+Parsing and analysis happen in the browser; data is not sent anywhere.
 
-| Button | What it does |
+| Control | What it does |
 |---|---|
-| Upload files | Adds one or many files at once (or drag and drop). Each file, and each lead-like sheet in a workbook, becomes a data source; all sources are merged into one analysis. Toggle or remove sources in the bar under the toolbar |
+| Upload files | Adds one or many CSV, TSV, XLSX, XLS, ODS or JSON files (or drag and drop). Nothing changes until you click Analyze |
+| Data sources bar | Each file or lead-like sheet, with its row count, an include toggle, a data-type selector (CRM / Sales, auto-detected) and remove |
+| Analyze | Builds the deck from the included sources |
 | Present | Full-screen slide mode (arrow keys, Esc) |
-| Download PPTX | Builds a native, editable 16:9 PowerPoint (real charts and tables) from the current data |
-| Open in Google Slides | Uploads the PPTX to the viewer's Google Drive through the Google Drive connector, which converts it to Google Slides, then links to it. Falls back to manual import steps when Drive isn't available |
+| Download PPTX | Native, editable 16:9 PowerPoint (real charts and tables) of the current deck |
+| Open in Google Slides | Uploads the PPTX to the viewer's Google Drive via the Google Drive connector (converted to Slides), with a manual-import fallback |
 
-## Multiple files
-- Columns are detected per file, so files can use different header names (e.g. `Status Leads` vs `Status`).
-- Rows are merged; a lead ID that appears in more than one file is counted once (the latest source wins).
-- Workbook sheets without lead columns (e.g. a notes sheet) are skipped.
-- With more than one source, an extra **Across data sources** slide compares leads, rejection rate, leads in play, value and period per source, and "Data source" is tested as an outcome driver.
-- With one file the deck is the same 7 slides.
+## Data types
+- **CRM engagements**: one row per engagement (e.g. `Engagement ID`, `Smallholders Team`, `Engagement Type`, `Respon Pengguna`,
+  `Alasan customer tidak tertarik`, `Detail Pembahasan`, `Sumber Lead`). Rows are classified by status: *Already order* = won;
+  *Prospect* / *Mempertimbangkan* = still in play; *Cold - Tidak tertarik* = lost. Rejection and order exports can be
+  separate files or one file.
+- **Sales orders**: one row per order line (e.g. `main_order_no`, `pic_name`, `customer_phone`, `item_name`, `qty`, `gmv`,
+  `customer_status`, `main_inv_status`). Lines are grouped into orders.
+- CRM wins are linked to sales orders by phone number (`08…` and `+62…` normalised), then an order number in the notes
+  (`#B2C…`), then first name + same PIC. Repeated engagement IDs are counted once.
 
-## Slides
+## Slides (only the ones the data supports are shown)
 1. Cover
-2. Executive summary: KPIs, key findings, bottom line
-3. What drives the outcome: best-separating dimension (Gini gain) and a rejected vs. in-play cohort profile, with a confounding check
-4. Why leads say no: translated reasons by status, reason-quality score, proposed reason taxonomy
-5. Pipeline at stake: value, average value, closing-date coverage, and the leads still in play
-6. Next steps: owner and timing for each action, plus data gaps
-7. Thank you
+2. Executive summary: KPIs, findings, bottom line
+3. Success story: how CRM wins happened (channel, source) and the sales orders they became
+4. Sales last week: GMV by product and PIC, repeat vs new, orders missing from the CRM, partial payments
+5. Why leads say no: reasons grouped by the fix they need, plus signals read from the discussion notes
+6. What separates winners: the dimension that best separates orders from the rest, cohort profile, confounding caveat
+7. Recoverable demand: leads still in play and what they are asking
+8. Next steps: up to four actions with owner and timing
+9. Thank you
 
 ## Files
 - `index.html`: built deck, ready to open
-- `src/deck.html`: page, analysis and HTML slides (images written as `{{IMG:name}}`)
-- `src/export-pptx.js`: PPTX builder (pptxgenjs) and Google Drive upload, inlined at build time
-- `src/sample-data.json`: sample dataset with lead names and phone numbers removed
-- `assets/`: compressed images taken from the template
+- `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
+  `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
+  `src/export-pptx.js`: PPTX builder and Google Drive upload
+- `src/sample-data.json`: last week's three exports with phone numbers and names replaced by anonymous tokens
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
-## Findings on the sample (21–25 Sep 2026, 34 leads)
-- 88% (30) not interested; 4 leads are still in play, worth Rp9.99M.
-- Engagement channel fully separates outcomes: WhatsApp chat 0/30 progressed, on-site visits and phone calls 4/4.
-- The effect is confounded. All 30 rejections share one PIC, product line (KebunPRO), location and lead source, and were
-  logged over 3 days, so this reads as one failed campaign. A controlled re-contact test is needed to isolate the channel.
-- 100% of rejections use the catch-all reason "No clear interest yet". There is no diagnostic signal.
-- All in-play leads cite timing ("no need in the near term"), and none have a closing date.
-- 88% of rows have no potential-sales value or product, so lost value can't be sized.
+## Findings on last week's data (28 Sep – 4 Oct 2026)
+- Rp669M GMV from 19 orders (19 customers, 4 new); the top 2 orders are 39% of GMV.
+- All 10 CRM wins are confirmed in sales (9 orders, Rp279M). 9 of 10 came from one PIC's on-site canvassing.
+- Lead source separates outcomes: canvassing 8 of 9 ordered, database 0 of 23.
+- 15 of 17 "not interested" leads are locked into a shop, KUD or agent (2 buy on credit, 3 already fertilized this season).
+- 10 of 11 leads still in play asked about the warehouse, delivery or prices; 6 could not be reached by phone.
+- 3 leads stalled on stock or a 7–14 day delivery (AC AKP, KCL Mahkota, NPK).
+- 10 of 19 orders (Rp390M) have no CRM engagement, and CRM wins carry no GMV.

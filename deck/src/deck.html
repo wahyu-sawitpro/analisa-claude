@@ -37,7 +37,7 @@ button,select{font-family:inherit}
 .src-chip{display:inline-flex;align-items:center;gap:2px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 4px 4px 12px;max-width:100%}
 .src-chip label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--green-dk);font-weight:600;min-width:0;overflow-wrap:anywhere}
 .src-chip input{accent-color:var(--green);margin:0}
-.src-chip em{font-style:normal;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
+.src-chip em{white-space:nowrap;font-style:normal;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
 .src-chip button{border:0;background:transparent;color:var(--muted);font-size:17px;line-height:1;width:26px;height:26px;border-radius:50%;cursor:pointer}
 .src-chip button:hover{background:var(--tint);color:#7A2016}
 .src-chip.off{opacity:.55}
@@ -160,13 +160,26 @@ main{padding-block:14px 60px;padding-inline:16px}
 .tip{position:fixed;z-index:60;pointer-events:none;background:#1F2A19;color:#fff;font-size:12.5px;padding:7px 10px;border-radius:8px;max-width:280px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .tip b{color:var(--yellow)}
 @media (max-width:640px){.bar .brand span{display:none}.btn .t{display:none}.btn{padding:8px 11px}}
+.sources .spacer{flex:1}
+.src-chip select{border:0;background:var(--tint);color:var(--green-dk);font:inherit;font-size:12px;font-weight:600;border-radius:999px;padding:3px 6px;margin-left:6px;max-width:170px}
+.analyze{appearance:none;border:0;background:var(--yellow);color:var(--green-dk);font:inherit;font-weight:800;font-size:14px;border-radius:999px;padding:10px 18px;cursor:pointer;box-shadow:0 2px 8px rgba(39,78,19,.25)}
+.analyze:hover{background:#FFE06A} .analyze[disabled]{opacity:.5;cursor:not-allowed}
+.uptodate{font-size:12.5px;font-weight:700;color:var(--green)}
+.stale-note{max-width:1100px;margin:12px auto 0;padding:12px 16px;border-radius:12px;background:var(--green-dk);color:#fff;display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-weight:600;box-sizing:border-box}
+.stale-note button{margin-left:auto}
+@media (max-width:1132px){.stale-note{margin-inline:16px}}
+.deck.stale .frame{opacity:.45;filter:grayscale(.4)}
+.mini{margin-bottom:12px}.mini h4{margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mini .hbars{gap:7px}.mini .track{height:10px}
+.stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.tbl th .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;border:1.5px solid #fff}
 </style>
 
 <header class="bar">
-  <div class="brand"><img src="{{IMG:logo.png}}" alt=""><span>Leads Analysis Deck</span></div>
+  <div class="brand"><img src="{{IMG:logo.png}}" alt=""><span>Sales &amp; Leads Deck</span></div>
   <div class="src"><span>Data source</span><b id="srcName">–</b></div>
   <div class="actions">
-    <button class="btn primary" id="uploadBtn" type="button" title="CSV, XLSX, XLS, ODS, TSV or JSON">
+    <button class="btn primary" id="uploadBtn" type="button" title="CRM or sales exports: CSV, XLSX, XLS, ODS, TSV or JSON">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg><span class="t">Upload files</span></button>
     <button class="btn" id="presentBtn" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span class="t">Present</span></button>
@@ -178,9 +191,10 @@ main{padding-block:14px 60px;padding-inline:16px}
   </div>
 </header>
 <div class="sources" id="sources" aria-label="Data sources"></div>
+<div class="stale-note" id="staleNote" hidden><span>Your files are ready. Check the data type of each file, then build the deck.</span><button class="analyze" type="button" id="staleGo">Analyze now →</button></div>
 <div id="notice" class="notice" hidden></div>
 <main><div class="deck" id="deck"></div></main>
-<div class="drop-hint" id="dropHint" hidden>Drop one or more files to add them to the deck</div>
+<div class="drop-hint" id="dropHint" hidden>Drop one or more files to add them</div>
 <div class="present" id="present" hidden>
   <div class="stage" id="stage"></div>
   <div class="ctrl"><button class="btn" id="pPrev" type="button" aria-label="Previous slide">‹</button><span id="pCount">1 / 1</span><button class="btn" id="pNext" type="button" aria-label="Next slide">›</button><button class="btn" id="pClose" type="button">Close</button></div>
@@ -207,441 +221,16 @@ main{padding-block:14px 60px;padding-inline:16px}
 <script>
 const IMG={cover:"{{IMG:cover.jpg}}",closing:"{{IMG:closing.jpg}}",logo:"{{IMG:logo.png}}",wm:"{{IMG:wordmark.png}}",palm:"{{IMG:palm.png}}",panel:"{{IMG:panel.jpg}}"};
 const SAMPLE=/*SAMPLE_DATA*/null;
-
-/* ================= Column detection ================= */
-// More specific keys first; each header is claimed by one key only.
-const FIELDS=[
-  ["reasonOther",/alasan\s*lain|other\s*reason|reason.*other/],
-  ["fieldPic",/pic.*lapang|field\s*(pic|officer)|tim\s*lapang/],
-  ["closing",/closing|estimasi\s*tanggal/],
-  ["ffb",/ffb|tbs|\(mt\)|tonase/],
-  ["potential",/potential\s*sales|potensi|nilai|revenue|value|\(idr\)|omzet/],
-  ["reason",/alasan|reason|penyebab/],
-  ["status",/status/],
-  ["pic",/pic|sales\s*(rep|person)|owner|petugas/],
-  ["channel",/tipe\s*engag|jenis\s*engag|channel|metode|media\s*kontak/],
-  ["date",/tanggal|date|tgl|waktu/],
-  ["location",/lokasi|kabupat|kecamatan|location|wilayah|area|region|kota/],
-  ["source",/sumber|source/],
-  ["purpose",/tujuan|program|layanan|segment/],
-  ["product",/produk|product|sku|item/],
-  ["id",/^id$|lead\s*id|^no\.?$|kode/],
-  ["note",/keterangan|catatan|note|remark/],
-];
-const PII=/nama\s*leads|^nama$|name|telf|telp|phone|hp|whats?app\s*no|contact|kontak|email|alamat/;
-const LABEL={_src:"Data source",pic:"PIC",channel:"Engagement channel",date:"Date",location:"Location",source:"Lead source",fieldPic:"Field PIC",purpose:"Product line",
-  potential:"Potential sales (IDR)",ffb:"Potential FFB (MT)",product:"Product offered",status:"Lead status",reason:"Rejection reason",reasonOther:"Other reason",
-  closing:"Est. closing date",id:"ID",note:"Notes"};
-const norm=s=>String(s??"").toLowerCase().replace(/[_\-]+/g," ").replace(/\s+/g," ").trim();
-function detect(headers){ const map={},used=new Set();
-  for(const [key,re] of FIELDS){ const h=headers.find(h=>!used.has(h)&&re.test(norm(h))&&!(key!=="id"&&PII.test(norm(h))&&!/pic/.test(norm(h)))); if(h){map[key]=h;used.add(h)} }
-  return map; }
-
-/* ================= Cleaning & translation ================= */
-const blank=v=>v===null||v===undefined||(typeof v==="string"&&v.trim()==="")||(typeof v==="number"&&isNaN(v));
-const clean=v=>blank(v)?null:String(v).replace(/\s+/g," ").trim();
-function canonStatus(v){ const s=norm(v); if(!s) return null;
-  if(/tidak|ga?k\s*minat|not\s*interest|tolak|reject|lost/.test(s)) return "Not interested";
-  if(/timbang|pikir|consider|follow|nego|ragu/.test(s)) return "Considering";
-  if(/closing|deal|won|beli|closed/.test(s)) return "Closed";
-  if(/tertarik|minat|interest|hot|warm/.test(s)) return "Interested";
-  return clean(v).replace(/^./,c=>c.toUpperCase()); }
-const REASON_EN=[
-  [/belum ada ketertarikan|tidak ada ketertarikan|no clear interest/,"No clear interest yet"],
-  [/waktu dekat|belum butuh|belum perlu|not needed|near term|nanti/,"No need in the near term"],
-  [/harga|mahal|price|expensive/,"Price too high"],
-  [/sudah (punya|ada|pakai|langganan)|kompetitor|competitor|supplier lain/,"Already has a supplier"],
-  [/tidak (bisa )?dihubungi|tidak (merespon|respon|balas)|no response|unreachable/,"Unreachable / no response"],
-  [/modal|dana|budget|uang/,"No budget"],
-  [/izin|persetujuan|approval|pemilik|koperasi/,"Needs owner / co-op approval"],
-  [/percaya|trust|ragu kualitas/,"Doubts about the product"],
-  [/^lain|other/,"Other"],
-];
-const trReason=v=>{ const s=norm(v); if(!s) return null; const m=REASON_EN.find(([re])=>re.test(s)); return m?m[1]:clean(v); };
-const CATCHALL=/^(no clear interest yet|other)$/i, TIMING=/near term/i;
-function trChannel(v){ const s=norm(v); if(!s) return null;
-  if(/chat|whats|wa\b/.test(s)) return "WhatsApp chat"; if(/visit|kunjung|onsite|lapang/.test(s)) return "On-site visit";
-  if(/phone|telepon|call|telp/.test(s)) return "Phone call"; if(/event|seminar|pameran/.test(s)) return "Event";
-  return clean(v).replace(/\s*\(.*\)\s*/,""); }
-function toNum(v){ if(blank(v)) return null; if(typeof v==="number") return v; let s=String(v).replace(/rp|idr|\s/gi,"");
-  if(/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s=s.replace(/\./g,"").replace(",","."); else s=s.replace(/,/g,""); const n=parseFloat(s); return isNaN(n)?null:n; }
-function toDate(v){ if(blank(v)) return null; let d=null;
-  if(v instanceof Date) d=new Date(Math.round(v.getTime()/60000)*60000);
-  else if(typeof v==="number"&&v>20000&&v<80000) d=new Date(Math.round((v-25569)*864e5)+new Date().getTimezoneOffset()*6e4);
-  else{ const s=String(v).trim(); let m;
-    if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})( 00:00(:00)?)?$/))) d=new Date(+m[1],+m[2]-1,+m[3]);
-    else if((m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/))) d=new Date(+(m[3].length===2?"20"+m[3]:m[3]),+m[2]-1,+m[1]);
-    else{ const t=Date.parse(s); if(!isNaN(t)) d=new Date(t);} }
-  if(!d||isNaN(d)) return null; return new Date(d.getFullYear(),d.getMonth(),d.getDate()); }
-
-/* ================= Formatting ================= */
-const nf=new Intl.NumberFormat("en-US");
-const pct=(a,b)=>b?Math.round(a/b*100):0;
-function rp(n){ if(!n) return "Rp0"; if(n>=1e9) return "Rp"+(n/1e9).toLocaleString("en-US",{maximumFractionDigits:2})+"B";
-  if(n>=1e6) return "Rp"+(n/1e6).toLocaleString("en-US",{maximumFractionDigits:2})+"M"; return "Rp"+nf.format(n); }
-function rpParts(n){ const m=rp(n).replace("Rp","").match(/^(.*?)([MB])?$/); return [m[1],m[2]||""]; }
-const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], DAY=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-const fd=d=>d?`${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`:"–";
-const fds=d=>`${DAY[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`;
-const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function span(ds){ if(!ds.length) return "Undated"; const a=ds[0],b=ds[ds.length-1]; if(+a===+b) return fd(a);
-  if(a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()) return `${a.getDate()}–${b.getDate()} ${MON[b.getMonth()]} ${b.getFullYear()}`;
-  return `${fd(a)} – ${fd(b)}`; }
-const STATUS_COLOR={"Not interested":"#8E9C84","Considering":"#D9A21B","Interested":"#4A653B","Closed":"#274E13"};
-const EXTRA=["#5B7F95","#A8653A","#6E5A8A","#3F8C7A"];
-const STATUS_ORDER=["Not interested","Considering","Interested","Closed"];
-
-/* ================= Analysis ================= */
-function countBy(rows,f){const m=new Map();for(const r of rows){const k=f(r);if(k===null||k===undefined)continue;m.set(k,(m.get(k)||0)+1)}return [...m].sort((a,b)=>b[1]-a[1])}
-const srcLabel=d=>d.sheet&&!/^sheet\s*1$/i.test(d.sheet)?`${d.name} · ${d.sheet}`:d.name;
-function canonRow(r,map,src){ const o={_raw:r,_map:map,_src:src};
-  for(const k in map){ const v=r[map[k]];
-    o[k]=k==="potential"||k==="ffb"?toNum(v):k==="date"||k==="closing"?toDate(v):k==="status"?canonStatus(v):k==="channel"?trChannel(v):k==="reason"?trReason(v):clean(v); }
-  if(o.reason==="Other"&&o.reasonOther) o.reason=o.reasonOther;
-  return o; }
-// Any number of uploaded files/sheets: columns are detected per source, rows merged, repeated lead IDs kept once (latest source wins).
-function analyse(sources){
-  const map={}, all=[];
-  for(const d of sources){ const m=detect(d.headers), label=srcLabel(d); Object.keys(m).forEach(k=>map[k]=map[k]||m[k]);
-    for(const r of d.rows){ if(Object.values(r).some(v=>!blank(v))) all.push(canonRow(r,m,label)); } }
-  const byId=new Map(), rows=[]; let dupes=0;
-  for(const o of all){ if(o.id){ if(byId.has(o.id)){ rows[byId.get(o.id)]=o; dupes++; continue; } byId.set(o.id,rows.length); } rows.push(o); }
-  const A={rows,map,n:rows.length,dupes,srcCount:sources.length};
-  A.srcNames=sources.map(srcLabel);
-  if(sources.length>1) map._src="Data source";
-  A.status=map.status?countBy(rows,r=>r.status):[];
-  A.statusKeys=A.status.map(s=>s[0]).sort((a,b)=>{const ia=STATUS_ORDER.indexOf(a),ib=STATUS_ORDER.indexOf(b);return (ia<0?9:ia)-(ib<0?9:ib)});
-  A.color=k=>STATUS_COLOR[k]||EXTRA[A.statusKeys.filter(x=>!STATUS_COLOR[x]).indexOf(k)%EXTRA.length];
-  A.isWarm=r=>!!r.status&&r.status!=="Not interested";
-  A.rej=rows.filter(r=>r.status==="Not interested"); A.warm=rows.filter(A.isWarm);
-  A.reasons=map.reason?countBy(rows,r=>r.reason):[];
-  A.rawReason=new Map(rows.filter(r=>r.reason&&r._map.reason).map(r=>[r.reason,clean(r._raw[r._map.reason])]));
-  A.dates=map.date?rows.map(r=>r.date).filter(Boolean).sort((a,b)=>a-b):[];
-  A.potWarm=A.warm.reduce((s,r)=>s+(r.potential||0),0);
-  A.potKnown=rows.filter(r=>r.potential).length;
-  A.fill=Object.keys(LABEL).filter(k=>map[k]&&k!=="_src").map(k=>[LABEL[k],rows.filter(r=>r[k]!==null&&r[k]!==undefined).length/(rows.length||1)]);
-  A.typos=map.status?countBy(rows.filter(r=>r._map.status),r=>clean(r._raw[r._map.status])).filter(([raw])=>raw&&!STATUS_ORDER.includes(raw)):[];
-  // Per-source comparison
-  A.sources=A.srcNames.map(name=>{ const rs=rows.filter(r=>r._src===name), w=rs.filter(A.isWarm), rj=rs.filter(r=>r.status==="Not interested");
-    return {name,n:rs.length,rej:rj.length,warm:w.length,rate:rs.length?rj.length/rs.length:0,pot:w.reduce((s,r)=>s+(r.potential||0),0),
-      dates:rs.map(r=>r.date).filter(Boolean).sort((a,b)=>a-b),status:A.statusKeys.map(k=>[k,rs.filter(r=>r.status===k).length])}; }).filter(x=>x.n);
-
-  // Which dimension best separates progressed vs rejected leads (weighted Gini gain on a warm/not flag).
-  const DIMS=["channel","pic","purpose","source","location","product","_src"].filter(k=>map[k]);
-  const gini=(w,n)=>{if(!n)return 0;const p=w/n;return 2*p*(1-p)};
-  const base=gini(A.warm.length,A.n);
-  const val=(r,k)=>(k==="_src"?r._src:r[k])??"(blank)";
-  A.dims=DIMS.map(k=>{ const groups=countBy(rows,r=>val(r,k)).map(([g,n])=>{const w=rows.filter(r=>val(r,k)===g&&A.isWarm(r)).length;return {g,n,w,rate:w/n}});
-    const gain=base-groups.reduce((s,x)=>s+x.n/A.n*gini(x.w,x.n),0);
-    const pure=groups.every(x=>x.rate===0||x.rate===1);
-    return {k,groups,gain,pure}; }).sort((a,b)=>b.gain-a.gain+1e-9>0&&Math.abs(b.gain-a.gain)>1e-9?b.gain-a.gain:DIMS.indexOf(a.k)-DIMS.indexOf(b.k));
-  A.best=A.warm.length&&A.rej.length?A.dims[0]:null;
-
-  // Cohort profile: dominant value per dimension for rejected vs progressed leads.
-  const dom=(rs,k)=>{const c=countBy(rs,r=>(k==="_src"?r._src:r[k])??"(not filled)");return c.length?{v:c[0][0],share:c[0][1]/rs.length}:{v:"–",share:0}};
-  A.profile=DIMS.map(k=>({k,rej:dom(A.rej,k),warm:dom(A.warm,k)}));
-  A.lockstep=A.profile.filter(p=>p.rej.share===1&&p.rej.v!=="(not filled)"&&(A.warm.length===0||p.warm.v!==p.rej.v)).map(p=>p.k);
-  A.rejDays=[...new Set(A.rej.filter(r=>r.date).map(r=>+r.date))].sort((a,b)=>a-b);
-
-  // Reason quality
-  A.rejReasons=countBy(A.rej,r=>r.reason);
-  A.catchAll=A.rej.filter(r=>r.reason&&CATCHALL.test(r.reason)).length;
-  A.rejNoReason=A.rej.filter(r=>!r.reason).length;
-  A.warmReasons=countBy(A.warm,r=>r.reason);
-  A.warmTiming=A.warm.filter(r=>r.reason&&TIMING.test(r.reason)).length;
-  A.warmClosing=A.warm.filter(r=>r.closing).length;
-  return A;
-}
-
-/* ================= Narrative (shared by HTML and PPTX) ================= */
-const lw=s=>s==="PIC"?s:s.toLowerCase();
-const andList=a=>a.length<2?a.join(""):a.slice(0,-1).join(", ")+" and "+a[a.length-1];
-const lc=(k,v)=>k==="channel"?v.toLowerCase():v;
-function narrative(A){
-  const N={}, rejN=A.rej.length, warmN=A.warm.length, n=A.n, L=k=>LABEL[k].toLowerCase();
-  N.period=span(A.dates);
-  N.kpis=[
-    {v:nf.format(n),u:"",l:"Leads logged"},
-    {v:String(pct(rejN,n)),u:"%",l:`${nf.format(rejN)} leads not interested`},
-    {v:nf.format(warmN),u:"",l:"Still in play (considering or better)",hot:true},
-    {v:rpParts(A.potWarm)[0],u:rpParts(A.potWarm)[1],l:A.map.potential?"Potential sales from leads still in play":"No potential-sales column"},
-  ];
-  const B=A.best, grp=B?B.groups:[];
-  const hi=grp.slice().sort((a,b)=>b.rate-a.rate||b.n-a.n)[0], lo=grp.slice().sort((a,b)=>a.rate-b.rate||b.n-a.n)[0];
-  const others=grp.filter(g=>g!==lo), othersW=others.reduce((s,g)=>s+g.w,0), othersN=others.reduce((s,g)=>s+g.n,0);
-  N.driver=B?{dim:LABEL[B.k],k:B.k,pure:B.pure,lo,hi,othersW,othersN}:null;
-  const lock=A.lockstep.filter(k=>!B||k!==B.k).map(k=>LABEL[k]);
-  const days=A.rejDays.length;
-
-  // Slide 3 headline + caveat
-  if(B){
-    N.driverTitle=B.pure&&lo.rate===0
-      ? `${lo.g} moved 0 of ${lo.n} leads forward; all ${othersW} leads still in play came from ${others.map(g=>lc(B.k,g.g)).join(" or ")}`
-      : `${LABEL[B.k]} is the strongest outcome driver: ${Math.round(hi.rate*100)}% of ${hi.g} leads progressed vs ${Math.round(lo.rate*100)}% of ${lo.g}`;
-    N.caveat=lock.length
-      ? `<b>Channel alone can't be blamed yet.</b> Every rejected lead also shares the same ${andList(lock.map(lw))}${days?`, and all were logged within ${days} day${days>1?"s":""}`:""}. These factors move together, so this looks like one campaign that failed rather than a market-wide signal. Only a controlled test can separate channel from offer and audience.`
-      : `<b>Sample is small (${n} leads).</b> Treat the gap as a hypothesis and confirm it with next week's data.`;
-  }
-  // Reasons
-  const topRej=A.rejReasons[0];
-  N.catchPct=pct(A.catchAll,rejN);
-  N.reasonTitle=rejN&&A.map.reason
-    ? (N.catchPct>=50?`${N.catchPct}% of rejections are logged as “${topRej[0]}”, which says nothing about why`:`Top rejection reason: “${topRej[0]}” (${pct(topRej[1],rejN)}%)`)
-    : "Rejection reasons";
-  // Pipeline
-  N.pipeTitle=warmN?`${warmN} leads worth ${rp(A.potWarm)} are delayed by timing, not lost`:"No leads are still in play in this data";
-  if(warmN&&A.warmTiming<warmN) N.pipeTitle=`${warmN} leads worth ${rp(A.potWarm)} are still in play and need a dated follow-up`;
-
-  N.summaryTitle=B&&lock.length?`${pct(rejN,n)}% of leads said no, and the pattern points to how we engage, not to demand`
-    :`${pct(rejN,n)}% of leads said no; ${warmN} are still in play`;
-  // Across sources
-  const SR=A.sources.filter(x=>x.n>=3);
-  if(A.sources.length>1){
-    const by=SR.slice().sort((a,b)=>b.rate-a.rate), top=by[0], bot=by[by.length-1], gap=top&&bot?Math.round((top.rate-bot.rate)*100):0;
-    N.srcGap=gap;
-    N.srcTitle=SR.length<2?`${A.sources.length} data sources combined into one view of ${nf.format(n)} leads`
-      : gap>=20?`Rejection ranges from ${pct(bot.rej,bot.n)}% in ${bot.name} to ${pct(top.rej,top.n)}% in ${top.name}`
-      : `Rejection is consistent across ${SR.length} sources (${pct(bot.rej,bot.n)}–${pct(top.rej,top.n)}%), so the pattern is structural`;
-    N.srcNote=`${A.sources.length} sources merged${A.dupes?`; ${A.dupes} repeated lead ID${A.dupes>1?"s":""} counted once (latest source kept)`:""}.`;
-  }
-  // Findings for the executive summary
-  N.findings=[];
-  if(B) N.findings.push([`${LABEL[B.k]} decides the outcome`, B.pure&&lo.rate===0
-      ? `${lo.g}: 0 of ${lo.n} progressed. ${others.map(g=>g.g).join(" and ")}: ${othersW} of ${othersN} still in play.`
-      : `${hi.g} progressed ${Math.round(hi.rate*100)}% vs ${Math.round(lo.rate*100)}% for ${lo.g}.`]);
-  if(lock.length) N.findings.push(["The rejections are one batch, not a trend",
-      `All ${rejN} rejected leads share one ${lock.slice(0,3).map(lw).join(", one ")}${days?`, logged over ${days} day${days>1?"s":""}`:""}.`]);
-  if(rejN&&A.map.reason) N.findings.push(["We don't know why leads say no",
-      N.catchPct>=50?`${N.catchPct}% of rejections use a catch-all reason, so the team can't fix the pitch.`:`Top reason: ${topRej[0]} (${pct(topRej[1],rejN)}%).`]);
-  if(warmN) N.findings.push([`${rp(A.potWarm)} is recoverable`, `${warmN} leads ${A.warmTiming===warmN?"only need the timing to be right":"are still considering"}; ${A.warmClosing?`${A.warmClosing} have`:"none have"} a closing date yet.`]);
-  if(A.sources.length>1&&N.srcGap>=20) N.findings.splice(1,0,["Results differ by data source",N.srcTitle+"."]);
-  N.findings=N.findings.slice(0,4);
-  N.bottom=B&&lock.length
-    ? {p:`Fix how we reach and qualify leads before adding more volume.`, s:`Re-contact part of the rejected batch through the channel that works, and make the reason field diagnostic, so next week's data can show what really drives rejection.`}
-    : {p:`Follow up on the leads still in play and tighten data capture.`, s:`Better reason and value fields will make next week's analysis sharper.`};
-
-  // Actions
-  const warmPic=countBy(A.warm,r=>r.pic)[0]?.[0], rejPic=countBy(A.rej,r=>r.pic)[0]?.[0];
-  N.actions=[];
-  if(B&&lo.rate===0&&othersN) N.actions.push({t:`Test ${lc(B.k,hi.g)}s on the rejected batch`,
-    d:`Pick 10 of the ${lo.n} ${lo.g} leads and re-contact them by ${lc(B.k,hi.g)}. If 2 or more progress, the channel is the bottleneck. If none do, the offer or targeting is.`,
-    o:rejPic&&warmPic&&rejPic!==warmPic?`${rejPic} + ${warmPic}`:(rejPic||"Plantation team"),w:"Next 2 weeks"});
-  if(warmN) N.actions.push({t:`Book dated follow-ups for ${warmN} leads in play`,
-    d:`${A.warmTiming===warmN?"All cite timing, so agree a concrete revisit date with each lead and log it as the estimated closing date.":"Agree a next step with each lead and log an estimated closing date."} Value at stake: ${rp(A.potWarm)}.`,
-    o:warmPic||"Lead PIC",w:"This week"});
-  if(rejN&&A.map.reason) N.actions.push({t:"Replace the catch-all reason",
-    d:"Make the reason a required dropdown: price, no need yet (with a revisit month), has a supplier, unreachable, needs approval, doubts the product. Drop “no clear interest”.",
-    o:"Sales ops",w:"Next form update"});
-  const missPot=n-A.potKnown;
-  N.actions.push({t:"Make pipeline value measurable",
-    d:`${A.map.potential?`${missPot} of ${n} leads (${pct(missPot,n)}%) have no potential-sales value`:"There is no potential-sales column"}${A.map.product?`, and ${A.rows.filter(r=>!r.product).length} have no product`:""}. Require both for every engagement so lost value can be sized.`,
-    o:"Sales ops",w:"Next form update"});
-  N.actions=N.actions.slice(0,4);
-
-  // Data gaps (compact)
-  const empty=A.fill.filter(x=>x[1]===0).map(x=>x[0]);
-  N.gaps=[];
-  if(A.typos.length) N.gaps.push(`status typed freely (${A.typos.slice(0,2).map(t=>`“${t[0]}”`).join(", ")})`);
-  if(empty.length) N.gaps.push(`${empty.length} columns always empty (${empty.slice(0,4).join(", ")})`);
-  if(A.map.fieldPic){const f=A.rows.filter(r=>r.fieldPic).length; if(f<n) N.gaps.push(`field PIC filled for ${f} of ${n}`);}
-  return N;
-}
-
-/* ================= HTML slides ================= */
-function hbars(items,{fmt=v=>nf.format(v),right,max,color="#4A653B",scale}={}){
-  if(!items.length) return `<div class="empty">This column isn't in the data</div>`;
-  const top=scale||Math.max(...items.map(i=>i.v));
-  return `<div class="hbars">${items.slice(0,max||items.length).map(i=>`<div class="hb"><div class="top"><span class="k" title="${esc(i.tip||i.k)}">${esc(i.k)}</span><span class="n">${fmt(i.v)}${right?`<em>${esc(right(i))}</em>`:""}</span></div>
-    <div class="track">${(i.segs||[[i.v,color,i.tip||i.k]]).filter(s=>s[0]).map(s=>`<div class="seg" style="flex:0 0 ${s[0]/top*100}%;background:${s[1]}" data-tip="${esc(s[2])}"></div>`).join("")}</div></div>`).join("")}</div>`;
-}
-const legend=A=>A.statusKeys.length>1?`<div class="legend">${A.statusKeys.map(s=>`<span><i style="background:${A.color(s)}"></i>${esc(s)}</span>`).join("")}</div>`:"";
-
-function contentSlide(n,kicker,title,body){
-  return `<div class="slide content"><div class="panel"></div><div class="ybar"></div><img class="palm" src="${IMG.palm}" alt=""><img class="logo" src="${IMG.logo}" alt="SawitPRO">
-  <div class="kicker">${esc(kicker)}</div><h2>${esc(title)}</h2><div class="body">${body}</div>
-  <div class="foot"><span>SAWITPRO PROPRIETARY</span><span class="pg">${n}</span><span>Do not use or distribute without permission from SawitPRO</span></div></div>`;
-}
-function buildSlides(A,N){
-  const S=[];
-  S.push(`<div class="slide cover"><img class="bg" src="${IMG.cover}" alt=""><div class="shade"></div><img class="wm" src="${IMG.wm}" alt="SawitPRO.id">
-    <div class="band"></div><div class="disc"><img src="${IMG.logo}" alt=""></div>
-    <div class="txt"><p class="eyebrow">Plantation Team</p><p class="title">Why Leads Say No</p></div>
-    <div class="meta">Lead rejection analysis · ${esc(N.period)} · ${nf.format(A.n)} leads${A.sources.length>1?` · ${A.sources.length} sources`:""}</div></div>`);
-
-  // 2 Executive summary
-  S.push(contentSlide(S.length+1,"Executive summary",N.summaryTitle,`
-    <div class="kpis">${N.kpis.map(k=>`<div class="kpi${k.hot?" hot":""}"><div class="v">${esc(k.v)}<small>${esc(k.u)}</small></div><div class="l">${esc(k.l)}</div></div>`).join("")}</div>
-    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin-top:18px">
-      <div class="card"><div class="findings">${N.findings.map(f=>`<div class="find"><span class="mk"></span><div><b>${esc(f[0])}</b><p>${esc(f[1])}</p></div></div>`).join("")}</div></div>
-      <div class="bottom"><span class="lb">Bottom line</span><p>${esc(N.bottom.p)}</p><small>${esc(N.bottom.s)}</small></div></div>`));
-
-  // Across data sources (only when several files/sheets are combined)
-  if(A.sources.length>1){
-    const top=Math.max(...A.sources.map(x=>x.n));
-    const bars=A.sources.map(x=>({k:x.name,v:x.n,segs:x.status.map(([k,c])=>[c,A.color(k),`${x.name} · ${k}: ${c}`])}));
-    S.push(contentSlide(S.length+1,"Across data sources",N.srcTitle,`
-      <div style="display:grid;grid-template-columns:1fr 1.25fr;gap:18px">
-        <div class="card"><h3>Leads per source, by status</h3><p class="sub">Each uploaded file or sheet</p>${legend(A)}${hbars(bars.slice(0,8),{right:i=>`${pct(A.sources.find(x=>x.name===i.k).rej,i.v)}% no`,scale:top})}</div>
-        <div class="card" style="padding:14px 16px"><table class="tbl"><thead><tr><th>Source</th><th>Leads</th><th>Not interested</th><th>In play</th><th>Potential</th><th>Period</th></tr></thead><tbody>
-          ${A.sources.slice(0,8).map(x=>`<tr><td>${esc(x.name)}</td><td class="num">${x.n}</td><td class="num">${pct(x.rej,x.n)}%</td><td class="num">${x.warm}</td><td class="num">${x.pot?rp(x.pot):"–"}</td><td style="white-space:nowrap">${esc(span(x.dates))}</td></tr>`).join("")}
-          </tbody><tfoot><tr><td>All sources</td><td class="num">${A.n}</td><td class="num">${pct(A.rej.length,A.n)}%</td><td class="num">${A.warm.length}</td><td class="num">${A.potWarm?rp(A.potWarm):"–"}</td><td style="white-space:nowrap">${esc(N.period)}</td></tr></tfoot></table>
-          <p class="sub" style="margin:10px 0 0">${esc(N.srcNote)}${A.sources.length>8?` Showing 8 of ${A.sources.length} sources.`:""}</p></div></div>`));
-  }
-
-  // 3 Outcome driver
-  const D=N.driver;
-  const rateBars=D?A.best.groups.map(g=>({k:g.g,v:Math.round(g.rate*100),n:g.n,w:g.w,tip:`${g.g}: ${g.w} of ${g.n} still in play`})):[];
-  const prof=A.profile.map(p=>`<tr><td class="dim">${esc(LABEL[p.k])}</td><td>${esc(p.rej.v)}<span class="sh">${Math.round(p.rej.share*100)}%</span>${A.lockstep.includes(p.k)?`<span class="same">all</span>`:""}</td>
-    <td>${A.warm.length?`${esc(p.warm.v)}<span class="sh">${Math.round(p.warm.share*100)}%</span>`:"–"}</td></tr>`).join("");
-  const dayRow=A.dates.length?`<tr><td class="dim">Dates</td><td>${esc(span(A.rej.map(r=>r.date).filter(Boolean).sort((a,b)=>a-b)))}</td><td>${esc(span(A.warm.map(r=>r.date).filter(Boolean).sort((a,b)=>a-b)))}</td></tr>`:"";
-  S.push(contentSlide(S.length+1,"What drives the outcome",D?N.driverTitle:"Outcome drivers",D?`
-    <div style="display:grid;grid-template-columns:0.9fr 1.3fr;gap:18px">
-      <div class="card"><h3>Leads still in play, by ${esc(D.dim.toLowerCase())}</h3><p class="sub">Share of leads that did not reject (considering or better)</p>
-        ${hbars(rateBars,{fmt:v=>v+"%",right:i=>`${i.w} of ${i.n}`,scale:100})}</div>
-      <div class="card" style="padding:14px 16px"><table class="tbl"><thead><tr><th>Dimension</th><th>Not interested (${A.rej.length})</th><th>Still in play (${A.warm.length})</th></tr></thead>
-        <tbody>${prof}${dayRow}</tbody></table></div></div>
-    <div class="caveat" style="margin-top:16px">${N.caveat}</div>`
-    :`<div class="card"><div class="empty">Needs a status column with both rejected and progressing leads.</div></div>`));
-
-  // 4 Reasons
-  const rb=A.reasons.slice(0,5).map(([k,v])=>({k,v,tip:`${k}${A.rawReason.get(k)&&A.rawReason.get(k)!==k?` (“${A.rawReason.get(k)}”)`:""}`,
-    segs:A.statusKeys.map(s=>{const c=A.rows.filter(r=>r.reason===k&&r.status===s).length;return [c,A.color(s),`${k} · ${s}: ${c}`]})}));
-  S.push(contentSlide(S.length+1,"Why leads say no",N.reasonTitle,`
-    <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:18px">
-      <div class="card"><h3>Reasons logged, by lead status</h3><p class="sub">Original Indonesian wording is shown on hover</p>${legend(A)}${hbars(rb,{right:i=>pct(i.v,A.n)+"%"})}
-        ${A.warm.length?`<p class="sub" style="margin:16px 0 0">Leads still in play: ${A.warmReasons.map(([k,v])=>`${v}× ${esc(k.toLowerCase())}`).join(", ")}. That is a timing objection, which can be nurtured.</p>`:""}</div>
-      <div class="card"><h3>Reason quality</h3><p class="sub">Can the team act on the reason given?</p>
-        <div class="bigstat">${N.catchPct}<small>%</small></div><p style="margin:6px 0 16px;font-size:13.5px;color:var(--body);line-height:1.45">of rejections carry a catch-all reason${A.rejNoReason?`, and ${A.rejNoReason} carry none`:""}. There is nothing to fix in the pitch, price or targeting.</p>
-        <h3 style="font-size:14px">Proposed required options</h3><p class="sub" style="margin-bottom:10px">Each one points to a different fix</p>
-        <div class="chips">${["Price too high","No need yet + revisit month","Already has a supplier","Unreachable","Needs owner / co-op approval","Doubts the product"].map(c=>`<span class="chip">${c}</span>`).join("")}</div></div></div>`));
-
-  // 5 Pipeline
-  const cols=[["id","ID"],["date","Date"],["pic","PIC"],["product","Product"],["location","Location"],["potential","Potential"]].filter(c=>A.map[c[0]]);
-  const wl=A.warm.slice().sort((a,b)=>(b.potential||0)-(a.potential||0)), shown=wl.slice(0,6);
-  const cell=(r,k)=>k==="potential"?`<td class="num">${r.potential?rp(r.potential):"–"}</td>`:k==="date"?`<td style="white-space:nowrap">${r.date?fd(r.date):"–"}</td>`:`<td>${esc(k==="product"?(r.product||r.purpose||"–"):(r[k]||"–"))}</td>`;
-  S.push(contentSlide(S.length+1,"Pipeline at stake",N.pipeTitle,A.warm.length?`
-    <div class="stats3">
-      <div class="kpi hot"><div class="v">${rpParts(A.potWarm)[0]}<small>${rpParts(A.potWarm)[1]}</small></div><div class="l">Potential sales still in play</div></div>
-      <div class="kpi"><div class="v">${A.potWarm&&A.warm.length?rpParts(A.potWarm/A.warm.length)[0]:"–"}<small>${A.potWarm?rpParts(A.potWarm/A.warm.length)[1]:""}</small></div><div class="l">Average value per lead in play</div></div>
-      <div class="kpi"><div class="v">${A.warmClosing}<small>/${A.warm.length}</small></div><div class="l">Have an estimated closing date</div></div></div>
-    <div class="card" style="margin-top:16px;padding:14px 16px"><table class="tbl"><thead><tr>${cols.map(c=>`<th>${c[1]}</th>`).join("")}<th>Reason</th><th>Status</th></tr></thead><tbody>
-      ${shown.map(r=>`<tr>${cols.map(([k])=>cell(r,k)).join("")}<td>${esc(r.reason||"–")}</td><td><span class="pill">${esc(r.status)}</span></td></tr>`).join("")}</tbody></table>
-      <p class="sub" style="margin:10px 0 0">${wl.length>shown.length?`Top ${shown.length} of ${wl.length} by value. `:""}Lead names and phone numbers are left out; look them up by ID in the CRM.</p></div>`
-    :`<div class="card"><div class="empty">Every lead in this data is not interested, or there is no status column.</div></div>`));
-
-  // 6 Actions
-  S.push(contentSlide(S.length+1,"Next steps",`${N.actions.length} actions for the next two weeks`,`
-    <div class="act">${N.actions.map((a,i)=>`<div class="card"><h3><span>${i+1}</span>${esc(a.t)}</h3><p>${esc(a.d)}</p><div class="meta"><span>Owner: ${esc(a.o)}</span><span class="when">${esc(a.w)}</span></div></div>`).join("")}</div>
-    ${N.gaps.length?`<div class="gaps"><b>Also clean up in the form:</b> ${esc(N.gaps.join("; "))}.</div>`:""}`));
-
-  S.push(`<div class="slide closing"><img class="bg" src="${IMG.closing}" alt=""><div class="shade"></div><img class="wm" src="${IMG.wm}" alt="SawitPRO.id"><img class="lg" src="${IMG.logo}" alt="">
-    <div class="box"><h2>Thank You</h2><p>#TerusTumbuh</p></div></div>`);
-  return S;
-}
-
-/* ================= Render & scaling ================= */
-let SLIDES=[]; const state={sources:[],sample:true,A:null,N:null};
-const deckEl=document.getElementById("deck"), presentEl=document.getElementById("present"), stage=document.getElementById("stage");
-function render(){
-  const on=state.sources.filter(x=>x.on);
-  renderSources();
-  if(!on.length){ deckEl.innerHTML=`<div class="card"><div class="empty">All data sources are switched off. Turn one on above, or upload a file.</div></div>`; SLIDES=[]; state.A=null; return; }
-  const A=analyse(on), N=narrative(A); state.A=A; state.N=N;
-  SLIDES=buildSlides(A,N);
-  deckEl.innerHTML=SLIDES.map((s,i)=>`<section class="frame" aria-label="Slide ${i+1}">${s}</section>`).join("");
-  const files=new Set(on.map(x=>x.name)).size;
-  document.getElementById("srcName").textContent=on.length===1?`${srcLabel(on[0])} · ${nf.format(A.n)} leads`
-    :`${files} file${files>1?"s":""}${on.length>files?` · ${on.length} sheets`:""} · ${nf.format(A.n)} leads${A.dupes?` (${A.dupes} repeat${A.dupes>1?"s":""} merged)`:""}`;
-  const missing=["status","reason","pic"].filter(k=>!A.map[k]);
-  if(missing.length&&!state.sample) note(`Couldn't find these columns: ${missing.map(k=>LABEL[k]).join(", ")}. Related slides will be empty. Use headers that contain words like “Status”, “Alasan/Reason” or “PIC”.`);
-  fit();
-}
-function fit(){ for(const f of deckEl.querySelectorAll(".frame")) f.firstElementChild.style.transform=`scale(${f.clientWidth/1280})`; if(!presentEl.hidden) showP(); }
-new ResizeObserver(fit).observe(deckEl);
-function note(msg,err,html){ const n=document.getElementById("notice"); if(!msg){n.hidden=true;return} if(html) n.innerHTML=msg; else n.textContent=msg; n.className="notice"+(err?" err":""); n.hidden=false; }
-
-/* ================= File loading ================= */
-const SAMPLE_SRC={name:SAMPLE?.name||"Sample data",sheet:SAMPLE?.sheet,headers:SAMPLE?Object.keys(SAMPLE.rows[0]):[],rows:SAMPLE?.rows||[],on:true};
-const KEY_FIELDS=["status","reason","pic","id","channel"];
-function sheetToDs(wb,name,sheet){
-  const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,raw:true,defval:null,blankrows:false});
-  let hi=aoa.findIndex(r=>r.filter(v=>!blank(v)).length>=2); if(hi<0) hi=0;
-  const headers=(aoa[hi]||[]).map((h,i)=>blank(h)?`Column ${i+1}`:String(h).trim());
-  return {name,sheet,headers,rows:aoa.slice(hi+1).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??null]))).filter(r=>Object.values(r).some(v=>!blank(v))),on:true};
-}
-// One file -> one or more sources. Workbooks keep every sheet that looks like lead data (else the largest sheet).
-async function readFile(file){
-  const ext=file.name.split(".").pop().toLowerCase();
-  if(ext==="json"){ const j=JSON.parse(await file.text()); const rows=Array.isArray(j)?j:(j.rows||j.data||Object.values(j).find(Array.isArray));
-    if(!Array.isArray(rows)||!rows.length) throw new Error("the JSON file must contain an array of rows");
-    return [{name:file.name,headers:[...new Set(rows.flatMap(r=>Object.keys(r)))],rows,on:true}]; }
-  if(typeof XLSX==="undefined") throw new Error("the spreadsheet reader didn't load. Check your connection and reload the page");
-  const wb=["csv","tsv","txt"].includes(ext)?XLSX.read(await file.text(),{type:"string",cellDates:true,raw:false,FS:ext==="tsv"?"\t":undefined}):XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true});
-  const sheets=wb.SheetNames.map(sh=>sheetToDs(wb,file.name,sh)).filter(d=>d.rows.length);
-  if(!sheets.length) throw new Error("no data rows found");
-  const leadLike=sheets.filter(d=>{const m=detect(d.headers);return KEY_FIELDS.filter(k=>m[k]).length>=2});
-  const keep=leadLike.length?leadLike:[sheets.sort((a,b)=>b.rows.length-a.rows.length)[0]];
-  if(wb.SheetNames.length===1) keep.forEach(d=>d.sheet=null);
-  return keep;
-}
-const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v3"):localStorage.setItem("sp-deck-data-v3",JSON.stringify(state.sources)); }catch(e){} };
-async function loadFiles(list){
-  const files=[...list]; if(!files.length) return;
-  note(""); const failed=[], added=[];
-  for(const f of files){ try{ added.push(...await readFile(f)); }catch(e){ failed.push(`“${f.name}”: ${e.message}`); } }
-  if(added.length){
-    if(state.sample){ state.sources=[]; state.sample=false; }
-    for(const d of added){ const i=state.sources.findIndex(x=>x.name===d.name&&x.sheet===d.sheet); if(i>=0) state.sources[i]=d; else state.sources.push(d); }
-    render(); save();
-  }
-  if(failed.length) note(`Couldn't read ${failed.join("; ")}.`,true);
-  else if(added.length){ const k=state.sources.filter(x=>x.on).length;
-    note(k===1?`Loaded ${srcLabel(added[0])}.`:`Added ${added.length} data source${added.length>1?"s":""}. The deck now combines ${k} sources into one analysis.`); }
-}
-function renderSources(){
-  const box=document.getElementById("sources");
-  if(state.sample){ box.innerHTML=`<span class="lbl">Showing sample data</span><span class="hintx">Upload one or more files to replace it. Several files are combined into one deck.</span>`; return; }
-  box.innerHTML=`<span class="lbl">Data sources</span>${state.sources.map((d,i)=>`<span class="src-chip${d.on?"":" off"}">
-    <label><input type="checkbox" data-i="${i}" ${d.on?"checked":""} aria-label="Include ${esc(srcLabel(d))}"> ${esc(srcLabel(d))} <em>${nf.format(d.rows.length)}</em></label>
-    <button type="button" data-rm="${i}" aria-label="Remove ${esc(srcLabel(d))}">×</button></span>`).join("")}
-    <button class="link" type="button" id="addMore">+ Add files</button><button class="link" type="button" id="clearAll">Clear all</button>`;
-}
-document.getElementById("sources").addEventListener("change",e=>{ const i=e.target.dataset?.i; if(i===undefined) return; state.sources[+i].on=e.target.checked; note(""); render(); save(); });
-document.getElementById("sources").addEventListener("click",e=>{
-  const rm=e.target.closest("[data-rm]"); if(rm){ state.sources.splice(+rm.dataset.rm,1); if(!state.sources.length){ state.sources=[{...SAMPLE_SRC}]; state.sample=true; } note(""); render(); save(); return; }
-  if(e.target.id==="addMore") document.getElementById("fileIn").click();
-  if(e.target.id==="clearAll"){ state.sources=[{...SAMPLE_SRC}]; state.sample=true; note(""); render(); save(); }
-});
-document.getElementById("uploadBtn").onclick=()=>document.getElementById("fileIn").click();
-document.getElementById("fileIn").onchange=e=>{ loadFiles(e.target.files); e.target.value=""; };
-let dragN=0; const hint=document.getElementById("dropHint");
-addEventListener("dragenter",e=>{if([...e.dataTransfer.types].includes("Files")){dragN++;hint.hidden=false}});
-addEventListener("dragleave",()=>{dragN=Math.max(0,dragN-1); if(!dragN) hint.hidden=true});
-addEventListener("dragover",e=>e.preventDefault());
-addEventListener("drop",e=>{e.preventDefault(); dragN=0; hint.hidden=true; loadFiles(e.dataTransfer.files);});
-
-/* ================= Present mode ================= */
-let cur=0;
-function showP(){ const s=Math.min(innerWidth/1280,(innerHeight-70)/720); stage.style.width=1280*s+"px"; stage.style.height=720*s+"px";
-  stage.innerHTML=SLIDES[cur]; stage.firstElementChild.style.transform=`scale(${s})`; document.getElementById("pCount").textContent=`${cur+1} / ${SLIDES.length}`; }
-const go=d=>{ cur=Math.max(0,Math.min(SLIDES.length-1,cur+d)); showP(); };
-document.getElementById("presentBtn").onclick=()=>{ const y=[...deckEl.children].findIndex(f=>f.getBoundingClientRect().bottom>90); cur=Math.max(0,y);
-  presentEl.hidden=false; showP(); presentEl.requestFullscreen?.().catch(()=>{}); };
-function closeP(){ presentEl.hidden=true; if(document.fullscreenElement) document.exitFullscreen?.().catch(()=>{}); }
-document.getElementById("pPrev").onclick=()=>go(-1); document.getElementById("pNext").onclick=()=>go(1); document.getElementById("pClose").onclick=closeP;
-stage.onclick=e=>go(e.clientX>innerWidth/2?1:-1);
-addEventListener("keydown",e=>{ if(presentEl.hidden) return; if(["ArrowRight","PageDown"," "].includes(e.key)){e.preventDefault();go(1)} else if(["ArrowLeft","PageUp"].includes(e.key)){e.preventDefault();go(-1)} else if(e.key==="Escape") closeP(); });
-addEventListener("resize",()=>{ if(!presentEl.hidden) showP(); });
-
-/* ================= Tooltip ================= */
-const tip=document.getElementById("tip");
-addEventListener("pointermove",e=>{ const t=e.target.closest?.("[data-tip]"); if(!t){tip.hidden=true;return}
-  tip.textContent=t.dataset.tip; tip.hidden=false; const w=tip.offsetWidth; tip.style.left=Math.min(innerWidth-w-8,e.clientX+14)+"px"; tip.style.top=(e.clientY+16)+"px"; });
-
-/*EXPORT_PPTX*/
+/*INCLUDE:analysis.js*/
+/*INCLUDE:slides.js*/
+/*INCLUDE:app.js*/
+/*INCLUDE:export-pptx.js*/
 
 /* ================= Boot ================= */
-let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data-v3")||"null") }catch(e){}
-if(Array.isArray(saved)&&saved.some(d=>d.rows?.length)){ state.sources=saved; state.sample=false; } else state.sources=[{...SAMPLE_SRC}];
-render();
+let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data-v4")||"null") }catch(e){}
+if(saved&&Array.isArray(saved.sources)&&saved.sources.some(d=>d.rows?.length)){
+  state.sources=saved.sources; state.sample=false;
+  if(saved.dirty){ state.dirty=true; renderSources(); deckEl.innerHTML=`<div class="card"><div class="empty">Your files are loaded. Click <b>&nbsp;Analyze&nbsp;</b> to build the deck.</div></div>`; }
+  else analyzeNow();
+} else { state.sources=SAMPLE_SRCS.map(s=>({...s})); analyzeNow(); }
 </script>
