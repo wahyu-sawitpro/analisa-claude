@@ -27,14 +27,17 @@ Parsing and analysis happen in the browser; data is not sent anywhere.
 1. Cover
 2. Executive summary: KPIs, findings, bottom line
 3. Success story: how CRM wins happened (channel, source) and the sales orders they became
-4. Sales last week: GMV by product and PIC, repeat vs new, orders missing from the CRM, partial payments
-5. Rejection reasons last week: every reason (English, with the original CRM wording), split by status, a heat table against
+4. Sales · what sold: GMV and units by product type (grouped from item names), GMV and orders by product category,
+   basket size and common product pairs, price gaps on the same SKU
+5. Sales · who bought and how: GMV and customers by region (regency/city, normalised) and province, order value by
+   ordering channel and new vs repeat, sales PIC, unpaid amounts on partially paid orders, open orders, orders missing from the CRM
+6. Rejection reasons last week: every reason (English, with the original CRM wording), split by status, a heat table against
    the two dimensions that best predict the reason (e.g. lead type, PIC), and notes on logging quality and location hot spots
-6. What the reasons mean: reasons grouped by the fix they need, plus signals read from the discussion notes
-7. What separates winners: the dimension that best separates orders from the rest, cohort profile, confounding caveat
-8. Recoverable demand: leads still in play and what they are asking
-9. Next steps: up to four actions with owner and timing
-10. Thank you
+7. What the reasons mean: reasons grouped by the fix they need, plus signals read from the discussion notes
+8. What separates winners: the dimension that best separates orders from the rest, cohort profile, confounding caveat
+9. Recoverable demand: leads still in play and what they are asking
+10. Next steps: up to six actions with owner and timing
+11. Thank you
 
 ## Files
 - `index.html`: built deck, ready to open
@@ -46,6 +49,12 @@ Parsing and analysis happen in the browser; data is not sent anywhere.
 
 ## Findings on last week's data (28 Sep – 4 Oct 2026)
 - Rp669M GMV from 19 orders (19 customers, 4 new); the top 2 orders are 39% of GMV.
+- Rock phosphate is the anchor product: 71% of units (1,977 of 2,779) and 40% of GMV. By product category, Pupuk has
+  the most GMV (30%) and Khusus Petani the most orders (8). 7 of 19 orders mix product types, most often KCL with NPK or RP.
+- RP Mahkota 50kg (Egypt) sold at Rp111k–129k per unit across 7 lines (+15%).
+- Riau is 81% of GMV. Kampar has the most customers (7); Siak's Rp161M is mostly one Rp147M order.
+- Web orders average Rp50.5M vs Rp18.2M on the Petani app; repeat customers are 15 of 19 orders and 87% of GMV.
+- Rp170M is still unpaid on 4 partially paid orders, and 13 of 19 orders are still open.
 - All 10 CRM wins are confirmed in sales (9 orders, Rp279M). 9 of 10 came from one PIC's on-site canvassing.
 - Lead source separates outcomes: canvassing 8 of 9 ordered, database 0 of 23.
 - Lead type predicts the rejection reason: existing leads 15 of 17 locked into a shop, KUD or agent; new leads 7 of 12 "just asking".

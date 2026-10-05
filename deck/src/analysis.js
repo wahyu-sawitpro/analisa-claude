@@ -38,6 +38,11 @@ const SALES_FIELDS=[
   ["name",[/customer_?name|nama\s*customer/]],
   ["qty",[/^qty$|quantity|jumlah/]],
   ["gmv",[/^gmv$/,/sales_?amount/,/nett_?sales/,/revenue/,/total/]],
+  ["salesAmount",[/sales_?amount/]],
+  ["nett",[/nett_?sales|net\s*sales/]],
+  ["revenue",[/^revenue$|paid\s*amount|amount\s*paid/]],
+  ["discount",[/discount|diskon/]],
+  ["shipping",[/shipping|ongkir/]],
   ["item",[/item_?name|^item$|product_?name|^produk$/]],
   ["category",[/product_?cat|kategori|category/]],
   ["payStatus",[/inv_?status|payment/]],
@@ -166,8 +171,17 @@ function canonCrm(r,map,src){ const o={_raw:r,_src:src};
   o.theme=themeOf(o.reason);
   return o; }
 function canonSale(r,map,src){ const o={_raw:r,_src:src};
-  for(const k in map){ const v=r[map[k]]; o[k]=k==="qty"||k==="gmv"?toNum(v):k==="date"?toDate(v):clean(v); }
-  o.ph=phoneKey(o.phone); o.nk=nameKey(o.name); return o; }
+  for(const k in map){ const v=r[map[k]]; o[k]=["qty","gmv","salesAmount","nett","revenue","discount","shipping"].includes(k)?toNum(v):k==="date"?toDate(v):clean(v); }
+  o.ph=phoneKey(o.phone); o.nk=nameKey(o.name);
+  o.family=familyOf(o.item); o.region=regionOf(o.city)||regionOf(o.province);
+  o.unit=o.qty?(o.salesAmount??o.gmv??0)/o.qty:null;
+  return o; }
+// Product family from the item name (fertilizer type), so "RP Mahkota" and "RP Sasco" count together.
+const FAMILIES=[["Seeds",/benih|seed|topaz|bibit/],["Rock phosphate (RP)",/\brp\b|rock\s*phos|fosfat/],["NPK",/\bnpk\b/],["KCL / MOP",/kcl|\bmop\b/],["Urea",/urea/],
+  ["ZA",/\bza\b/],["Borate",/borat|boron/],["Dolomite",/dolomit/],["TSP / SP-36",/\btsp\b|sp-?36/],["Herbicide & pesticide",/gramoxone|metsulindo|herbisida|herbicide|racun|insektisida|pestisida|round\s*up/]];
+const familyOf=v=>{ const s=norm(v); if(!s) return null; const f=FAMILIES.find(([,re])=>re.test(s)); return f?f[0]:clean(v).split(" ")[0]; };
+const regionOf=v=>{ const s=clean(v); if(!s) return null; const t=s.toUpperCase().replace(/^(KABUPATEN|KAB\.?|KOTA)\s+/,"").replace(/\s+CITY$/,"").trim();
+  return t.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); };
 
 function analyse(sources){
   const A={crmSources:[],salesSources:[]}; const crm=[], lines=[];
@@ -198,6 +212,28 @@ function analyse(sources){
   A.customers=new Set(O.map(o=>o.ph||o.nk||o.no)).size;
   A.newOrders=O.filter(o=>o.isNew); A.partial=O.filter(o=>o.partial);
   A.byItem=sumBy(lines,l=>shortItem(l.item)||null,l=>l.gmv||0);
+  // What sold: product family, product category, basket and price consistency
+  const grp=(key)=>{ const m=new Map(); for(const l of lines){ const k=key(l); if(!k) continue; if(!m.has(k)) m.set(k,{k,gmv:0,qty:0,orders:new Set(),cust:new Set()});
+      const g=m.get(k); g.gmv+=l.gmv||0; g.qty+=l.qty||0; g.orders.add(l.orderNo||l.invoice||l); g.cust.add(l.ph||l.nk); }
+    return [...m.values()].map(g=>({...g,orders:g.orders.size,cust:g.cust.size})).sort((a,b)=>b.gmv-a.gmv); };
+  A.byFamily=grp(l=>l.family); A.byCat=grp(l=>l.category); A.byRegion=grp(l=>l.region); A.byProvince=grp(l=>regionOf(l.province));
+  A.qtyTotal=lines.reduce((s,l)=>s+(l.qty||0),0);
+  A.itemsPerOrder=O.length?O.reduce((s,o)=>s+o.lines.length,0)/O.length:0;
+  const pairs=new Map(); for(const o of O){ const f=[...new Set(o.lines.map(l=>l.family).filter(Boolean))].sort(); for(let i=0;i<f.length;i++) for(let j=i+1;j<f.length;j++){ const k=f[i]+" + "+f[j]; pairs.set(k,(pairs.get(k)||0)+1); } }
+  A.pairs=[...pairs].sort((a,b)=>b[1]-a[1]);
+  A.multiFamily=O.filter(o=>new Set(o.lines.map(l=>l.family)).size>1).length;
+  A.priceSpread=[...new Set(lines.map(l=>l.item))].map(it=>{ const u=lines.filter(l=>l.item===it&&l.unit>0).map(l=>l.unit); return u.length>=3?{item:shortItem(it),n:u.length,min:Math.min(...u),max:Math.max(...u)}:null; })
+    .filter(Boolean).map(x=>({...x,spread:(x.max-x.min)/x.min})).sort((a,b)=>b.spread-a.spread);
+  // How they bought: ordering channel, new vs repeat, sales PIC
+  const seg=(f)=>{ const m=new Map(); for(const o of O){ const k=f(o); if(!k) continue; if(!m.has(k)) m.set(k,{k,n:0,gmv:0}); const g=m.get(k); g.n++; g.gmv+=o.gmv; }
+    return [...m.values()].map(g=>({...g,aov:g.gmv/g.n})).sort((a,b)=>b.gmv-a.gmv); };
+  A.byApp=seg(o=>o.app); A.byCust=seg(o=>o.isNew?"New customer":"Repeat customer");
+  // Money and fulfilment at risk
+  const outLine=l=>/partial|unpaid|pending/i.test(l.payStatus||"")&&l.revenue!=null?Math.max(0,(l.nett??l.gmv??0)-l.revenue):0;
+  A.outstanding=lines.reduce((s,l)=>s+outLine(l),0);
+  A.openOrders=O.filter(o=>o.lines.some(l=>/^new$|open|pending|process/i.test(l.soStatus||"")));
+  A.discount=lines.reduce((s,l)=>s+(l.discount||0),0); A.shipping=lines.reduce((s,l)=>s+(l.shipping||0),0);
+  A.salesDays=sumBy(O,o=>o.date?+o.date:null,o=>o.gmv).sort((a,b)=>a[0]-b[0]);
   A.byPic=sumBy(O,o=>o.pic,o=>o.gmv).map(([p,g])=>({p,g,n:O.filter(o=>o.pic===p).length}));
   A.byCity=sumBy(O,o=>o.city,o=>o.gmv);
   A.top2=O.slice(0,2).reduce((s,o)=>s+o.gmv,0);

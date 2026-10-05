@@ -176,6 +176,9 @@ main{padding-block:14px 60px;padding-inline:16px}
 .heatt td,.heatt th{text-align:center;padding:5px 6px;font-size:11.5px}.heatt td:first-child,.heatt th:first-child{text-align:left}
 .heatt th.grp{border-left:2px solid #fff}.heatt tr.sub2 th{background:#6E8F5A;font-weight:600;font-size:11px}
 .heatt td.heat{font-weight:700;font-variant-numeric:tabular-nums;border-left:2px solid #fff}
+.tbl.seg td,.tbl.seg th{padding:5px 8px;font-size:12px}
+.mini-h{margin:2px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.act.act3{grid-template-columns:repeat(3,1fr);gap:14px}.act.act3 .card{padding:14px 16px}.act.act3 .card p{font-size:12.5px}.act.act3 .card h3{font-size:15px}
 .stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .tbl th .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;border:1.5px solid #fff}
 </style>
@@ -266,6 +269,11 @@ const SALES_FIELDS=[
   ["name",[/customer_?name|nama\s*customer/]],
   ["qty",[/^qty$|quantity|jumlah/]],
   ["gmv",[/^gmv$/,/sales_?amount/,/nett_?sales/,/revenue/,/total/]],
+  ["salesAmount",[/sales_?amount/]],
+  ["nett",[/nett_?sales|net\s*sales/]],
+  ["revenue",[/^revenue$|paid\s*amount|amount\s*paid/]],
+  ["discount",[/discount|diskon/]],
+  ["shipping",[/shipping|ongkir/]],
   ["item",[/item_?name|^item$|product_?name|^produk$/]],
   ["category",[/product_?cat|kategori|category/]],
   ["payStatus",[/inv_?status|payment/]],
@@ -394,8 +402,17 @@ function canonCrm(r,map,src){ const o={_raw:r,_src:src};
   o.theme=themeOf(o.reason);
   return o; }
 function canonSale(r,map,src){ const o={_raw:r,_src:src};
-  for(const k in map){ const v=r[map[k]]; o[k]=k==="qty"||k==="gmv"?toNum(v):k==="date"?toDate(v):clean(v); }
-  o.ph=phoneKey(o.phone); o.nk=nameKey(o.name); return o; }
+  for(const k in map){ const v=r[map[k]]; o[k]=["qty","gmv","salesAmount","nett","revenue","discount","shipping"].includes(k)?toNum(v):k==="date"?toDate(v):clean(v); }
+  o.ph=phoneKey(o.phone); o.nk=nameKey(o.name);
+  o.family=familyOf(o.item); o.region=regionOf(o.city)||regionOf(o.province);
+  o.unit=o.qty?(o.salesAmount??o.gmv??0)/o.qty:null;
+  return o; }
+// Product family from the item name (fertilizer type), so "RP Mahkota" and "RP Sasco" count together.
+const FAMILIES=[["Seeds",/benih|seed|topaz|bibit/],["Rock phosphate (RP)",/\brp\b|rock\s*phos|fosfat/],["NPK",/\bnpk\b/],["KCL / MOP",/kcl|\bmop\b/],["Urea",/urea/],
+  ["ZA",/\bza\b/],["Borate",/borat|boron/],["Dolomite",/dolomit/],["TSP / SP-36",/\btsp\b|sp-?36/],["Herbicide & pesticide",/gramoxone|metsulindo|herbisida|herbicide|racun|insektisida|pestisida|round\s*up/]];
+const familyOf=v=>{ const s=norm(v); if(!s) return null; const f=FAMILIES.find(([,re])=>re.test(s)); return f?f[0]:clean(v).split(" ")[0]; };
+const regionOf=v=>{ const s=clean(v); if(!s) return null; const t=s.toUpperCase().replace(/^(KABUPATEN|KAB\.?|KOTA)\s+/,"").replace(/\s+CITY$/,"").trim();
+  return t.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); };
 
 function analyse(sources){
   const A={crmSources:[],salesSources:[]}; const crm=[], lines=[];
@@ -426,6 +443,28 @@ function analyse(sources){
   A.customers=new Set(O.map(o=>o.ph||o.nk||o.no)).size;
   A.newOrders=O.filter(o=>o.isNew); A.partial=O.filter(o=>o.partial);
   A.byItem=sumBy(lines,l=>shortItem(l.item)||null,l=>l.gmv||0);
+  // What sold: product family, product category, basket and price consistency
+  const grp=(key)=>{ const m=new Map(); for(const l of lines){ const k=key(l); if(!k) continue; if(!m.has(k)) m.set(k,{k,gmv:0,qty:0,orders:new Set(),cust:new Set()});
+      const g=m.get(k); g.gmv+=l.gmv||0; g.qty+=l.qty||0; g.orders.add(l.orderNo||l.invoice||l); g.cust.add(l.ph||l.nk); }
+    return [...m.values()].map(g=>({...g,orders:g.orders.size,cust:g.cust.size})).sort((a,b)=>b.gmv-a.gmv); };
+  A.byFamily=grp(l=>l.family); A.byCat=grp(l=>l.category); A.byRegion=grp(l=>l.region); A.byProvince=grp(l=>regionOf(l.province));
+  A.qtyTotal=lines.reduce((s,l)=>s+(l.qty||0),0);
+  A.itemsPerOrder=O.length?O.reduce((s,o)=>s+o.lines.length,0)/O.length:0;
+  const pairs=new Map(); for(const o of O){ const f=[...new Set(o.lines.map(l=>l.family).filter(Boolean))].sort(); for(let i=0;i<f.length;i++) for(let j=i+1;j<f.length;j++){ const k=f[i]+" + "+f[j]; pairs.set(k,(pairs.get(k)||0)+1); } }
+  A.pairs=[...pairs].sort((a,b)=>b[1]-a[1]);
+  A.multiFamily=O.filter(o=>new Set(o.lines.map(l=>l.family)).size>1).length;
+  A.priceSpread=[...new Set(lines.map(l=>l.item))].map(it=>{ const u=lines.filter(l=>l.item===it&&l.unit>0).map(l=>l.unit); return u.length>=3?{item:shortItem(it),n:u.length,min:Math.min(...u),max:Math.max(...u)}:null; })
+    .filter(Boolean).map(x=>({...x,spread:(x.max-x.min)/x.min})).sort((a,b)=>b.spread-a.spread);
+  // How they bought: ordering channel, new vs repeat, sales PIC
+  const seg=(f)=>{ const m=new Map(); for(const o of O){ const k=f(o); if(!k) continue; if(!m.has(k)) m.set(k,{k,n:0,gmv:0}); const g=m.get(k); g.n++; g.gmv+=o.gmv; }
+    return [...m.values()].map(g=>({...g,aov:g.gmv/g.n})).sort((a,b)=>b.gmv-a.gmv); };
+  A.byApp=seg(o=>o.app); A.byCust=seg(o=>o.isNew?"New customer":"Repeat customer");
+  // Money and fulfilment at risk
+  const outLine=l=>/partial|unpaid|pending/i.test(l.payStatus||"")&&l.revenue!=null?Math.max(0,(l.nett??l.gmv??0)-l.revenue):0;
+  A.outstanding=lines.reduce((s,l)=>s+outLine(l),0);
+  A.openOrders=O.filter(o=>o.lines.some(l=>/^new$|open|pending|process/i.test(l.soStatus||"")));
+  A.discount=lines.reduce((s,l)=>s+(l.discount||0),0); A.shipping=lines.reduce((s,l)=>s+(l.shipping||0),0);
+  A.salesDays=sumBy(O,o=>o.date?+o.date:null,o=>o.gmv).sort((a,b)=>a[0]-b[0]);
   A.byPic=sumBy(O,o=>o.pic,o=>o.gmv).map(([p,g])=>({p,g,n:O.filter(o=>o.pic===p).length}));
   A.byCity=sumBy(O,o=>o.city,o=>o.gmv);
   A.top2=O.slice(0,2).reduce((s,o)=>s+o.gmv,0);
@@ -552,20 +591,28 @@ function narrative(A){
   if(won) N.winTitle=wp&&wc&&wp.n/won>=.6&&wc.n/won>=.6
       ? `${wp.v}'s ${lc(wc.v)}s produced ${wp.n} of ${won} CRM wins${A.has.sales?`, ${rp(A.linkedGmv)} in orders`:""}`
       : `${won} CRM engagements ended in an order${A.has.sales?`, worth ${rp(A.linkedGmv)}`:""}`;
-  if(A.has.sales){ const O=A.orders;
+  if(A.has.sales){ const O=A.orders, F0=A.byFamily[0], Q=A.qtyTotal||1, C0=A.byCat[0], CO=A.byCat.slice().sort((a,b)=>b.orders-a.orders)[0];
+    N.soldTitle=F0?(F0.qty/Q>=.5?`${F0.k} is the anchor product: ${pct(F0.qty,Q)}% of units and ${pct(F0.gmv,A.gmv)}% of GMV`:`${F0.k} leads with ${pct(F0.gmv,A.gmv)}% of GMV`):"What sold";
+    N.catLine=C0?(CO&&CO.k!==C0.k?`By product category, ${C0.k} brings the most GMV (${pct(C0.gmv,A.gmv)}%) and ${CO.k} the most orders (${CO.orders}).`:`By product category, ${C0.k} leads on GMV (${pct(C0.gmv,A.gmv)}%) and orders (${C0.orders}).`):"";
+    const P0=A.byProvince[0], RG=A.byRegion, RC=RG.slice().sort((a,b)=>b.cust-a.cust||b.gmv-a.gmv)[0], R0=RG[0];
+    const r0top=R0?Math.max(...O.filter(o=>o.lines.some(l=>l.region===R0.k)).map(o=>o.gmv)):0;
+    N.whoTitle=RC?`${P0&&A.byProvince.length>1?`${P0.k} is ${pct(P0.gmv,A.gmv)}% of GMV; `:""}${RC.k} has the most customers (${RC.cust})${R0&&R0.k!==RC.k?`, ${R0.k} the most GMV`:""}`:"Who bought and how";
+    N.regionNote=R0&&R0.orders<=3&&r0top/R0.gmv>=.8?`${R0.k}'s ${rp(R0.gmv)} is mostly one order (${rp(r0top)}), so ${RC&&RC.k!==R0.k?RC.k:"the broader base"} is the steadier market.`:"";
     N.salesTitle=A.noCrm.length/O.length>=.3?`${rp(A.gmv)} from ${O.length} orders, but ${A.noCrm.length} of them never appear in the CRM`
       :`${rp(A.gmv)} from ${O.length} orders; the top 2 make up ${pct(A.top2,A.gmv)}%`; }
   if(warm) N.warmTitle=A.intentWarm.length>=2?`${warm} leads are still in play, and ${A.intentWarm.length} are already asking how to buy`:`${warm} leads are still in play`;
 
   // Headline for the executive summary
   const dh=N.driver&&won?`${N.driver.hi.g} converts (${N.driver.hi.w} of ${N.driver.hi.n}); ${lc(N.driver.lo.g)} doesn't (${N.driver.lo.w} of ${N.driver.lo.n})`:null;
-  N.headline=A.has.sales?`${rp(A.gmv)} in sales last week.${dh?` ${dh}.`:""}`:dh||(n?`${pct(lost,n)}% of leads said no; ${warm} are still in play`:"Executive summary");
+  const sF0=A.byFamily?.[0], sTail=sF0?` ${sF0.k} is ${pct(sF0.qty,A.qtyTotal||1)}% of units${A.outstanding>=A.gmv*.1?`, and ${rp(A.outstanding)} is still unpaid`:""}.`:"";
+  N.headline=A.has.sales?`${rp(A.gmv)} in sales last week.${dh?` ${dh}.`:sTail}`:dh||(n?`${pct(lost,n)}% of leads said no; ${warm} are still in play`:"Executive summary");
   // Findings (max 4)
   const F=[];
   if(N.driver){ const {hi,lo}=N.driver; F.push([`${N.driver.dim} separates winners from the rest`,`${hi.g}: ${hi.w} of ${hi.n} ${A.posLabel}. ${lo.g}: ${lo.w} of ${lo.n}.`]); }
   if(tTop&&lost) F.push([tTop.t==="Locked in elsewhere"?"Rejections are about loyalty, not product":`Top rejection theme: ${lc(tTop.t)}`,
     `${tTop.lost} of ${lost} “not interested” leads${tTop.t==="Locked in elsewhere"?" already buy from a shop, KUD or agent":` cite ${lc(tTop.t)}`}${sig("credit").lost?`; ${sig("credit").lost} buy on credit`:""}${sig("season").lost?`; ${sig("season").lost} already fertilized this season`:""}.`]);
   if(A.intentWarm.length>=2) F.push(["Warm leads are asking how to buy",`${A.intentWarm.length} of ${warm} leads in play asked about the warehouse, delivery or prices${A.unreachable?`; ${A.unreachable} could not be reached by phone`:""}.`]);
+  if(A.has.sales&&A.outstanding>=A.gmv*.1) F.push([`${rp(A.outstanding)} of last week's sales is still unpaid`,`${A.partial.length} partially paid order${A.partial.length>1?"s":""} worth ${rp(A.partial.reduce((s,o)=>s+o.gmv,0))}; ${A.openOrders.length} of ${A.orders.length} orders are still open.`]);
   if(A.has.sales&&A.noCrm.length/A.orders.length>=.3) F.push(["The CRM misses most of the sales story",`${A.noCrm.length} of ${A.orders.length} orders (${rp(A.noCrm.reduce((s,o)=>s+o.gmv,0))}) have no CRM engagement${A.crmMap.potential?", and CRM wins carry no GMV":""}.`]);
   if(A.stockRows.length>=2) F.push(["Stock-outs cost real orders",`${A.stockRows.length} leads stalled because the product wasn't available or delivery was too slow.`]);
   if(!A.has.sales&&!won&&nw){ const ca=A.notWon.filter(r=>r.theme==="Just asking").length; if(ca/nw>=.5) F.push(["We don't know why leads say no",`${pct(ca,nw)}% of reasons are a catch-all, so the team can't fix the pitch.`]); }
@@ -584,10 +631,11 @@ function narrative(A){
   if(A.intentWarm.length>=2) act.push({t:`Close ${A.intentWarm.length} warm leads within 48 hours`,d:`They asked about the warehouse, delivery or prices.${A.unreachable?` ${A.unreachable} could not be reached by phone, so send the price list and warehouse location on WhatsApp, then follow up.`:""}`,o:warmPic||"Lead PIC",w:"This week"});
   if(tTop&&tTop.t==="Locked in elsewhere"&&tTop.lost>=3) act.push({t:"Stop competing head-on with KUDs and shops",d:`${tTop.lost} rejections are tied to an existing shop, KUD or agent${sig("credit").lost?`, ${sig("credit").lost} of them buying on credit`:""}. Test a KUD partnership or payment terms, and drop these numbers from this season's call lists.`,o:"Sales lead",w:"Next 2 weeks"});
   if(A.stockRows.length>=2){ const pr=productsIn(A.stockRows).slice(0,3); act.push({t:"Restock what leads asked for",d:`${A.stockRows.length} leads stalled on availability or a 7–14 day delivery${pr.length?`: ${andList(pr)}`:""}. Confirm stock before promising, and offer warehouse pickup.`,o:"Supply & ops",w:"This week"}); }
+  if(A.has.sales&&A.outstanding>=A.gmv*.05) act.push({t:`Collect ${rp(A.outstanding)} still unpaid`,d:`${A.partial.length} order${A.partial.length>1?"s are":" is"} only partially paid. Confirm payment dates before the next delivery to these customers.`,o:"Finance + order PIC",w:"This week"});
   if(A.has.sales&&A.noCrm.length/A.orders.length>=.3) act.push({t:"Log every order in the CRM",d:`${A.noCrm.length} of ${A.orders.length} orders have no engagement record. Add the order number to each CRM entry so wins carry their GMV.`,o:"Sales ops",w:"Next form update"});
   if(warm&&!A.intentWarm.length) act.push({t:`Book dated follow-ups for ${warm} leads in play`,d:"Agree a concrete next step with each lead and log a follow-up date.",o:warmPic||"Lead PIC",w:"This week"});
   if(nw&&A.notWon.filter(r=>r.theme==="Just asking").length/nw>=.3) act.push({t:"Replace the catch-all reason",d:"Make the reason a required dropdown: price, no need yet (with a revisit month), has a supplier, tied to KUD, out of stock, unreachable. Drop “just asking”.",o:"Sales ops",w:"Next form update"});
-  N.actions=act.slice(0,4);
+  N.actions=act.slice(0,6);
 
   // Data gaps
   const g=[]; const fill=k=>A.crm.filter(r=>r[k]!==null&&r[k]!==undefined).length/(n||1);
@@ -658,17 +706,36 @@ function buildSlides(A,N){
           <p class="sub" style="margin:8px 0 0">${A.has.sales?`Matched by phone number, then order number in the notes, then name and PIC.${A.linkedOrders.length>5?` Top 5 of ${A.linkedOrders.length} by GMV.`:""}`:"Upload the sales file to see what these wins were worth."}</p></div></div></div>`));
   }
 
-  // Sales last week
+  // Sales: what sold
   if(A.has.sales){
-    const O=A.orders, rep=O.filter(o=>!o.isNew), newG=A.newOrders.reduce((s,o)=>s+o.gmv,0), parG=A.partial.reduce((s,o)=>s+o.gmv,0), ncG=A.noCrm.reduce((s,o)=>s+o.gmv,0);
-    S.push(contentSlide(next(),"Sales last week",N.salesTitle,`
-      <div style="display:grid;grid-template-columns:1.1fr 1fr .9fr;gap:16px">
-        <div class="card"><h3>GMV by product</h3><p class="sub">Top items across all orders</p>${hbars(A.byItem.slice(0,6).map(([k,v])=>({k,v})),{fmt:rp})}</div>
-        <div class="card"><h3>GMV by PIC</h3><p class="sub">Orders in brackets</p>${hbars(A.byPic.slice(0,6).map(x=>({k:x.p,v:x.g,o:x.n})),{fmt:rp,right:i=>`(${i.o})`,color:"#6E8F5A"})}</div>
+    const O=A.orders, Q=A.qtyTotal||1, F0=A.byFamily[0], sp=A.priceSpread[0], pair=A.pairs[0];
+    S.push(contentSlide(next(),"Sales last week · what sold",N.soldTitle,`
+      <div style="display:grid;grid-template-columns:1.1fr 1.1fr .85fr;gap:16px;align-items:start">
+        <div class="card"><h3>GMV by product type</h3><p class="sub">Grouped from item names; units in grey</p>${hbars(A.byFamily.slice(0,7).map(x=>({k:x.k,v:x.gmv,q:x.qty})),{fmt:rp,right:i=>`${nf.format(i.q)} units`})}</div>
+        <div class="card"><h3>GMV by product category</h3><p class="sub">“product_cat” in the sales export; orders in grey</p>${hbars(A.byCat.slice(0,7).map(x=>({k:x.k,v:x.gmv,o:x.orders})),{fmt:rp,right:i=>`${i.o} order${i.o>1?"s":""}`,color:"#6E8F5A"})}
+          ${N.catLine?`<p class="sub" style="margin:14px 0 0">${esc(N.catLine)}</p>`:""}</div>
         <div style="display:flex;flex-direction:column;gap:12px">
-          ${kpiHtml({v:String(pct(rep.length,O.length)),u:"%",l:`Repeat-customer orders; ${A.newOrders.length} new customers worth ${rp(newG)}`})}
-          ${kpiHtml({v:String(A.noCrm.length),u:`/${O.length}`,l:`Orders with no CRM engagement (${rp(ncG)})`,hot:A.noCrm.length/O.length>=.3})}
-          ${A.partial.length?kpiHtml({v:String(A.partial.length),u:"",l:`Partially paid orders worth ${rp(parG)}`}):kpiHtml({v:String(pct(A.top2,A.gmv)),u:"%",l:"of GMV from the top 2 orders"})}
+          ${F0?kpiHtml({v:String(pct(F0.qty,Q)),u:"%",l:`of all units sold are ${F0.k} (${nf.format(F0.qty)} of ${nf.format(Q)})`,hot:true}):""}
+          ${kpiHtml({v:A.itemsPerOrder.toFixed(1),u:"",l:`products per order; ${A.multiFamily} of ${O.length} orders mix product types${pair?`, most often ${pair[0]}`:""}`})}
+          ${sp&&sp.spread>=.05?kpiHtml({v:"+"+Math.round(sp.spread*100),u:"%",l:`price gap on ${sp.item} across ${sp.n} order lines (${rp(sp.min)}–${rp(sp.max)} per unit)`})
+            :kpiHtml({v:rpParts(A.gmv/(O.length||1))[0],u:rpParts(A.gmv/(O.length||1))[1],l:"average order value"})}
+        </div></div>`));
+
+    // Sales: who bought and how
+    const appName=k=>({WEB:"Web",PETANI:"Petani app"}[String(k).toUpperCase()]||k);
+    const segTable=(title,rows)=>`<table class="tbl seg"><thead><tr><th>${title}</th><th>Orders</th><th>GMV</th><th>Avg order</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.k)}</td><td class="num">${x.n}</td><td class="num">${rp(x.gmv)}</td><td class="num">${rp(x.aov)}</td></tr>`).join("")}</tbody></table>`;
+    const parG=A.partial.reduce((s,o)=>s+o.gmv,0), openG=A.openOrders.reduce((s,o)=>s+o.gmv,0), ncG=A.noCrm.reduce((s,o)=>s+o.gmv,0);
+    S.push(contentSlide(next(),"Sales last week · who bought and how",N.whoTitle,`
+      <div style="display:grid;grid-template-columns:1fr 1.15fr .8fr;gap:16px;align-items:start">
+        <div class="card"><h3>GMV by customer region</h3><p class="sub">${esc(A.byProvince.map(p=>`${p.k} ${pct(p.gmv,A.gmv)}%`).join(" · "))}; customers in grey</p>${hbars(A.byRegion.slice(0,7).map(x=>({k:x.k,v:x.gmv,c:x.cust})),{fmt:rp,right:i=>`${i.c} cust.`})}
+          ${N.regionNote?`<p class="sub" style="margin:12px 0 0">${esc(N.regionNote)}</p>`:""}</div>
+        <div class="card" style="display:flex;flex-direction:column;gap:12px"><div><h3>How they ordered</h3><p class="sub" style="margin-bottom:8px">Average order value by ordering channel and customer type</p>
+          ${A.byApp.length?segTable("Channel",A.byApp.map(x=>({...x,k:appName(x.k)}))):""}</div>${segTable("Customer",A.byCust)}
+          <div><h4 class="mini-h">Sales PIC</h4>${hbars(A.byPic.slice(0,4).map(x=>({k:x.p,v:x.g,o:x.n})),{fmt:rp,right:i=>`(${i.o})`,color:"#6E8F5A"})}</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          ${A.partial.length?kpiHtml({v:rpParts(A.outstanding||parG)[0],u:rpParts(A.outstanding||parG)[1],l:A.outstanding?`still unpaid on ${A.partial.length} partially paid orders (${rp(parG)} GMV)`:`GMV on ${A.partial.length} partially paid orders`,hot:true}):""}
+          ${A.openOrders.length?kpiHtml({v:String(A.openOrders.length),u:`/${O.length}`,l:`orders still open, not completed (${rp(openG)})`}):""}
+          ${A.has.crm?kpiHtml({v:String(A.noCrm.length),u:`/${O.length}`,l:`orders with no CRM engagement (${rp(ncG)})`}):kpiHtml({v:String(pct(A.top2,A.gmv)),u:"%",l:"of GMV from the top 2 orders"})}
         </div></div>`));
   }
 
@@ -725,7 +792,7 @@ function buildSlides(A,N){
 
   // Next steps
   S.push(contentSlide(next(),"Next steps",`${N.actions.length} actions for the coming week`,`
-    <div class="act">${N.actions.map((a,i)=>`<div class="card"><h3><span>${i+1}</span>${esc(a.t)}</h3><p>${esc(a.d)}</p><div class="meta"><span>Owner: ${esc(a.o)}</span><span class="when">${esc(a.w)}</span></div></div>`).join("")}</div>
+    <div class="act${N.actions.length>4?" act3":""}">${N.actions.map((a,i)=>`<div class="card"><h3><span>${i+1}</span>${esc(a.t)}</h3><p>${esc(a.d)}</p><div class="meta"><span>Owner: ${esc(a.o)}</span><span class="when">${esc(a.w)}</span></div></div>`).join("")}</div>
     ${N.gaps.length?`<div class="gaps"><b>Also clean up in the CRM:</b> ${esc(N.gaps.join("; "))}.</div>`:""}`));
 
   S.push(`<div class="slide closing"><img class="bg" src="${IMG.closing}" alt=""><div class="shade"></div><img class="wm" src="${IMG.wm}" alt="SawitPRO.id"><img class="lg" src="${IMG.logo}" alt="">
@@ -933,17 +1000,37 @@ function buildPptx(A,N){
       txt(sl,"Matched by phone number, then order number in the notes, then name and PIC.",{x:X(512),y:X(612),w:X(634),h:0.22,fontSize:8.5,color:"7A8373"});
     } else { box(sl,498,180,662,462); table(sl,["ID","PIC","Channel","Source","Notes"],A.won.slice(0,8).map(r=>[r.id||"–",r.pic||"–",r.channel||"–",r.source||"–",(r.detail||"").slice(0,60)]),512,196,634,[90,110,100,90,244]); } }
 
-  // Sales last week
-  if(A.has.sales){ const sl=content("Sales last week",N.salesTitle), O=A.orders, rep=O.filter(o=>!o.isNew).length;
-    const newG=A.newOrders.reduce((s,o)=>s+o.gmv,0), parG=A.partial.reduce((s,o)=>s+o.gmv,0), ncG=A.noCrm.reduce((s,o)=>s+o.gmv,0);
-    box(sl,80,180,400,462); heading(sl,100,196,360,"GMV by product","Top items across all orders, Rp million");
-    hbar(sl,A.byItem.slice(0,6).map(([k,v])=>({k,v:Math.round(v/1e5)/10})),96,248,368,384,{fmt:'0.0"M"'});
-    box(sl,496,180,370,462); heading(sl,516,196,330,"GMV by PIC","Rp million; orders in brackets");
-    hbar(sl,A.byPic.slice(0,6).map(x=>({k:`${x.p} (${x.n})`,v:Math.round(x.g/1e5)/10})),512,248,338,384,{fmt:'0.0"M"',colors:["6E8F5A"]});
-    [{v:String(pct(rep,O.length)),u:"%",l:`Repeat-customer orders; ${A.newOrders.length} new customers worth ${rp(newG)}`},
-     {v:String(A.noCrm.length),u:`/${O.length}`,l:`Orders with no CRM engagement (${rp(ncG)})`,hot:A.noCrm.length/O.length>=.3},
-     A.partial.length?{v:String(A.partial.length),u:"",l:`Partially paid orders worth ${rp(parG)}`}:{v:String(pct(A.top2,A.gmv)),u:"%",l:"of GMV from the top 2 orders"}]
-     .forEach((k,i)=>kpi(sl,882,180+i*158,278,146,k)); }
+  // Sales: what sold
+  if(A.has.sales){ const O=A.orders, Q=A.qtyTotal||1, F0=A.byFamily[0], sp=A.priceSpread[0], pair=A.pairs[0];
+    const sl=content("Sales last week · what sold",N.soldTitle);
+    box(sl,80,180,410,462); heading(sl,100,196,370,"GMV by product type","Rp million, grouped from item names");
+    hbar(sl,A.byFamily.slice(0,7).map(x=>({k:`${x.k} (${nf.format(x.qty)})`,v:Math.round(x.gmv/1e5)/10})),96,248,378,384,{fmt:'0.0"M"'});
+    box(sl,506,180,410,462); heading(sl,526,196,370,"GMV by product category","Rp million; orders in brackets");
+    hbar(sl,A.byCat.slice(0,7).map(x=>({k:`${x.k} (${x.orders})`,v:Math.round(x.gmv/1e5)/10})),522,248,378,330,{fmt:'0.0"M"',colors:["6E8F5A"]});
+    if(N.catLine) txt(sl,N.catLine,{x:X(526),y:X(586),w:X(370),h:X(46),fontSize:9.5,color:"535353",fit:"shrink"});
+    const k3=[F0&&{v:String(pct(F0.qty,Q)),u:"%",l:`of all units sold are ${F0.k} (${nf.format(F0.qty)} of ${nf.format(Q)})`,hot:true},
+      {v:A.itemsPerOrder.toFixed(1),u:"",l:`products per order; ${A.multiFamily} of ${O.length} orders mix product types${pair?`, most often ${pair[0]}`:""}`},
+      sp&&sp.spread>=.05?{v:"+"+Math.round(sp.spread*100),u:"%",l:`price gap on ${sp.item} across ${sp.n} order lines (${rp(sp.min)}–${rp(sp.max)} per unit)`}:{v:rpParts(A.gmv/(O.length||1))[0],u:rpParts(A.gmv/(O.length||1))[1],l:"average order value"}].filter(Boolean);
+    k3.forEach((k,i)=>kpi(sl,932,180+i*158,228,146,k));
+
+    // Sales: who bought and how
+    const s2=content("Sales last week · who bought and how",N.whoTitle), appName=k=>({WEB:"Web",PETANI:"Petani app"}[String(k).toUpperCase()]||k);
+    box(s2,80,180,380,462); heading(s2,100,196,340,"GMV by customer region",`Rp million; customers in brackets. ${A.byProvince.map(p=>`${p.k} ${pct(p.gmv,A.gmv)}%`).join(" · ")}`);
+    hbar(s2,A.byRegion.slice(0,7).map(x=>({k:`${x.k} (${x.cust})`,v:Math.round(x.gmv/1e5)/10})),96,248,348,330,{fmt:'0.0"M"'});
+    if(N.regionNote) txt(s2,N.regionNote,{x:X(100),y:X(586),w:X(340),h:X(46),fontSize:9.5,color:"535353",fit:"shrink"});
+    box(s2,476,180,440,462); heading(s2,496,196,400,"How they ordered","Average order value by channel and customer type");
+    const segRows=(t,rows)=>[[t,"Orders","GMV","Avg order"].map((h,i)=>({text:h,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:9,align:i?"right":"left"}})),
+      ...rows.map(x=>[{text:String(x.k)},{text:String(x.n),options:R},{text:rp(x.gmv),options:R},{text:rp(x.aov),options:R}])];
+    const tOpt=y=>({x:X(492),y:X(y),w:X(408),colW:[X(150),X(66),X(96),X(96)],fontFace:FONT,fontSize:9,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.04,autoPage:false});
+    let y=246; if(A.byApp.length){ s2.addTable(segRows("Channel",A.byApp.map(x=>({...x,k:appName(x.k)}))),tOpt(y)); y+=26*(A.byApp.length+1)+14; }
+    s2.addTable(segRows("Customer",A.byCust),tOpt(y)); y+=26*(A.byCust.length+1)+16;
+    txt(s2,"SALES PIC (ORDERS)",{x:X(496),y:X(y),w:X(400),h:0.2,fontSize:8.5,bold:true,color:"7A8373",charSpacing:1});
+    hbar(s2,A.byPic.slice(0,4).map(x=>({k:`${x.p} (${x.n})`,v:Math.round(x.g/1e5)/10})),492,y+14,408,Math.max(120,630-y-14),{fmt:'0.0"M"',colors:["6E8F5A"]});
+    const parG=A.partial.reduce((s,o)=>s+o.gmv,0), openG=A.openOrders.reduce((s,o)=>s+o.gmv,0), ncG=A.noCrm.reduce((s,o)=>s+o.gmv,0);
+    [A.partial.length&&{v:rpParts(A.outstanding||parG)[0],u:rpParts(A.outstanding||parG)[1],l:A.outstanding?`still unpaid on ${A.partial.length} partially paid orders (${rp(parG)} GMV)`:`GMV on ${A.partial.length} partially paid orders`,hot:true},
+     A.openOrders.length&&{v:String(A.openOrders.length),u:`/${O.length}`,l:`orders still open, not completed (${rp(openG)})`},
+     A.has.crm?{v:String(A.noCrm.length),u:`/${O.length}`,l:`orders with no CRM engagement (${rp(ncG)})`}:{v:String(pct(A.top2,A.gmv)),u:"%",l:"of GMV from the top 2 orders"}].filter(Boolean)
+     .forEach((k,i)=>kpi(s2,932,180+i*158,228,146,k)); }
 
   // Rejection reasons in detail
   if(A.reasonRows.length){ const sl=content("Rejection reasons last week",N.rrTitle), RL=A.reasonList.slice(0,7), dims=A.reasonDims;
@@ -986,10 +1073,11 @@ function buildPptx(A,N){
 
   // Next steps
   { const sl=content("Next steps",`${N.actions.length} actions for the coming week`);
-    N.actions.forEach((a,i)=>{ const x=80+(i%2)*548, y=180+Math.floor(i/2)*205; box(sl,x,y,532,190);
-      txt(sl,[{text:`${i+1}  `,options:{color:"D9A21B",bold:true,fontSize:12}},{text:a.t,options:{color:"274E13",bold:true,fontSize:13}}],{x:X(x+20),y:X(y+16),w:X(492),h:0.3,fit:"shrink"});
-      txt(sl,a.d,{x:X(x+20),y:X(y+48),w:X(492),h:X(96),fontSize:10.5,color:"535353",fit:"shrink"});
-      txt(sl,[{text:`Owner: ${a.o}`,options:{bold:true,color:"274E13"}},{text:`     ${a.w}`,options:{bold:true,color:"9A6F00"}}],{x:X(x+20),y:X(y+154),w:X(492),h:0.25,fontSize:9.5}); });
+    const nc=N.actions.length>4?3:2, cw=nc===3?(1080-2*14)/3:532, gap=nc===3?14:16;
+    N.actions.forEach((a,i)=>{ const x=80+(i%nc)*(cw+gap), y=180+Math.floor(i/nc)*205; box(sl,x,y,cw,190);
+      txt(sl,[{text:`${i+1}  `,options:{color:"D9A21B",bold:true,fontSize:12}},{text:a.t,options:{color:"274E13",bold:true,fontSize:nc===3?12:13}}],{x:X(x+18),y:X(y+14),w:X(cw-36),h:X(40),fit:"shrink"});
+      txt(sl,a.d,{x:X(x+18),y:X(y+56),w:X(cw-36),h:X(92),fontSize:nc===3?9.5:10.5,color:"535353",fit:"shrink"});
+      txt(sl,[{text:`Owner: ${a.o}`,options:{bold:true,color:"274E13"}},{text:`     ${a.w}`,options:{bold:true,color:"9A6F00"}}],{x:X(x+18),y:X(y+156),w:X(cw-36),h:0.25,fontSize:9}); });
     if(N.gaps.length) txt(sl,[{text:"Also clean up in the CRM: ",options:{bold:true,color:"274E13"}},{text:N.gaps.join("; ")+"."}],{x:X(80),y:X(600),w:X(1080),h:X(40),fontSize:10,color:"535353",fit:"shrink"}); }
 
   // Closing
