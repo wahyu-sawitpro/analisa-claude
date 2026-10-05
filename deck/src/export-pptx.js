@@ -38,13 +38,24 @@ function buildPptx(T,DX){
   const kpi=(sl,x,y,w,h,k)=>{ box(sl,x,y,w,h,k.hot?"4A653B":"FFFFFF");
     txt(sl,[{text:k.v,options:{fontSize:28,bold:true,color:k.hot?"FFFFFF":"274E13"}},{text:k.u,options:{fontSize:14,bold:true,color:k.hot?"FFFFFF":"4A653B"}}],{x:X(x+16),y:X(y+12),w:X(w-32),h:0.5});
     txt(sl,k.l,{x:X(x+16),y:X(y+56),w:X(w-32),h:X(h-62),fontSize:9.5,color:k.hot?"E4ECDD":"535353",fit:"shrink"}); };
+  // Bar charts are drawn from plain shapes and text boxes, not native charts: Google Slides drops the
+  // category labels of imported PPTX charts (showing 1, 2, 3 …) and shows an embedded-workbook preview.
+  const fmtOf=f=>f==='0.0"M"'?v=>`Rp${(Math.round(v*10)/10).toLocaleString("en-US")}M`:f==='0"%"'?v=>`${v}%`:v=>nf.format(v);
+  const rect=(sl,x,y,w,h,c)=>sl.addShape(pres.shapes.RECTANGLE,{x:X(x),y:X(y),w:X(Math.max(w,.5)),h:X(h),fill:{color:c},line:{color:c,width:0}});
   const hbar=(sl,items,x,y,w,h,{colors=["4A653B"],names=["Value"],fmt="0",legend=false,stacked=false,max}={})=>{
     if(!items.length) return txt(sl,"Not in this data",{x:X(x),y:X(y+h/2-10),w:X(w),h:0.3,fontSize:11,color:"7A8373",align:"center"});
-    const it=items.slice().reverse(), lab=it.map(i=>i.k.length>40?i.k.slice(0,39)+"…":i.k);
-    const data=names.map((nm,si)=>({name:nm,labels:lab,values:it.map(i=>stacked?(i.s[si]||0):i.v)}));
-    sl.addChart(pres.charts.BAR,data,{...base,x:X(x),y:X(y),w:X(w),h:X(h),barDir:"bar",barGrouping:stacked?"stacked":"clustered",chartColors:colors,showValue:true,
-      dataLabelPosition:stacked?"ctr":"outEnd",dataLabelColor:stacked?"FFFFFF":"2B2F28",dataLabelFormatCode:stacked?"0;;;":fmt,showLegend:legend,legendPos:"t",legendFontSize:9.5,legendColor:"535353",
-      barGapWidthPct:50,valAxisMinVal:0,...(stacked?{}:{valAxisMaxVal:(max||Math.max(...it.map(i=>i.v)))*1.25})}); };
+    const F=fmtOf(fmt), tot=it=>stacked?it.s.reduce((a,b)=>a+(b||0),0):it.v;
+    if(legend&&stacked){ let lx=x; names.forEach((nm,i)=>{ if(!items.some(it=>it.s[i])) return; rect(sl,lx,y+3,10,10,colors[i]);
+        txt(sl,nm,{x:X(lx+14),y:X(y),w:X(nm.length*6+10),h:X(16),fontSize:9,color:"535353",valign:"middle"}); lx+=nm.length*6+34; }); y+=26; h-=26; }
+    const top=max||Math.max(...items.map(tot))||1, n=items.length, rh=Math.min(52,h/n), bh=Math.max(8,Math.min(12,rh*.28)), lh=rh-bh-6;
+    items.forEach((it,i)=>{ const ry=y+i*rh, by=ry+lh+2;
+      txt(sl,it.k,{x:X(x),y:X(ry),w:X(w-96),h:X(lh),fontSize:10,color:"2B2F28",valign:"bottom",fit:"shrink"});
+      txt(sl,F(tot(it)),{x:X(x+w-96),y:X(ry),w:X(96),h:X(lh),fontSize:10,bold:true,color:"2B2F28",align:"right",valign:"bottom"});
+      rect(sl,x,by,w,bh,"E9EDE5");
+      let bx=x; (stacked?it.s.map((v,si)=>[v||0,colors[si]]):[[it.v,colors[0]]]).forEach(([v,c])=>{ if(!v) return; const bw=w*v/top;
+        rect(sl,bx,by,bw-(stacked?1.5:0),bh,c);
+        if(stacked&&bw>=18&&bh>=10) txt(sl,String(v),{x:X(bx),y:X(by),w:X(bw),h:X(bh),fontSize:7.5,bold:true,color:"FFFFFF",align:"center",valign:"middle"});
+        bx+=bw; }); }); };
   const table=(sl,head,rows,x,y,w,colW,o={})=>{ const hd=head.map(t=>({text:t,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:9.5}}));
     sl.addTable([hd,...rows.map(r=>r.map(c=>typeof c==="object"?c:{text:String(c)}))],{x:X(x),y:X(y),w:X(w),colW:colW&&colW.map(X),fontFace:FONT,fontSize:9,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.045,autoPage:false,...o}); };
   const R={align:"right"};
@@ -191,7 +202,7 @@ function buildPptx(T,DX){
     DX.actions.forEach((a,i)=>{ const x=80+(i%nc)*(cw+gap), y=180+Math.floor(i/nc)*205; box(sl,x,y,cw,190);
       txt(sl,[{text:`${i+1}  `,options:{color:"D9A21B",bold:true,fontSize:12}},{text:a.t,options:{color:"274E13",bold:true,fontSize:nc===3?12:13}}],{x:X(x+18),y:X(y+14),w:X(cw-36),h:X(40),fit:"shrink"});
       txt(sl,a.d,{x:X(x+18),y:X(y+56),w:X(cw-36),h:X(92),fontSize:nc===3?9.5:10.5,color:"535353",fit:"shrink"});
-      txt(sl,[...(a.team?[{text:`${a.team}   `,options:{bold:true,color:"4A653B"}}]:[]),{text:`Owner: ${a.o}`,options:{bold:true,color:"274E13"}},{text:`     ${a.w}`,options:{bold:true,color:"9A6F00"}}],{x:X(x+18),y:X(y+156),w:X(cw-36),h:0.25,fontSize:9}); });
+      txt(sl,[...(a.team?[{text:`${a.team}  ·  `,options:{bold:true,color:"4A653B"}}]:[]),{text:`Owner: ${a.o}`,options:{bold:true,color:"274E13"}},{text:`  ·  ${a.w}`,options:{bold:true,color:"9A6F00"}}],{x:X(x+18),y:X(y+156),w:X(cw-36),h:0.25,fontSize:9}); });
     if(DX.gaps.length) txt(sl,[{text:"Also clean up in the CRM: ",options:{bold:true,color:"274E13"}},{text:DX.gaps.join("; ")+"."}],{x:X(80),y:X(600),w:X(1080),h:X(40),fontSize:10,color:"535353",fit:"shrink"}); }
 
   // Closing

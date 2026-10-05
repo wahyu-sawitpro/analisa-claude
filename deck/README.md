@@ -10,7 +10,7 @@ Parsing and analysis happen in the browser; data is not sent anywhere.
 | Data sources bar | Each file or lead-like sheet, with its row count, an include toggle, a data-type selector (CRM / Sales, auto-detected) and remove |
 | Analyze | Builds the deck from the included sources |
 | Present | Full-screen slide mode (arrow keys, Esc) |
-| Download PPTX | Native, editable 16:9 PowerPoint (real charts and tables) of the current deck |
+| Download PPTX | Editable 16:9 PowerPoint of the current deck. Bar charts are drawn from shapes and text boxes (no embedded chart workbooks), so they look the same in PowerPoint and Google Slides |
 | Open in Google Slides | Uploads the PPTX to the viewer's Google Drive via the Google Drive connector (converted to Slides), with a manual-import fallback |
 
 ## Teams
