@@ -21,21 +21,21 @@ ev AS (
   SELECT
     user_id,
     campaign_week,
-    countIf(ev = 'petani_juara_open' AND in_range) > 0             AS opened_section,
-    countIf(ev = 'petani_juara_join_btn_clicked' AND in_range) > 0 AS joined,
-    minIf(ts, ev = 'petani_juara_join_btn_clicked' AND in_range)   AS open_task,
-    maxIf(ts, ev IN ('fertcalc_rslt_open', 'fertcalc2_rslt_open')) AS last_calculator,
-    maxIf(ts, ev = 'pnd_diagno_rslt_open')                         AS last_pnd,
-    maxIf(ts, ev = 'ffbprice_district')                            AS last_ffb_price,
-    maxIf(ts, ev = 'report_open')                                  AS last_report,
-    maxIf(ts, ev = 'petani_juara_social_submit_clicked')           AS last_socmed,
+    countIf(evt = 'petani_juara_open' AND in_range) > 0             AS opened_section,
+    countIf(evt = 'petani_juara_join_btn_clicked' AND in_range) > 0 AS joined,
+    minIf(ts, evt = 'petani_juara_join_btn_clicked' AND in_range)   AS open_task,
+    maxIf(ts, evt IN ('fertcalc_rslt_open', 'fertcalc2_rslt_open')) AS last_calculator,
+    maxIf(ts, evt = 'pnd_diagno_rslt_open')                         AS last_pnd,
+    maxIf(ts, evt = 'ffbprice_district')                            AS last_ffb_price,
+    maxIf(ts, evt = 'report_open')                                  AS last_report,
+    maxIf(ts, evt = 'petani_juara_social_submit_clicked')           AS last_socmed,
     maxIf(ts, is_khusus_petani)                                    AS last_khususpetani
   FROM (
     SELECT
       e.user_id                                AS user_id,
       toDateTime(e.event_time, 'Asia/Jakarta') AS ts,
       toMonday(ts)                             AS campaign_week,
-      lower(e.event_name)                      AS ev,
+      lower(e.event_name)                      AS evt,
       e.event_name = 'page_view'
         AND arrayExists(x -> position(x, 'khusus-petani') > 0, e.event_params_arr) AS is_khusus_petani,
       -- dateRange only restricts the open/join events; activity events use the full week
