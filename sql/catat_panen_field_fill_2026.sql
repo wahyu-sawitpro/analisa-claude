@@ -1,4 +1,4 @@
--- Catat Panen 2026: jumlah user unik (distinct user_id) yang mengisi tiap field
+-- Catat Panen 2026: jumlah catatan unik (distinct fsp.id) yang mengisi tiap field
 -- Filter: created_at (Asia/Jakarta) di tahun 2026, user aktif & fraud_flag <> '5'
 
 WITH user_info AS (
@@ -10,7 +10,7 @@ WITH user_info AS (
 
 , data AS (
     SELECT
-          ui.id                             AS user_id
+          fsp.id                            AS catat_id
         , fsp.harvest_date_utc0             AS harvest_date_utc0
         , fsp.ffb_total_weight              AS ffb_total_weight
         , fsp.ffb_count                     AS ffb_count
@@ -33,25 +33,25 @@ WITH user_info AS (
 
 , agg AS (
     SELECT
-          uniqExact(user_id)                                                          AS u_total
-        , uniqExactIf(user_id, ifNull(harvest_date_utc0, 0) > 0)                      AS u_harvest_date
-        , uniqExactIf(user_id, ifNull(ffb_total_weight, 0) > 0)                       AS u_ffb_total_weight
-        , uniqExactIf(user_id, ifNull(ffb_count, 0) > 0)                              AS u_ffb_count
-        , uniqExactIf(user_id, ifNull(fruitlet_total_weight_in_kg, 0) > 0)            AS u_fruitlet_weight
-        , uniqExactIf(user_id, ifNull(next_harvest_schedule_at_utc0, 0) > 0)          AS u_next_harvest
-        , uniqExactIf(user_id, trimBoth(ifNull(page_one_buyer_name, '')) != '')       AS u_page_one_buyer
-        , uniqExactIf(user_id, ifNull(ffb_price_per_kg, 0) > 0)                       AS u_ffb_price
-        , uniqExactIf(user_id, trimBoth(toString(ifNull(buyer_type, ''))) != '')      AS u_buyer_type
-        , uniqExactIf(user_id, trimBoth(ifNull(buyer_name_master, '')) != '')         AS u_buyer_name
-        , uniqExactIf(user_id, trimBoth(ifNull(phone_buyer, '')) != '')               AS u_phone_buyer
-        , uniqExactIf(user_id, trimBoth(ifNull(photo_url, '')) != '')                 AS u_photo_url
+          uniqExact(catat_id)                                                          AS u_total
+        , uniqExactIf(catat_id, ifNull(harvest_date_utc0, 0) > 0)                      AS u_harvest_date
+        , uniqExactIf(catat_id, ifNull(ffb_total_weight, 0) > 0)                       AS u_ffb_total_weight
+        , uniqExactIf(catat_id, ifNull(ffb_count, 0) > 0)                              AS u_ffb_count
+        , uniqExactIf(catat_id, ifNull(fruitlet_total_weight_in_kg, 0) > 0)            AS u_fruitlet_weight
+        , uniqExactIf(catat_id, ifNull(next_harvest_schedule_at_utc0, 0) > 0)          AS u_next_harvest
+        , uniqExactIf(catat_id, trimBoth(ifNull(page_one_buyer_name, '')) != '')       AS u_page_one_buyer
+        , uniqExactIf(catat_id, ifNull(ffb_price_per_kg, 0) > 0)                       AS u_ffb_price
+        , uniqExactIf(catat_id, trimBoth(toString(ifNull(buyer_type, ''))) != '')      AS u_buyer_type
+        , uniqExactIf(catat_id, trimBoth(ifNull(buyer_name_master, '')) != '')         AS u_buyer_name
+        , uniqExactIf(catat_id, trimBoth(ifNull(phone_buyer, '')) != '')               AS u_phone_buyer
+        , uniqExactIf(catat_id, trimBoth(ifNull(photo_url, '')) != '')                 AS u_photo_url
     FROM data
 )
 
 SELECT
       field
-    , users                                   AS jumlah_user_input
-    , u_total                                 AS total_user_catat_panen
+    , users                                   AS jumlah_catat_input
+    , u_total                                 AS total_catat_panen
     , round(users * 100.0 / u_total, 2)       AS persen
 FROM agg
 ARRAY JOIN
