@@ -30,6 +30,9 @@ WITH user_info AS (
     JOIN default.asset a ON a.id = fm.asset_id
     WHERE a.owner_id IN (SELECT id FROM user_info)
       AND a.owner_id IN (SELECT owner_id FROM active_farm_owner)
+      -- sama seperti INNER JOIN dim_date di query segmentasi bulan
+      AND toDate(toDateTime(intDiv(fsp.created_at_utc0, 1000), 'Asia/Jakarta'))
+          IN (SELECT date_series FROM sawitpro_datamart.dim_date)
 )
 
 , bulan_1 AS (
@@ -68,7 +71,8 @@ SELECT
     round(100 * ph.total_catat_panen / t.total_catat_bulan_1, 2) AS pct_catat_panen,
     round(100 * sum(ph.total_catat_panen) OVER (ORDER BY d.selisih_hari ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
           / t.total_catat_bulan_1, 2) AS cum_pct_catat_panen,
-    round(100 * ph.total_farmer / t.total_farmer_bulan_1, 2) AS pct_farmer -- 1 farmer bisa muncul di beberapa hari, jadi tidak dijumlah 100%
+    round(100 * ph.total_farmer / t.total_farmer_bulan_1, 2) AS pct_farmer, -- 1 farmer bisa muncul di beberapa hari, jadi tidak dijumlah 100%
+    t.total_farmer_bulan_1 AS total_farmer_unik_bulan_1 -- angka ini yang dibandingkan dengan query segmentasi, BUKAN sum(total_farmer_catat_panen)
 FROM days d
 LEFT JOIN per_hari ph ON ph.selisih_hari = d.selisih_hari
 CROSS JOIN total t
