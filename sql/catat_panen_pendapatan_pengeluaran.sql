@@ -96,14 +96,14 @@ WITH user_info AS (
 
 , summary_user AS (
     SELECT 
-        sum(ucp.user_total_ffb_weight) AS total_ffb_weight,
-        avgIf(ucp.user_total_ffb_weight, ucp.has_catat_panen = 1) AS avg_ffb_weight_per_user,
-        medianExactIf(ucp.user_total_ffb_weight, ucp.has_catat_panen = 1) AS median_ffb_weight_per_user,
+        round(sum(ucp.user_total_ffb_weight)) AS total_ffb_weight,
+        round(avgIf(ucp.user_total_ffb_weight, ucp.has_catat_panen = 1)) AS avg_ffb_weight_per_user,
+        round(medianExactIf(ucp.user_total_ffb_weight, ucp.has_catat_panen = 1)) AS median_ffb_weight_per_user,
 
-        sum(ucp.user_total_pendapatan) AS total_pendapatan,
-        sum(ucp.user_total_pengeluaran) AS total_pengeluaran,
-        medianExactIf(ucp.user_total_pendapatan, ucp.has_catat_panen = 1 AND ucp.user_total_pendapatan > 0) AS median_pendapatan_per_user,
-        medianExactIf(ucp.user_total_pengeluaran, ucp.has_catat_panen = 1 AND ucp.user_total_pengeluaran > 0) AS median_pengeluaran_per_user
+        round(sum(ucp.user_total_pendapatan)) AS total_pendapatan,
+        round(sum(ucp.user_total_pengeluaran)) AS total_pengeluaran,
+        round(medianExactIf(ucp.user_total_pendapatan, ucp.has_catat_panen = 1 AND ucp.user_total_pendapatan > 0)) AS median_pendapatan_per_user,
+        round(medianExactIf(ucp.user_total_pengeluaran, ucp.has_catat_panen = 1 AND ucp.user_total_pengeluaran > 0)) AS median_pengeluaran_per_user
     FROM user_info ui
     LEFT JOIN data_farm df ON ui.id = df.owner_id
     LEFT JOIN user_catat_panen ucp ON ui.id = ucp.user_id
