@@ -46,19 +46,23 @@ WITH user_info AS (
     WHERE selisih_hari BETWEEN 0 AND 30
 )
 
-, total AS (
+-- tiap farmer hanya masuk ke 1 hari: hari yang paling sering dia pakai
+-- (kalau seri, ambil hari yang paling kecil), jadi jumlah Day 0..30 = total farmer Bulan 1
+, farmer_day AS (
     SELECT
-        count(id) AS total_catat_bulan_1,
-        uniqExact(user_id) AS total_farmer_bulan_1
-    FROM bulan_1
+        user_id,
+        argMax(selisih_hari, (cnt, -selisih_hari)) AS selisih_hari
+    FROM (
+        SELECT user_id, toInt64(selisih_hari) AS selisih_hari, count(id) AS cnt
+        FROM bulan_1
+        GROUP BY user_id, selisih_hari
+    )
+    GROUP BY user_id
 )
 
 , per_hari AS (
-    SELECT
-        toInt64(selisih_hari) AS selisih_hari,
-        count(id) AS total_catat_panen,
-        uniqExact(user_id) AS total_farmer
-    FROM bulan_1
+    SELECT selisih_hari, count() AS total_farmer
+    FROM farmer_day
     GROUP BY selisih_hari
 )
 
@@ -71,11 +75,7 @@ WITH user_info AS (
 SELECT
     d.selisih_hari AS selisih_hari,
     if(d.selisih_hari = 0, 'Day 0 (hari yang sama)', concat('Day +', toString(d.selisih_hari))) AS label_hari,
-    ph.total_catat_panen AS total_catat_panen,
-    ph.total_farmer AS total_farmer_catat_panen,      -- farmer unik di hari itu (1 farmer bisa muncul di beberapa hari)
-    t.total_catat_bulan_1 AS total_catat_bulan_1,     -- = total_catat_panen Bulan 1 di query segmentasi
-    t.total_farmer_bulan_1 AS total_farmer_bulan_1    -- = total_user_doing_catat_panen Bulan 1 di query segmentasi
+    ph.total_farmer AS total_farmer
 FROM days d
 LEFT JOIN per_hari ph ON ph.selisih_hari = d.selisih_hari
-CROSS JOIN total t
 ORDER BY d.selisih_hari
