@@ -1,7 +1,7 @@
 -- =====================================================================
 -- GMV Smallholders (sale_order_date >= 2026) — versi optimasi
--- Hasil sum(gmv) sama dengan query asli; perubahan hanya membuang
--- kerja yang tidak memengaruhi angka akhir:
+-- Poin 1-5 tidak mengubah angka; poin 6 sengaja mengubah definisi
+-- (semua invoice yang di-claim Smallholders):
 --
 --  1. sum(gmv) per grup = sum(sales_amount + shipping_cost) per baris, jadi
 --     GROUP BY final_result & join customer_first_order (key unik, tidak
@@ -22,12 +22,10 @@
 --     shopify_campaign_sales) dipre-filter ke key yang relevan saja.
 --     Filter tidak didorong melewati window count() di branch 1 kecuali
 --     filter level-invoice (sama dengan PARTITION BY) supaya hasil identik.
---  6. Fokus Smallholders: semua scan tabel besar dibatasi ke invoice
---     Smallholders. Tabel lark tim lain hanya dipakai sebagai daftar
---     pengecualian (invoice yang juga di-claim tim lain -> pic_teams bukan
---     'Smallholders' -> memang tidak dihitung di query asli).
---     Sisi kanan join resolusi invoice (datamart_ecommerce, shopify_orders,
---     account_move) dipre-filter ke key yang ada di lark, bukan full table.
+--  6. Fokus Smallholders: hanya larkbase_salesopportunities_smallholdersteam
+--     yang dibaca; tabel lark tim lain di-comment. Invoice yang juga di-claim
+--     tim lain sekarang IKUT dihitung (di query asli tidak, karena
+--     pic_teams-nya jadi mis. 'DG;Smallholders') -> angka bisa lebih besar.
 -- =====================================================================
 SELECT
   `source`.`sum(gmv)` AS `sum(gmv)`
@@ -35,7 +33,7 @@ FROM
   (
     WITH
     -- ------------------------------------------------------------------
-    -- (A) Invoice yang pic_teams-nya persis 'Smallholders'
+    -- (A) Invoice yang di-claim tim Smallholders
     --     (pengganti subquery `ss` di final_result)
     -- ------------------------------------------------------------------
     lark_ss AS (
@@ -45,37 +43,38 @@ FROM
         team
       FROM
         (
-          SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice) AS invoice_lark, 'Sales' AS team
-          FROM default.larkbase_salesopportunities_salesteam
-          WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
-          UNION ALL
-          SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'Mills'
-          FROM default.larkbase_salesopportunities_millsteam
-          WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
-          UNION ALL
-          SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'Suppliers'
-          FROM default.larkbase_salesopportunities_suppliersteam
-          WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
-          UNION ALL
-          SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'DG'
-          FROM default.larkbase_salesopportunities_dg
-          WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
-          UNION ALL
-          SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'Plantation'
-          FROM default.larkbase_salesopportunities_plantation
-          WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
-          UNION ALL
-          SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'Product Experiment'
-          FROM default.larkbase_salesopportunities_aspekpir
-          WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
-          UNION ALL
-          SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'FFB BD'
-          FROM default.larkbase_salesopportunities_bdffb
-          WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
-          UNION ALL
-          SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'Smallholders'
+          SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice) AS invoice_lark, 'Smallholders' AS team
           FROM default.larkbase_salesopportunities_smallholdersteam
           WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
+          -- tim lain tidak dipakai (fokus Smallholders)
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice) AS invoice_lark, 'Sales' AS team
+          -- FROM default.larkbase_salesopportunities_salesteam
+          -- WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'Mills'
+          -- FROM default.larkbase_salesopportunities_millsteam
+          -- WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'Suppliers'
+          -- FROM default.larkbase_salesopportunities_suppliersteam
+          -- WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'DG'
+          -- FROM default.larkbase_salesopportunities_dg
+          -- WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'Plantation'
+          -- FROM default.larkbase_salesopportunities_plantation
+          -- WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'Product Experiment'
+          -- FROM default.larkbase_salesopportunities_aspekpir
+          -- WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice <> '', parent_invoice, invoice_no <> '', invoice_no, order_no <> '', order_no, parent_invoice), 'FFB BD'
+          -- FROM default.larkbase_salesopportunities_bdffb
+          -- WHERE parent_invoice <> '' OR invoice_no <> '' OR order_no <> ''
         ) a
       WHERE
         invoice_lark NOT IN (
@@ -131,10 +130,10 @@ FROM
         ) so1 ON so1.clean_so_name = am.clean_ref
     ),
     smallholder_invoices AS (
-      SELECT invoice_no
+      SELECT DISTINCT invoice_no
       FROM summary_ss
-      GROUP BY invoice_no
-      HAVING arrayStringConcat(arraySort(groupUniqArray(team)), ';') = 'Smallholders'
+      -- GROUP BY invoice_no
+      -- HAVING arrayStringConcat(arraySort(groupUniqArray(team)), ';') = 'Smallholders'
     ),
     -- ------------------------------------------------------------------
     -- (B) PIC lookup versi `sh` (dipakai dop1 & dop_fallback)
@@ -155,58 +154,59 @@ FROM
           SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice) AS invoice_lark,
                  order_no AS order_lark,
                  multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice') AS notes,
-                 trimBoth(customer_name) AS name_lark, 'Sales' AS team, trimBoth(assignee) AS pic_name
-          FROM default.larkbase_salesopportunities_salesteam
-          WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-          UNION ALL
-          SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-                 order_no,
-                 multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-                 trimBoth(customer_name), 'Mills', trimBoth(assignee)
-          FROM default.larkbase_salesopportunities_millsteam
-          WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-          UNION ALL
-          SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-                 order_no,
-                 multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-                 trimBoth(assignee), 'Suppliers', trimBoth(assignee)
-          FROM default.larkbase_salesopportunities_suppliersteam
-          WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-          UNION ALL
-          SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-                 order_no,
-                 multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-                 trimBoth(assignee), 'Smallholders', trimBoth(assignee)
+                 trimBoth(assignee) AS name_lark, 'Smallholders' AS team, trimBoth(assignee) AS pic_name
           FROM default.larkbase_salesopportunities_smallholdersteam
           WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-          UNION ALL
-          SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-                 order_no,
-                 multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-                 trimBoth(assignee), 'DG', trimBoth(assignee)
-          FROM default.larkbase_salesopportunities_dg
-          WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-          UNION ALL
-          SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-                 order_no,
-                 multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-                 trimBoth(assignee), 'Agronomist', trimBoth(assignee)
-          FROM default.larkbase_salesopportunities_plantation
-          WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-          UNION ALL
-          SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-                 order_no,
-                 multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-                 trimBoth(assignee), 'Finance FFB BD', trimBoth(assignee)
-          FROM default.larkbase_salesopportunities_bdffb
-          WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-          UNION ALL
-          SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-                 order_no,
-                 multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-                 trimBoth(assignee), 'Product Experiment', trimBoth(assignee)
-          FROM default.larkbase_salesopportunities_aspekpir
-          WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
+          -- tim lain tidak dipakai (fokus Smallholders)
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice) AS invoice_lark,
+          --        order_no AS order_lark,
+          --        multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice') AS notes,
+          --        trimBoth(customer_name) AS name_lark, 'Sales' AS team, trimBoth(assignee) AS pic_name
+          -- FROM default.larkbase_salesopportunities_salesteam
+          -- WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
+          --        order_no,
+          --        multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
+          --        trimBoth(customer_name), 'Mills', trimBoth(assignee)
+          -- FROM default.larkbase_salesopportunities_millsteam
+          -- WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
+          --        order_no,
+          --        multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
+          --        trimBoth(assignee), 'Suppliers', trimBoth(assignee)
+          -- FROM default.larkbase_salesopportunities_suppliersteam
+          -- WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
+          --        order_no,
+          --        multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
+          --        trimBoth(assignee), 'DG', trimBoth(assignee)
+          -- FROM default.larkbase_salesopportunities_dg
+          -- WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
+          --        order_no,
+          --        multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
+          --        trimBoth(assignee), 'Agronomist', trimBoth(assignee)
+          -- FROM default.larkbase_salesopportunities_plantation
+          -- WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
+          --        order_no,
+          --        multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
+          --        trimBoth(assignee), 'Finance FFB BD', trimBoth(assignee)
+          -- FROM default.larkbase_salesopportunities_bdffb
+          -- WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
+          -- UNION ALL
+          -- SELECT multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
+          --        order_no,
+          --        multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
+          --        trimBoth(assignee), 'Product Experiment', trimBoth(assignee)
+          -- FROM default.larkbase_salesopportunities_aspekpir
+          -- WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
         ) AS a
       WHERE
         invoice_lark NOT IN (
