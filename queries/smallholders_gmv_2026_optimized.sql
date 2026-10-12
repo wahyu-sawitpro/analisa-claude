@@ -22,6 +22,12 @@
 --     shopify_campaign_sales) dipre-filter ke key yang relevan saja.
 --     Filter tidak didorong melewati window count() di branch 1 kecuali
 --     filter level-invoice (sama dengan PARTITION BY) supaya hasil identik.
+--  6. Fokus Smallholders: semua scan tabel besar dibatasi ke invoice
+--     Smallholders. Tabel lark tim lain hanya dipakai sebagai daftar
+--     pengecualian (invoice yang juga di-claim tim lain -> pic_teams bukan
+--     'Smallholders' -> memang tidak dihitung di query asli).
+--     Sisi kanan join resolusi invoice (datamart_ecommerce, shopify_orders,
+--     account_move) dipre-filter ke key yang ada di lark, bukan full table.
 -- =====================================================================
 SELECT
   `source`.`sum(gmv)` AS `sum(gmv)`
@@ -100,18 +106,28 @@ FROM
           FROM sawitpro_datamart.datamart_ecommerce
           WHERE invoice_status IN ('PAID', 'PARTIAL_PAID')
             AND sale_order_status NOT IN ('CANCELLED', 'CANCELED', 'DRAFT')
+            AND invoice_no IN (SELECT invoice_lark FROM lark_ss)
         ) de ON il.invoice_lark = de.invoice_no
         LEFT JOIN (
           SELECT DISTINCT replaceAll(name, '#', '') AS clean_so_name, name
           FROM default.shopify_orders
+          WHERE replaceAll(name, '#', '') IN (SELECT clean_invoice_key FROM lark_ss)
         ) so ON il.clean_invoice_key = so.clean_so_name
         LEFT JOIN (
           SELECT DISTINCT upper(trim(name)) AS name, replaceAll(upper(trim(ref)), '#', '') AS clean_ref
           FROM odoo_database.account_move
+          WHERE upper(trim(name)) IN (SELECT invoice_lark FROM lark_ss)
         ) am ON am.name = il.invoice_lark
         LEFT JOIN (
           SELECT DISTINCT replaceAll(upper(trim(name)), '#', '') AS clean_so_name, name
           FROM default.shopify_orders
+          WHERE replaceAll(upper(trim(name)), '#', '') IN (
+            SELECT replaceAll(upper(trim(ref)), '#', '')
+            FROM odoo_database.account_move
+            WHERE upper(trim(name)) IN (SELECT invoice_lark FROM lark_ss)
+          )
+            -- key '' tetap ikut: baris lark tanpa match account_move join ke clean_ref ''
+            OR replaceAll(upper(trim(name)), '#', '') = ''
         ) so1 ON so1.clean_so_name = am.clean_ref
     ),
     smallholder_invoices AS (
@@ -214,17 +230,38 @@ FROM
         trimBoth(il.pic_name) AS pic_name
       FROM
         lark_sh AS il
-        ANY LEFT JOIN sawitpro_datamart.datamart_ecommerce AS de
+        -- sisi kanan dipre-filter ke key yang ada di lark (kandidat match per key
+        -- tidak berubah, jadi hasil ANY JOIN tetap sama)
+        ANY LEFT JOIN (
+          SELECT invoice_no, order_no, invoice_status, sale_order_status
+          FROM sawitpro_datamart.datamart_ecommerce
+          WHERE invoice_no IN (SELECT invoice_lark FROM lark_sh)
+        ) AS de
           ON (il.invoice_lark = de.invoice_no)
           AND (de.invoice_status IN ('PAID', 'PARTIAL_PAID'))
           AND (toString(de.sale_order_status) NOT IN ('CANCELLED', 'CANCELED', 'DRAFT'))
-        ANY LEFT JOIN default.shopify_orders AS so
+        ANY LEFT JOIN (
+          SELECT name FROM default.shopify_orders
+          WHERE replace(name, '#', '') IN (SELECT invoice_lark FROM lark_sh)
+        ) AS so
           ON (il.invoice_lark = replace(so.name, '#', ''))
-        ANY LEFT JOIN default.shopify_orders AS so2
+        ANY LEFT JOIN (
+          SELECT name FROM default.shopify_orders
+          WHERE concat('INV/', replace(trimBoth(name), '#', ''), '/SHPFY') IN (SELECT invoice_lark FROM lark_sh)
+        ) AS so2
           ON (il.invoice_lark = concat('INV/', replace(trimBoth(so2.name), '#', ''), '/SHPFY'))
-        ANY LEFT JOIN odoo_database.account_move AS am
+        ANY LEFT JOIN (
+          SELECT name, ref FROM odoo_database.account_move
+          WHERE name IN (SELECT invoice_lark FROM lark_sh)
+        ) AS am
           ON am.name = il.invoice_lark
-        ANY LEFT JOIN default.shopify_orders AS so1
+        ANY LEFT JOIN (
+          SELECT name FROM default.shopify_orders
+          WHERE upper(name) IN (
+            SELECT upper(ref) FROM odoo_database.account_move
+            WHERE name IN (SELECT invoice_lark FROM lark_sh)
+          )
+        ) AS so1
           ON upper(so1.name) = upper(am.ref)
       WHERE
         (de.order_no != '') OR (so.name != '') OR (am.name != '') OR (so2.name != '')
