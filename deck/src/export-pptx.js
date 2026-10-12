@@ -104,123 +104,34 @@ function buildPptx(T,DX){
     teamBlock(t.A,t.N,DX.multi?`${t.name} · `:"");
   });
 
-  function teamBlock(A,N,pre){
-  // Success story
-  if(A.won.length){ const sl=content(pre+"Success story",N.winTitle);
-    box(sl,80,180,400,462); heading(sl,100,196,360,`How the ${A.won.length} wins happened`,"Share of CRM engagements that ended in an order");
-    ["channel","source"].forEach((k,i)=>{ const c=countBy(A.won,r=>r[k]).slice(0,3); if(!c.length) return;
-      txt(sl,LABEL[k].toUpperCase(),{x:X(100),y:X(250+i*190),w:X(360),h:0.2,fontSize:8.5,bold:true,color:"7A8373",charSpacing:1});
-      hbar(sl,c.map(([g,v])=>({k:g,v})),96,266+i*190,368,160,{max:A.won.length}); });
-    if(A.has.sales){ const nw=A.linkedOrders.filter(o=>o.isNew).length;
-      [{v:`${A.wonLinked.length}`,u:`/${A.won.length}`,l:"Wins confirmed in sales data",hot:true},{v:rpParts(A.linkedGmv)[0],u:rpParts(A.linkedGmv)[1],l:`GMV of ${A.linkedOrders.length} matched orders`},
-       A.hasCustStatus?{v:String(nw),u:`/${A.linkedOrders.length}`,l:"Matched orders from new customers"}:{v:String(A.wonFromNotes.length||A.won.length),u:`/${A.won.length}`,l:A.wonFromNotes.length?"Wins found only in the notes (“Closing …”)":"Wins with a CRM status of ordered"}].forEach((k,i)=>kpi(sl,498+i*224,180,210,104,k));
-      box(sl,498,298,662,344);
-      table(sl,["Order","PIC","Products","GMV","Customer"],A.linkedOrders.slice(0,5).map(o=>[o.no,o.pic||"–",o.items.slice(0,2).join(", ")+(o.items.length>2?` +${o.items.length-2}`:""),{text:rp(o.gmv),options:R},!A.hasCustStatus?"–":o.isNew?{text:"New",options:{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}}:"Repeat"]),
-        512,312,634,[86,118,270,80,80]);
-      txt(sl,"Matched by phone number, then order number in the notes, then name and PIC.",{x:X(512),y:X(612),w:X(634),h:0.22,fontSize:8.5,color:"7A8373"});
-    } else { box(sl,498,180,662,462); table(sl,["ID","PIC","Channel","Source","Notes"],A.won.slice(0,8).map(r=>[r.id||"–",r.pic||"–",r.channel||"–",r.source||"–",(r.detail||"").slice(0,60)]),512,196,634,[90,110,100,90,244]); } }
-
-  // Sales: what sold
-  if(A.has.sales){ const O=A.orders, Q=A.qtyTotal||1, F0=A.byFamily[0], sp=A.priceSpread[0], pair=A.pairs[0];
-    const sl=content(pre+"Sales last week · what sold",N.soldTitle);
-    box(sl,80,180,410,462); heading(sl,100,196,370,"GMV by product type","Rp million, grouped from item names");
-    hbar(sl,A.byFamily.slice(0,7).map(x=>({k:`${x.k} (${nf.format(x.qty)})`,v:Math.round(x.gmv/1e5)/10})),96,248,378,384,{fmt:'0.0"M"'});
-    box(sl,506,180,410,462); heading(sl,526,196,370,"GMV by product category","Rp million; orders in brackets");
-    hbar(sl,A.byCat.slice(0,7).map(x=>({k:`${x.k} (${x.orders})`,v:Math.round(x.gmv/1e5)/10})),522,248,378,330,{fmt:'0.0"M"',colors:["6E8F5A"]});
-    if(N.catLine) txt(sl,N.catLine,{x:X(526),y:X(586),w:X(370),h:X(46),fontSize:9.5,color:"535353",fit:"shrink"});
-    const k3=[F0&&(A.unitsAnchor?{v:String(pct(F0.qty,Q)),u:"%",l:`of all units sold are ${F0.k} (${nf.format(F0.qty)} of ${nf.format(Q)})`,hot:true}:{v:String(pct(F0.gmv,A.gmv)),u:"%",l:`of GMV is ${F0.k}`,hot:true}),
-      {v:A.itemsPerOrder.toFixed(1),u:"",l:`products per order; ${A.multiFamily} of ${O.length} orders mix product types${pair?`, most often ${pair[0]}`:""}`},
-      sp&&sp.spread>=.05?{v:"+"+Math.round(sp.spread*100),u:"%",l:`price gap on ${sp.item} across ${sp.n} order lines (${rp(sp.min)}–${rp(sp.max)} per unit)`}:{v:rpParts(A.gmv/(O.length||1))[0],u:rpParts(A.gmv/(O.length||1))[1],l:"average order value"}].filter(Boolean);
-    k3.forEach((k,i)=>kpi(sl,932,180+i*158,228,146,k));
-
-    // Sales: who bought and how
-    const s2=content(pre+"Sales last week · who bought and how",N.whoTitle), appName=k=>({WEB:"Web",PETANI:"Petani app","SAWITPRO-RETAIL":"SawitPRO retail","SAWITPRO-BISNIS":"SawitPRO bisnis"}[String(k).toUpperCase()]||k);
-    box(s2,80,180,380,462);
-    if(A.byRegion.length){ heading(s2,100,196,340,"GMV by customer region",`Rp million; customers in brackets. ${A.byProvince.map(p=>`${p.k} ${pct(p.gmv,A.gmv)}%`).join(" · ")}`);
-      hbar(s2,A.byRegion.slice(0,7).map(x=>({k:`${x.k} (${x.cust})`,v:Math.round(x.gmv/1e5)/10})),96,248,348,330,{fmt:'0.0"M"'}); }
-    else { heading(s2,100,196,340,"GMV by customer role","Rp million; orders in brackets. No region in this export");
-      hbar(s2,A.byRole.map(x=>({k:`${roleName(x.k)} (${x.n})`,v:Math.round(x.gmv/1e5)/10})),96,248,348,330,{fmt:'0.0"M"'}); }
-    if(N.regionNote&&A.byRegion.length) txt(s2,N.regionNote,{x:X(100),y:X(586),w:X(340),h:X(46),fontSize:9.5,color:"535353",fit:"shrink"});
-    box(s2,476,180,440,462); heading(s2,496,196,400,"How they ordered","Average order value by channel and customer type");
-    const segRows=(t,rows)=>[[t,"Orders","GMV","Avg order"].map((h,i)=>({text:h,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:9,align:i?"right":"left"}})),
-      ...rows.map(x=>[{text:String(x.k)},{text:String(x.n),options:R},{text:rp(x.gmv),options:R},{text:rp(x.aov),options:R}])];
-    const tOpt=y=>({x:X(492),y:X(y),w:X(408),colW:[X(150),X(66),X(96),X(96)],fontFace:FONT,fontSize:9,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.04,autoPage:false});
-    let y=246; if(A.byApp.length){ s2.addTable(segRows("Channel",A.byApp.map(x=>({...x,k:appName(x.k)}))),tOpt(y)); y+=26*(A.byApp.length+1)+14; }
-    if(A.byCust.length){ s2.addTable(segRows("Customer",A.byCust),tOpt(y)); y+=26*(A.byCust.length+1)+16; }
-    txt(s2,"SALES PIC (ORDERS)",{x:X(496),y:X(y),w:X(400),h:0.2,fontSize:8.5,bold:true,color:"7A8373",charSpacing:1});
-    hbar(s2,A.byPic.slice(0,4).map(x=>({k:`${x.p} (${x.n})`,v:Math.round(x.g/1e5)/10})),492,y+14,408,Math.max(120,630-y-14),{fmt:'0.0"M"',colors:["6E8F5A"]});
-    const parG=A.partial.reduce((s,o)=>s+o.gmv,0), openG=A.openOrders.reduce((s,o)=>s+o.gmv,0), ncG=A.noCrm.reduce((s,o)=>s+o.gmv,0);
-    [A.partial.length&&{v:rpParts(A.outstanding||parG)[0],u:rpParts(A.outstanding||parG)[1],l:A.outstanding?`still unpaid on ${A.partial.length} partially paid orders (${rp(parG)} GMV)`:`GMV on ${A.partial.length} partially paid orders`,hot:true},
-     A.openOrders.length&&{v:String(A.openOrders.length),u:`/${O.length}`,l:`orders still open, not completed (${rp(openG)})`},
-     A.has.crm?{v:String(A.noCrm.length),u:`/${O.length}`,l:`orders with no CRM engagement (${rp(ncG)})`}:{v:String(pct(A.top2,A.gmv)),u:"%",l:"of GMV from the top 2 orders"}].filter(Boolean)
-     .forEach((k,i)=>kpi(s2,932,180+i*158,228,146,k)); }
-
-  // Sales: order size and timing
-  if(N.oqNotes){ const sl=content(pre+"Sales last week · order size and timing",N.oqTitle), days=A.daily.filter(d=>d.orders||d.eng), nh=N.oqNotes.length?118:0;
-    box(sl,80,180,410,462-nh-(nh?14:0)); heading(sl,100,196,370,"GMV by day",`Rp million; orders${A.has.crm?" · CRM engagements":""} in brackets`);
-    hbar(sl,days.map(d=>({k:`${DAY[d.d.getDay()]} ${fds(d.d)} (${d.orders} ord.${A.has.crm?` · ${d.eng} CRM`:""})`,v:Math.round(d.gmv/1e5)/10})),96,248,378,384-nh-(nh?14:0),{fmt:'0.0"M"'});
-    box(sl,506,180,410,462-nh-(nh?14:0)); heading(sl,526,196,370,"Orders by size","Number of orders; share of GMV in brackets");
-    hbar(sl,A.bands.map(b=>({k:`${b.k} (${pct(b.gmv,A.gmv)}% GMV)`,v:b.n})),522,248,378,384-nh-(nh?14:0),{colors:["6E8F5A"]});
-    const kh=nh?(462-nh-14-24)/3:146;
-    [A.customers>=6?{v:String(Math.round(A.top3Share*100)),u:"%",l:`of GMV from the top 3 of ${A.customers} customers`,hot:true}:{v:String(pct(A.custAgg[0]?.gmv||0,A.gmv)),u:"%",l:`of GMV from the largest of ${A.customers} customers`,hot:true},
-     A.cycle.n?{v:String(A.cycle.median),u:" days",l:`median from CRM engagement to order (${A.cycle.n} matched wins)`}:{v:rpParts(A.gmv/(A.orders.length||1))[0],u:rpParts(A.gmv/(A.orders.length||1))[1],l:"average order value"},
-     A.discount>0?{v:(A.discount/(A.gmv||1)*100).toFixed(1),u:"%",l:`of GMV given as discount (${rp(A.discount)}, ${A.discOrders.length} orders)`}:{v:String(A.multiOrderCust),u:`/${A.customers}`,l:"customers who ordered more than once"}]
-     .forEach((k,i)=>kpi(sl,932,180+i*(kh+12),228,kh,k));
-    if(nh){ box(sl,80,642-nh,1080,nh,"FBEFC4"); txt(sl,N.oqNotes.map((t,i)=>({text:strip(t),options:{breakLine:i<N.oqNotes.length-1,paraSpaceAfter:4}})),{x:X(98),y:X(642-nh+10),w:X(1044),h:X(nh-20),fontSize:9.5,color:"5A4600",fit:"shrink"}); } }
-
-  // Rejection reasons in detail
-  if(A.reasonRows.length){ const sl=content(pre+"Rejection reasons last week",N.rrTitle), RL=A.reasonList.slice(0,7), dims=A.reasonDims;
-    box(sl,80,180,520,462); heading(sl,100,196,480,"Every reason given",`${A.reasonRows.length} engagements that did not order`);
-    hbar(sl,RL.map(r=>({k:r.k,s:[r.lost,r.warm,r.other]})),96,248,488,380,{stacked:true,names:["Not interested","Considering / prospect","No status"],colors:["8E9C84","D9A21B","C9CFC3"],legend:true});
-    const cols=dims.flatMap(k=>countBy(A.reasonRows.filter(r=>r[k]),r=>r[k]).slice(0,3).map(([g])=>({k,g})));
-    if(cols.length){ const v=(r,c)=>A.reasonRows.filter(x=>x.reason===r.k&&x[c.k]===c.g).length, mx=Math.max(1,...RL.flatMap(r=>cols.map(c=>v(r,c))));
-      const shade=n=>{ if(!n) return "FFFFFF"; const t=.15+.85*n/mx, mix=(a,b)=>Math.round(a+(b-a)*t).toString(16).padStart(2,"0"); return (mix(255,74)+mix(255,101)+mix(255,59)).toUpperCase(); };
-      const hd=t=>({text:t,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:8.5,align:"center"}});
-      const rows=[[{text:"Reason",options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:8.5}},...cols.map(c=>hd(`${LABEL[c.k]}: ${c.g}`))],
-        ...RL.map(r=>[{text:r.k,options:{fontSize:8.5}},...cols.map(c=>{const n=v(r,c);return {text:n?String(n):"",options:{align:"center",bold:true,fill:{color:shade(n)},color:n/mx>.5?"FFFFFF":"2B2F28"}};})])];
-      box(sl,620,180,540,300);
-      sl.addTable(rows,{x:X(632),y:X(192),w:X(516),colW:[X(156),...cols.map(()=>X(360/cols.length))],fontFace:FONT,fontSize:8.5,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.04,autoPage:false}); }
-    if(N.rrNotes.length){ box(sl,620,494,540,148,"FBEFC4"); txt(sl,N.rrNotes.map((t,i)=>({text:strip(t),options:{breakLine:i<N.rrNotes.length-1,paraSpaceAfter:5}})),{x:X(638),y:X(506),w:X(504),h:X(124),fontSize:9.5,color:"5A4600",fit:"shrink"}); } }
-
-  // Why leads say no
-  if(A.notWon.length){ const sl=content(pre+"What the reasons mean",N.reasonTitle);
-    box(sl,80,180,520,462); heading(sl,100,196,480,"Reasons, grouped by what would fix them",`${A.notWon.length} engagements that did not order`);
-    hbar(sl,A.themes.slice().sort((a,b)=>b.n-a.n).map(t=>({k:t.t,s:[t.lost,t.warm]})),96,248,488,380,{stacked:true,names:["Not interested","Considering / prospect"],colors:["8E9C84","D9A21B"],legend:true});
-    box(sl,620,180,540,462); heading(sl,640,196,500,"What the discussion notes say","Signals read from the CRM notes, by lead status");
-    if(A.signals.length) hbar(sl,A.signals.slice(0,6).map(x=>({k:x.label,s:[x.lost,x.warm]})),636,248,508,380,{stacked:true,names:["Not interested","Considering / prospect"],colors:["8E9C84","D9A21B"],legend:true});
-    else txt(sl,"No discussion notes in this data",{x:X(640),y:X(400),w:X(500),h:0.3,fontSize:11,color:"7A8373",align:"center"}); }
-
-  // What separates winners
-  if(N.driver){ const D=N.driver, sl=content(pre+"What separates winners",`${D.dim} decides the outcome. ${N.driverTitle}`), gs=A.best.groups.filter(x=>x.g!=="(not filled)");
-    box(sl,80,180,400,340); heading(sl,100,196,360,`Share ${A.posLabel}, by ${lc(D.dim)}`,`${A.crm.filter(r=>r.outcome).length} CRM engagements with a status`);
-    hbar(sl,gs.map(g=>({k:`${g.g} (${g.w}/${g.n})`,v:Math.round(g.rate*100)})),96,248,368,262,{fmt:'0"%"',max:100});
-    box(sl,496,180,664,340);
-    const cw=Math.floor(504/A.cohorts.length);
-    table(sl,["Most common",...A.cohorts.map(([c,rs])=>`${c} (${rs.length})`)],A.profile.map(p=>[{text:LABEL[p.k],options:{bold:true,color:"7A8373"}},...p.vals.map(v=>`${v.v}  ${Math.round(v.share*100)}%`)]),512,196,632,[128,...A.cohorts.map(()=>cw)]);
-    box(sl,80,536,1080,104,"FBEFC4"); txt(sl,strip(N.caveat),{x:X(100),y:X(548),w:X(1040),h:X(80),fontSize:10.5,color:"5A4600",valign:"middle",fit:"shrink"}); }
-
-  // Team performance: funnel and PIC scorecard
-  if(N.pf){ const sl=content(pre+"Team performance · funnel and PIC scorecard",N.pfTitle), FU=A.funnel, hasC=A.has.crm, hasS=A.has.sales, nh=N.pfNotes.length?118:0, ch=462-nh-(nh?14:0);
-    box(sl,80,180,380,ch); heading(sl,100,196,340,"CRM funnel","Engagements at each step; step conversion in brackets");
-    if(hasC) hbar(sl,FU.map((f,i)=>({k:i?`${f[0]} (${pct(f[1],FU[i-1][1])}%)`:f[0],v:f[1]})),96,248,348,ch-80,{max:FU[0][1]||1});
-    else txt(sl,"Upload a CRM file to see the funnel",{x:X(100),y:X(180+ch/2),w:X(340),h:0.3,fontSize:11,color:"7A8373",align:"center"});
-    box(sl,476,180,684,ch);
-    const head=["PIC",...(hasC?["CRM eng.","Reached","Won · warm · lost"]:[]),...(hasS?["Orders","GMV"]:[]),...(hasC&&hasS?["Orders in CRM"]:[])];
-    const rows=A.picCard.slice(0,7).map(g=>[g.p,...(hasC?[g.eng||"–",g.eng?`${pct(g.reached,g.eng)}%`:"–",g.eng?`${g.won} · ${g.warm} · ${g.lost}`:"–"]:[]),...(hasS?[g.orders||"–",g.orders?rp(g.gmv):"–"]:[]),
-      ...(hasC&&hasS?[g.orders?(g.inCrm?`${g.inCrm} of ${g.orders}`:{text:`0 of ${g.orders}`,options:{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}}):"–"]:[])].map((c,i)=>i?(typeof c==="object"?{...c,options:{...c.options,align:"right"}}:{text:String(c),options:R}):c));
-    const rest=652-170, cw=head.length>1?rest/(head.length-1):rest;
-    table(sl,head,rows,490,196,656,[170,...head.slice(1).map(()=>cw)]);
-    if(nh){ box(sl,80,642-nh,1080,nh,"FBEFC4"); txt(sl,N.pfNotes.map((t,i)=>({text:strip(t),options:{breakLine:i<N.pfNotes.length-1,paraSpaceAfter:4}})),{x:X(98),y:X(642-nh+10),w:X(1044),h:X(nh-20),fontSize:9.5,color:"5A4600",fit:"shrink"}); } }
-
-  // Recoverable demand
-  if(A.warm.length){ const sl=content(pre+"Recoverable demand",N.warmTitle), SL=Object.fromEntries(SIGNALS.map(s=>[s[0],s[1]]));
-    [{v:String(A.warm.length),u:"",l:"Considering or prospect",hot:true},{v:String(A.intentWarm.length),u:"",l:"Asked about warehouse, delivery or price"},
-     {v:String(A.warm.filter(r=>/unable|tidak bisa/i.test(r.callResp||"")).length),u:"",l:"Could not be reached by phone"},{v:String(A.stockRows.length),u:"",l:"Stalled on stock or delivery time"}].forEach((k,i)=>kpi(sl,80+i*274,180,256,104,k));
-    box(sl,80,300,1080,342);
-    table(sl,["ID","PIC","Channel","Status","What they asked or said"],A.warm.slice().sort((a,b)=>b.signals.length-a.signals.length).slice(0,5).map(r=>[r.id||"–",r.pic||"–",r.channel||"–",{text:r.status,options:{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}},r.signals.map(s=>SL[s]).join("; ")||r.reason||"–"]),96,316,1048,[110,140,130,120,548]);
-    txt(sl,"Names and phone numbers are left out; look leads up by ID in the CRM.",{x:X(96),y:X(612),w:8,h:0.22,fontSize:8.5,color:"7A8373"}); }
-
+  // Draw chart primitives (see viz.js) as plain shapes and text boxes.
+  function draw(sl,P,ox,oy){ P.forEach(p=>{
+    if(p.t==="r"){ const w=Math.max(p.w,.6), h=Math.max(p.h,.6), r=Math.min(p.r||0,w/2,h/2);
+      sl.addShape(r>=1.5?pres.shapes.ROUNDED_RECTANGLE:pres.shapes.RECTANGLE,{x:X(ox+p.x),y:X(oy+p.y),w:X(w),h:X(h),fill:{color:H(p.fill)},line:{color:H(p.fill),width:0},...(r>=1.5?{rectRadius:X(r)}:{})}); }
+    else if(p.t==="l"){ const x=Math.min(p.x1,p.x2), y=Math.min(p.y1,p.y2), up=(p.x2-p.x1)*(p.y2-p.y1)<0;
+      sl.addShape(pres.shapes.LINE,{x:X(ox+x),y:X(oy+y),w:X(Math.abs(p.x2-p.x1)),h:X(Math.abs(p.y2-p.y1)),flipV:up,line:{color:H(p.color),width:p.sw*.75,dashType:p.dash?"dash":"solid"}}); }
+    else if(p.t==="d") sl.addShape(pres.shapes.OVAL,{x:X(ox+p.cx-p.rad),y:X(oy+p.cy-p.rad),w:X(p.rad*2),h:X(p.rad*2),fill:{color:H(p.fill)},line:{color:"FFFFFF",width:1.5}});
+    else if(p.t==="t") txt(sl,p.s,{x:X(ox+p.x),y:X(oy+p.y),w:X(Math.max(p.w,8)),h:X(Math.max(p.h,8)),fontSize:Math.round(p.size*.75*10)/10,bold:p.bold,color:H(p.color),align:p.align,valign:p.valign==="middle"?"middle":p.valign,lineSpacingMultiple:.95});
+  }); }
+  function cellOf(v){ const o=typeof v==="object"&&v?v:{v}; return {text:String(o.v),options:o.pill?{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}:o.bold?{bold:true,color:"274E13"}:{}}; }
+  function panelSlide(spec){
+    const sl=content(spec.kicker,spec.title), L=layoutPanels(spec), ox=80, oy=180;
+    L.cells.forEach(c=>{
+      if(c.kpi) return kpi(sl,ox+c.x,oy+c.y,c.w,c.h,c.kpi);
+      box(sl,ox+c.x,oy+c.y,c.w,c.h);
+      if(c.title) heading(sl,ox+c.x+20,oy+c.y+16,c.w-40,c.title,c.sub); else if(c.sub) txt(sl,c.sub,{x:X(ox+c.x+20),y:X(oy+c.y+16),w:X(c.w-40),h:0.25,fontSize:9.5,color:"7A8373"});
+      const I=c.inner;
+      if(c.chart) draw(sl,layoutChart(c.chart,I.w,I.h),ox+c.x+I.x,oy+c.y+I.y);
+      else if(c.table){ const T=c.table, al=i=>T.align?.[i]==="r"?"right":T.align?.[i]==="c"?"center":"left";
+        const hd=T.head.map((h,i)=>({text:h,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:9,align:al(i)}}));
+        sl.addTable([hd,...T.rows.map(r=>r.map((v,i)=>{ const c2=cellOf(v); c2.options={...c2.options,align:al(i)}; return c2; }))],
+          {x:X(ox+c.x+I.x-6),y:X(oy+c.y+I.y),w:X(I.w+12),colW:(()=>{ const w=colWeights(T), t=w.reduce((a,b)=>a+b,0); return w.map(x=>X((I.w+12)*x/t)); })(),fontFace:FONT,fontSize:9,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.04,autoPage:false}); }
+      if(c.foot) txt(sl,c.foot,{x:X(ox+c.x+20),y:X(oy+c.y+c.h-c.fh-6),w:X(c.w-40),h:X(c.fh),fontSize:9.2,color:"535353",valign:"bottom",fit:"shrink"});
+    });
+    if(L.notes){ box(sl,ox,oy+L.notes.y,1080,L.notes.h,"FBEFC4");
+      txt(sl,L.notes.list.map((t,i)=>({text:strip(t),options:{breakLine:i<L.notes.list.length-1,paraSpaceAfter:3}})),{x:X(ox+18),y:X(oy+L.notes.y+9),w:X(1044),h:X(L.notes.h-18),fontSize:9.3,color:"5A4600",valign:"middle",fit:"shrink"}); }
   }
+  function teamBlock(A,N,pre){ teamSpecs(A,N,pre).forEach(panelSlide); }
 
   // Next steps
   { const sl=content("Next steps",`${DX.actions.length} actions for the coming week`);

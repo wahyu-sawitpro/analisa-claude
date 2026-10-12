@@ -25,6 +25,7 @@ const CRM_FIELDS=[
   ["source",[/sumber\s*lead|lead\s*source|^source$/]],
   ["purpose",[/objective|tujuan/]],
   ["product",[/product\s*yang\s*diminta|produk\s*yang\s*ditawarkan|pupuk\s*ditawarkan|^product$|^produk$/]],
+  ["userType",[/user\s*type/]],
   ["custType",[/customer\s*type|user\s*type|tipe\s*customer/]],
   ["id",[/engagement\s*id|^id$|lead\s*id/]],
   ["detail",[/detail\s*pembahasan|keterangan|catatan|notes?$/]],
@@ -154,7 +155,7 @@ function span(ds){ ds=ds.filter(Boolean).sort((a,b)=>a-b); if(!ds.length) return
   return `${fd(a)} – ${fd(b)}`; }
 const STATUS_COLOR={"Ordered":"#274E13","Prospect":"#4A653B","Interested":"#4A653B","Considering":"#D9A21B","Not interested":"#8E9C84"};
 const EXTRA=["#5B7F95","#A8653A","#6E5A8A","#3F8C7A"];
-const LABEL={channel:"Engagement channel",source:"Lead source",leadType:"Lead type",pic:"PIC",custType:"Customer type",location:"Location",purpose:"Objective",_src:"Data source"};
+const LABEL={channel:"Engagement channel",source:"Lead source",leadType:"Lead type",pic:"PIC",custType:"Customer type",userType:"Buyer type",location:"Location",purpose:"Objective",_src:"Data source"};
 function countBy(rows,f){const m=new Map();for(const r of rows){const k=f(r);if(k===null||k===undefined)continue;m.set(k,(m.get(k)||0)+1)}return [...m].sort((a,b)=>b[1]-a[1])}
 function sumBy(rows,f,v){const m=new Map();for(const r of rows){const k=f(r);if(k===null||k===undefined)continue;m.set(k,(m.get(k)||0)+v(r))}return [...m].sort((a,b)=>b[1]-a[1])}
 const srcLabel=d=>d.sheet&&!/^sheet\s*1$/i.test(d.sheet)?`${d.name} · ${d.sheet}`:d.name;
@@ -164,7 +165,7 @@ const shortItem=s=>String(s||"").replace(/\s*\(\d+\s*butir\)/i,"").replace(/\s+-
 function canonCrm(r,map,src){ const o={_raw:r,_src:src};
   for(const k in map){ const v=r[map[k]];
     o[k]=k==="potential"||k==="ffb"||k==="needKg"?toNum(v):k==="date"||k==="closing"||k==="modified"||k==="fertDate"||k==="followDate"?toDate(v):k==="status"?canonStatus(v)
-      :k==="channel"?trChannel(v):k==="reason"?trReason(v):k==="custType"?(clean(v)||"").replace(/[^\p{L}\p{N} \/-]/gu,"").trim()||null:clean(v); }
+      :k==="channel"?trChannel(v):k==="reason"?trReason(v):k==="custType"||k==="userType"?(clean(v)||"").replace(/[^\p{L}\p{N} \/-]/gu,"").trim()||null:clean(v); }
   if(o.reason==="Other"&&o.reasonOther) o.reason=trReason(o.reasonOther);
   o.reasonRaw=map.reason?clean(r[map.reason]):null;
   o.ph=phoneKey(o.phone); o.nk=nameKey(o.name);
@@ -300,6 +301,31 @@ function analyse(sources){
   A.multiOrderCust=A.custAgg.filter(c=>c.n>1).length;
   A.discOrders=O.filter(o=>o.lines.some(l=>l.discount>0)); A.shipOrders=O.filter(o=>o.lines.some(l=>l.shipping>0));
 
+  // ---- What the wins are worth: order value and product mix of CRM wins against the rest
+  const aov=os=>os.length?os.reduce((s,o)=>s+o.gmv,0)/os.length:0, wonSet=new Set(A.linkedOrders);
+  A.aovWin=aov(A.linkedOrders); A.aovNoCrm=aov(A.noCrm); A.aovAll=aov(O);
+  const mixOf=os=>{ const t=os.reduce((s,o)=>s+o.gmv,0)||1, m=new Map(); os.forEach(o=>o.lines.forEach(l=>{ if(l.family) m.set(l.family,(m.get(l.family)||0)+(l.gmv||0)); })); return {t,m}; };
+  const mw=mixOf(A.linkedOrders), mr=mixOf(O.filter(o=>!wonSet.has(o)));
+  A.mix=A.byFamily.slice(0,5).map(f=>({k:f.k,win:Math.round((mw.m.get(f.k)||0)/mw.t*100),rest:Math.round((mr.m.get(f.k)||0)/mr.t*100)}));
+  A.wonNew=A.linkedOrders.filter(o=>o.isNew).length;
+  A.bigWin=A.linkedOrders[0]?{o:A.linkedOrders[0],r:A.linkedOrders[0].crm.find(r=>r.outcome==="Won")}:null;
+  A.potWins=A.wonLinked.filter(r=>r.potential); A.potSum=A.potWins.reduce((s,r)=>s+r.potential,0); A.potActual=A.potWins.reduce((s,r)=>s+r.orders.reduce((a,o)=>a+o.gmv,0),0);
+
+  // ---- Where to grow: product by region, what top-product buyers also buy, open orders by age
+  const fams=A.byFamily.slice(0,5).map(f=>f.k);
+  const geo=A.byRegion.length>=2?{k:"region",vals:A.byRegion.slice(0,4).map(x=>x.k),of:l=>l.region}:A.byApp.length>=2?{k:"channel",vals:A.byApp.map(x=>x.k),of:l=>O.find(o=>o.lines.includes(l))?.app}:null;
+  A.heat=geo&&fams.length>=2?{dim:geo.k,rows:fams,cols:geo.vals,v:(f,g)=>lines.filter(l=>l.family===f&&geo.of(l)===g).reduce((s,l)=>s+(l.gmv||0),0)}:null;
+  const custFam=new Map(); O.forEach(o=>{ const k=o.ph||o.nk||o.no; if(!custFam.has(k)) custFam.set(k,new Set()); o.lines.forEach(l=>l.family&&custFam.get(k).add(l.family)); });
+  const famCust=A.byFamily.slice().sort((a,b)=>b.cust-a.cust)[0];
+  if(famCust&&famCust.cust>=3){ const buyers=[...custFam.values()].filter(f=>f.has(famCust.k));
+    A.cross={f:famCust.k,n:buyers.length,also:A.byFamily.filter(g=>g.k!==famCust.k).map(g=>({k:g.k,n:buyers.filter(b=>b.has(g.k)).length})).filter(x=>x.n).sort((a,b)=>b.n-a.n).slice(0,5),only:buyers.filter(b=>b.size===1).length}; }
+  else A.cross=null;
+  const asOf=O.reduce((m,o)=>o.date&&o.date>m?o.date:m,null); A.asOf=asOf;
+  const AGE=[["0–1 days",0,1],["2–3 days",2,3],["4–6 days",4,6],["7+ days",7,1e9]];
+  A.aging=asOf?AGE.map(([k,lo,hi])=>{ const os=A.openOrders.filter(o=>o.date&&dd(asOf,o.date)>=lo&&dd(asOf,o.date)<=hi); return {k,n:os.length,gmv:os.reduce((s,o)=>s+o.gmv,0),lo}; }):[];
+  const newO=O.filter(o=>o.isNew); A.entry=A.hasCustStatus&&newO.length>=2?countBy(newO.flatMap(o=>[...new Set(o.lines.map(l=>l.family).filter(Boolean))]),f=>f)[0]:null;
+  A.newOrdersN=newO.length;
+
   // ---- Reasons and notes for leads that did not order
   A.reasons=countBy(A.notWon,r=>r.reason);
   A.themes=THEMES.map(([t,,c])=>({t,c,n:A.notWon.filter(r=>r.theme===t).length,lost:A.lost.filter(r=>r.theme===t).length,warm:A.warm.filter(r=>r.theme===t).length})).filter(x=>x.n);
@@ -307,6 +333,13 @@ function analyse(sources){
   A.unreachable=A.notWon.filter(r=>/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"")).length;
   A.stockRows=A.notWon.filter(r=>r.theme==="Stock & delivery"||r.signals.includes("stock"));
   A.intentWarm=A.warm.filter(r=>r.signals.some(s=>s==="logistics"||s==="price"));
+
+  // ---- Who can be won back: reason theme by whether the conversation happened
+  const RECOV=new Set(["Just asking","Stock & delivery","Price","Timing"]);
+  A.notWon.forEach(r=>{ r.contact=/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"")?"Call didn't connect":/phone/i.test(r.channel||"")?"Call connected":r.channel||"Not recorded";
+    r.recov=RECOV.has(r.theme)||r.outcome==="Warm"; });
+  A.recovN=A.notWon.filter(r=>r.recov).length;
+  A.contacts=countBy(A.notWon,r=>r.contact).map(([k])=>k);
 
   // ---- Rejection reasons in detail: which dimension predicts the reason given
   const RR=A.notWon.filter(r=>r.reason); A.reasonRows=RR;

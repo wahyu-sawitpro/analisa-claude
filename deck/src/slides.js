@@ -107,6 +107,55 @@ function narrative(A){
     ].filter(Boolean).slice(0,3);
   }
 
+  // What the wins are worth
+  if(won&&A.has.sales&&A.linkedOrders.length){
+    const share=pct(A.linkedGmv,A.gmv), bw=A.bigWin, gap=A.mix.slice().sort((a,b)=>Math.abs(b.win-b.rest)-Math.abs(a.win-a.rest))[0];
+    const days=bw?.r?.date&&bw.o.date?Math.round((bw.o.date-bw.r.date)/864e5):null, lt=countBy(A.won,r=>r.leadType)[0], ut=countBy(A.won,r=>r.userType);
+    N.wwTitle=A.noCrm.length?`Wins brought ${share}% of GMV; their orders average ${rp(A.aovWin)} vs ${rp(A.aovNoCrm)} for orders the CRM never saw`:`Wins brought ${share}% of GMV at ${rp(A.aovWin)} per order`;
+    N.wwNotes=[
+      bw&&`<b>Biggest win: ${rp(bw.o.gmv)}</b> (${esc(bw.o.items.slice(0,3).join(", "))}${bw.o.items.length>3?", …":""})${bw.r?.channel?` from ${esc(lc(bw.r.channel))}`:""}${bw.r?.source?` on a ${esc(lc(bw.r.source))} lead`:""}${bw.o.pic?` by ${esc(bw.o.pic)}`:""}${days!=null?`, ordered ${days<=0?"the same day":`${days} day${days>1?"s":""} later`}`:""}.`,
+      gap&&A.orders.length>A.linkedOrders.length&&Math.abs(gap.win-gap.rest)>=10&&`<b>${gap.win>gap.rest?`Wins lean on ${esc(gap.k)}`:`Wins buy less ${esc(gap.k)}`}:</b> ${gap.win}% of win GMV vs ${gap.rest}% in other orders${gap.win>gap.rest?`, so ${esc(gap.k)} is the product the CRM motion sells best`:""}.`,
+      lt&&`<b>${lt[1]} of ${won} wins came from ${esc(lc(lt[0]))}</b>${ut.length?`; buyers: ${esc(ut.map(([k,n])=>`${k} ${n}`).join(", "))}`:""}.`,
+      A.hasCustStatus&&`<b>${A.wonNew} of ${A.linkedOrders.length} win orders are from new customers.</b>${A.wonNew/A.linkedOrders.length<.3?" CRM wins are mostly re-orders; new-customer growth comes from orders outside the CRM.":""}`,
+      A.potWins.length===won?`<b>The CRM's potential GMV was ${A.potActual>=A.potSum?"met":"missed"}:</b> ${rp(A.potSum)} expected on the ${won} wins, ${rp(A.potActual)} ordered (${A.potSum?Math.round((A.potActual/A.potSum-1)*100):0}%). A usable forecast for the next pipeline.`
+        :A.potWins.length&&`<b>Potential GMV was logged on only ${A.potWins.length} of ${won} wins</b> (${rp(A.potSum)} expected, ${rp(A.potActual)} ordered). Fill it on every lead to size the pipeline.`
+    ].filter(Boolean).slice(0,4);
+  }
+
+  // Where to grow
+  if(A.has.sales&&A.orders.length>=3){
+    const Hm=A.heat, cr=A.cross, top=cr?.also[0], ag=A.aging.filter(a=>a.lo>=4), agN=ag.reduce((s,a)=>s+a.n,0), agG=ag.reduce((s,a)=>s+a.gmv,0);
+    let hot=null; if(Hm) for(const r of Hm.rows) for(const c of Hm.cols){ const v=Hm.v(r,c); if(!hot||v>hot.v) hot={r,c,v}; }
+    let skew=null; if(Hm&&Hm.cols.length>=2) for(const c of Hm.cols){ const tot=Hm.rows.reduce((s,r)=>s+Hm.v(r,c),0), f=Hm.rows.slice().sort((a,b)=>Hm.v(b,c)-Hm.v(a,c))[0];
+      if(tot&&f!==Hm.rows[0]&&Hm.v(f,c)/tot>=.4){ skew={c,f,p:pct(Hm.v(f,c),tot)}; break; } }
+    N.wgTitle=([cr&&top&&cr.n-top.n>=2&&`${cr.n-top.n} of ${cr.n} ${cr.f.replace(/\s*\(.*\)/,"")} buyers skipped ${top.k}`,
+      agN>=2&&`${agN} open orders (${rp(agG)}) are 4+ days old`,
+      hot&&`${hot.r} in ${appName(hot.c)} is the biggest pocket (${rp(hot.v)})`].filter(Boolean).slice(0,2).join("; ")||"Where to grow next").replace(/^./,c=>c.toUpperCase());
+    const sp=A.priceSpread[0];
+    N.wgNotes=[
+      cr&&cr.only>=2&&`<b>${cr.only} of ${cr.n} ${esc(cr.f)} buyers bought nothing else.</b>${top?` Offer ${esc(top.k)} (bought by ${top.n} of them) as the add-on on the next call.`:""}`,
+      A.entry&&`<b>New customers start with ${esc(A.entry[0])}</b> (${A.entry[1]} of ${A.newOrdersN} new-customer orders). Lead with it when opening new accounts.`,
+      skew&&`<b>${esc(appName(skew.c))} buys mostly ${esc(skew.f)}</b> (${skew.p}% of its GMV), unlike the other ${Hm.dim==="region"?"regions":"channels"}. Stock and pitch by area.`,
+      A.aging.some(a=>a.n)&&`<b>${A.openOrders.length} of ${A.orders.length} orders are still open</b> as of ${fds(A.asOf)}${agN?`; ${agN} (${rp(agG)}) for 4+ days`:""}. Confirm delivery dates before customers chase them.`,
+      sp&&sp.spread>=.1&&`<b>${esc(sp.item)} sold at ${rp(sp.min)}–${rp(sp.max)} per unit</b> across ${sp.n} lines (+${Math.round(sp.spread*100)}%). Check that discounts follow one price list.`
+    ].filter(Boolean).slice(0,4);
+  }
+
+  // Who can be won back
+  if(nw){
+    const closed=A.notWon.filter(r=>!r.recov), cTop=countBy(closed,r=>r.theme)[0];
+    N.cbTitle=`${A.recovN} of ${nw} leads who didn't order can still be won back${cTop&&cTop[1]>=2?`; ${cTop[1]} are ${TL[cTop[0]]||lc(cTop[0])}`:""}`;
+    const PLAN={"Locked in elsewhere":["Closed for now","Offer payment terms or a KUD / agent partnership; drop from this season's cold-call lists","Next season"],
+      "Just asking":["Recoverable","Send the price list and warehouse location on WhatsApp, then call to ask what they need","Within 48 hours"],
+      "Stock & delivery":["Recoverable","Call back the day the product is in stock; offer warehouse pickup","When stock lands"],
+      "Price":["Recoverable","Quote bulk or bundle prices and the landed cost including delivery","This week"],
+      "Timing":["Recoverable","Log the next fertilizing month and book a call two weeks before","Before next application"],
+      "Not a fit":["Closed","Remove from call lists (no land, wrong number, too small)","–"],
+      "Other":["Check","Re-read the notes and pick a specific reason","This week"]};
+    N.plan=countBy(A.notWon,r=>r.theme||"Other").map(([t,n])=>{ const p=PLAN[t]||PLAN.Other, w=A.notWon.filter(r=>(r.theme||"Other")===t&&r.outcome==="Warm").length;
+      return [{v:t,bold:true},`${n}${w?` (${w} warm)`:""}`,p[0]==="Recoverable"?{v:"Recoverable",pill:true}:w?`${p[0]}, ${w} still warm`:p[0],p[1],p[2]]; });
+  }
+
   // Headline for the executive summary
   const dh=N.driver&&won?`${N.driver.hi.g} converts (${N.driver.hi.w} of ${N.driver.hi.n}); ${lc(N.driver.lo.g)} doesn't (${N.driver.lo.w} of ${N.driver.lo.n})`:null;
   const sF0=A.byFamily?.[0], sTail=sF0?` ${sF0.k} is ${pct(sF0.gmv,A.gmv||1)}% of GMV${A.outstanding>=A.gmv*.1?`, and ${rp(A.outstanding)} is still unpaid`:""}.`:"";
@@ -175,144 +224,140 @@ function contentSlide(n,kicker,title,body){
   <div class="kicker">${esc(kicker)}</div><h2>${esc(title)}</h2><div class="body">${body}</div>
   <div class="foot"><span>SAWITPRO PROPRIETARY</span><span class="pg">${n}</span><span>Do not use or distribute without permission from SawitPRO</span></div></div>`;
 }
+const appName=k=>({WEB:"Web",PETANI:"Petani app","SAWITPRO-RETAIL":"SawitPRO retail","SAWITPRO-BISNIS":"SawitPRO bisnis"}[String(k).toUpperCase()]||k);
 const roleName=k=>String(k).toLowerCase().replace(/_/g," ").replace(/^./,c=>c.toUpperCase());
 const OUT_COLOR={"Ordered":"#274E13","Considering / prospect":"#D9A21B","Not interested":"#8E9C84"};
 
-// Slides for one team. `pre` prefixes each kicker ("Smallholder · ") when the deck covers several teams.
-function teamSlides(A,N,pre,S,next){
+// Slides for one team, described once as panel specs (see viz.js) and drawn by both the page and the PPTX.
+// `pre` prefixes each kicker ("Smallholder · ") when the deck covers several teams.
+function teamSpecs(A,N,pre){
+  const S=[], O=A.orders, pl=(n,w)=>`${n} ${w}${n===1?"":"s"}`, rpM=v=>rp(v);
+  const NI={name:"Not interested",color:OUTC.lost}, WM={name:"Considering / prospect",color:OUTC.warm}, NS={name:"No status",color:OUTC.none};
+
   // Success story
   if(A.won.length){
-    const mini=k=>{const c=countBy(A.won,r=>r[k]);return c.length?`<div class="mini"><h4>${esc(LABEL[k])}</h4>${hbars(c.slice(0,3).map(([g,v])=>({k:g,v})),{scale:A.won.length,right:i=>pct(i.v,A.won.length)+"%"})}</div>`:""};
-    const rows=A.has.sales?A.linkedOrders.slice(0,5).map(o=>`<tr><td>${esc(o.no)}</td><td>${esc(o.pic||"–")}</td><td>${esc(o.items.slice(0,2).join(", "))}${o.items.length>2?` +${o.items.length-2}`:""}</td><td class="num">${rp(o.gmv)}</td><td>${!A.hasCustStatus?"–":o.isNew?`<span class="pill">New</span>`:"Repeat"}</td></tr>`).join("")
-      :A.won.slice(0,6).map(r=>`<tr><td>${esc(r.id||"–")}</td><td>${esc(r.pic||"–")}</td><td>${esc(r.channel||"–")}</td><td>${esc(r.source||"–")}</td><td>${esc((r.detail||"").slice(0,60))}</td></tr>`).join("");
-    const newWon=A.linkedOrders.filter(o=>o.isNew).length;
-    S.push(contentSlide(next(),pre+"Success story",N.winTitle,`
-      <div style="display:grid;grid-template-columns:.85fr 1.45fr;gap:18px;align-items:start">
-        <div class="card"><h3>How the ${A.won.length} wins happened</h3><p class="sub">Share of CRM engagements that ended in an order</p>${["channel","source"].map(mini).join("")}</div>
-        <div style="display:flex;flex-direction:column;gap:14px">
-          <div class="stats3">${[{v:`${A.wonLinked.length}`,u:`/${A.won.length}`,l:"Wins confirmed in sales data",hot:true},{v:rpParts(A.linkedGmv)[0],u:rpParts(A.linkedGmv)[1],l:`GMV of ${A.linkedOrders.length} matched orders`},
-            A.hasCustStatus?{v:String(newWon),u:`/${A.linkedOrders.length}`,l:"Matched orders from new customers"}:{v:String(A.wonFromNotes.length||A.won.length),u:`/${A.won.length}`,l:A.wonFromNotes.length?"Wins found only in the notes (“Closing …”)":"Wins with a CRM status of ordered"}].map(k=>A.has.sales?kpiHtml(k):"").join("")}</div>
-          <div class="card" style="padding:14px 16px"><table class="tbl"><thead><tr>${(A.has.sales?["Order","PIC","Products","GMV","Customer"]:["ID","PIC","Channel","Source","Notes"]).map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>
-          <p class="sub" style="margin:8px 0 0">${A.has.sales?`Matched by ${andList(A.matchCounts.filter(m=>A.won.some(r=>r.matchBy===m[0])).map(([k])=>`${k} (${A.won.filter(r=>r.matchBy===k).length})`))}.${A.wonFromNotes.length?` ${A.wonFromNotes.length} counted as wins from “Closing” in the notes.`:""}${A.linkedOrders.length>5?` Top 5 of ${A.linkedOrders.length} by GMV.`:""}`:"Upload the sales file to see what these wins were worth."}</p></div></div></div>`));
+    const dims=["channel","source","leadType","userType"].filter(k=>A.won.some(r=>r[k])).slice(0,3);
+    const how={w:.85,title:`How the ${A.won.length} wins happened`,sub:"Each bar splits the CRM wins; count inside",
+      chart:{type:"stack100",rows:dims.map(k=>({label:LABEL[k],segs:countBy(A.won,r=>r[k]??"(not filled)").map(([g,n],i)=>({k:g,n,color:g==="(not filled)"?OUTC.none:CAT[i]||"#B3BBAB"}))}))}};
+    let right;
+    if(A.has.sales){
+      const kp=[{v:`${A.wonLinked.length}`,u:`/${A.won.length}`,l:"Wins confirmed in sales data",hot:true},{v:rpParts(A.linkedGmv)[0],u:rpParts(A.linkedGmv)[1],l:`GMV of ${pl(A.linkedOrders.length,"matched order")}`},
+        A.hasCustStatus?{v:String(A.wonNew),u:`/${A.linkedOrders.length}`,l:"Matched orders from new customers"}:{v:String(A.wonFromNotes.length||A.won.length),u:`/${A.won.length}`,l:A.wonFromNotes.length?"Wins found only in the notes (“Closing …”)":"Wins with a CRM status of ordered"}];
+      const by=andList(A.matchCounts.filter(m=>A.won.some(r=>r.matchBy===m[0])).map(([k])=>`${k} (${A.won.filter(r=>r.matchBy===k).length})`));
+      right={w:1.45,split:[{h:104,kpiRow:kp},{title:"Orders behind the wins",sub:A.linkedOrders.length>5?`Top 5 of ${A.linkedOrders.length} by GMV`:"Matched from the sales export",
+        table:{head:["Order","PIC","Products","GMV","Customer"],align:["l","l","l","r","l"],rows:A.linkedOrders.slice(0,5).map(o=>[o.no,o.pic||"–",o.items.slice(0,2).join(", ")+(o.items.length>2?` +${o.items.length-2}`:""),rp(o.gmv),!A.hasCustStatus?"–":o.isNew?{v:"New",pill:true}:"Repeat"])},
+        foot:`Matched by ${by||"–"}.${A.wonFromNotes.length?` ${A.wonFromNotes.length} counted as wins from “Closing” in the notes.`:""}`}]};
+    } else right={w:1.45,title:"The wins",sub:"Upload the sales file to see what these wins were worth",table:{head:["ID","PIC","Channel","Source","Notes"],rows:A.won.slice(0,7).map(r=>[r.id||"–",r.pic||"–",r.channel||"–",r.source||"–",(r.detail||"").slice(0,60)])}};
+    S.push({kicker:pre+"Success story",title:N.winTitle,rows:[{cards:[how,right]}]});
+  }
+
+  // Success story: what the wins are worth
+  if(N.wwNotes){
+    const cats=[[`CRM wins\n${pl(A.linkedOrders.length,"order")}`,A.aovWin,OUTC.won],A.noCrm.length&&[`No CRM record\n${pl(A.noCrm.length,"order")}`,A.aovNoCrm,"#8E9C84"],[`All orders\n${O.length}`,A.aovAll,"#86AD6C"]].filter(Boolean);
+    const rest=O.length>A.linkedOrders.length;
+    S.push({kicker:pre+"Success story · what the wins are worth",title:N.wwTitle,rows:[{cards:[
+      {w:.95,title:"Average order value",sub:"Orders behind CRM wins vs the rest",chart:{type:"column",cats:cats.map(c=>c[0]),series:[{name:"Average order",values:cats.map(c=>c[1]),colors:cats.map(c=>c[2])}],fmt:rpM,lblH:36}},
+      {w:1.25,title:"Product mix: wins vs other orders",sub:"Share of each group's GMV by product type",chart:{type:"column",cats:A.mix.map(m=>m.k),series:[{name:"CRM wins",color:CAT[0],values:A.mix.map(m=>m.win)},...(rest?[{name:"Other orders",color:CAT[2],values:A.mix.map(m=>m.rest)}]:[])],fmt:v=>v+"%",lblH:36}},
+      {w:.72,kpis:[{v:String(pct(A.linkedGmv,A.gmv)),u:"%",l:"of the team's GMV came from orders behind CRM wins",hot:true},
+        A.cycle.n?{v:String(A.cycle.median),u:" days",l:`median from CRM engagement to order (${A.cycle.sameDay} of ${A.cycle.n} same day)`}:{v:rpParts(A.aovWin)[0],u:rpParts(A.aovWin)[1],l:"average order behind a win"},
+        A.hasCustStatus?{v:String(A.wonNew),u:`/${A.linkedOrders.length}`,l:"win orders from new customers"}:{v:String(A.wonLinked.length),u:`/${A.won.length}`,l:"wins confirmed in sales"}]}]}],notes:N.wwNotes});
   }
 
   // Sales: what sold
   if(A.has.sales){
-    const O=A.orders, Q=A.qtyTotal||1, F0=A.byFamily[0], sp=A.priceSpread[0], pair=A.pairs[0];
-    S.push(contentSlide(next(),pre+"Sales last week · what sold",N.soldTitle,`
-      <div style="display:grid;grid-template-columns:1.1fr 1.1fr .85fr;gap:16px;align-items:start">
-        <div class="card"><h3>GMV by product type</h3><p class="sub">Grouped from item names; units in grey</p>${hbars(A.byFamily.slice(0,7).map(x=>({k:x.k,v:x.gmv,q:x.qty})),{fmt:rp,right:i=>`${nf.format(i.q)} units`})}</div>
-        <div class="card"><h3>GMV by product category</h3><p class="sub">“product_cat” in the sales export; orders in grey</p>${hbars(A.byCat.slice(0,7).map(x=>({k:x.k,v:x.gmv,o:x.orders})),{fmt:rp,right:i=>`${i.o} order${i.o>1?"s":""}`,color:"#6E8F5A"})}
-          ${N.catLine?`<p class="sub" style="margin:14px 0 0">${esc(N.catLine)}</p>`:""}</div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          ${F0?(A.unitsAnchor?kpiHtml({v:String(pct(F0.qty,Q)),u:"%",l:`of all units sold are ${F0.k} (${nf.format(F0.qty)} of ${nf.format(Q)})`,hot:true}):kpiHtml({v:String(pct(F0.gmv,A.gmv)),u:"%",l:`of GMV is ${F0.k}${A.orders.filter(o=>o.lines.some(l=>l.family===F0.k)).length===1?", from a single order":""}`,hot:true})):""}
-          ${kpiHtml({v:A.itemsPerOrder.toFixed(1),u:"",l:`products per order; ${A.multiFamily} of ${O.length} orders mix product types${pair?`, most often ${pair[0]}`:""}`})}
-          ${sp&&sp.spread>=.05?kpiHtml({v:"+"+Math.round(sp.spread*100),u:"%",l:`price gap on ${sp.item} across ${sp.n} order lines (${rp(sp.min)}–${rp(sp.max)} per unit)`})
-            :kpiHtml({v:rpParts(A.gmv/(O.length||1))[0],u:rpParts(A.gmv/(O.length||1))[1],l:"average order value"})}
-        </div></div>`));
+    const Q=A.qtyTotal||1, F0=A.byFamily[0], sp=A.priceSpread[0], pair=A.pairs[0];
+    const k3=[F0&&(A.unitsAnchor?{v:String(pct(F0.qty,Q)),u:"%",l:`of all units sold are ${F0.k} (${nf.format(F0.qty)} of ${nf.format(Q)})`,hot:true}:{v:String(pct(F0.gmv,A.gmv)),u:"%",l:`of GMV is ${F0.k}${O.filter(o=>o.lines.some(l=>l.family===F0.k)).length===1?", from a single order":""}`,hot:true}),
+      {v:A.itemsPerOrder.toFixed(1),u:"",l:`products per order; ${A.multiFamily} of ${O.length} orders mix product types${pair?`, most often ${pair[0]}`:""}`},
+      sp&&sp.spread>=.05?{v:"+"+Math.round(sp.spread*100),u:"%",l:`price gap on ${sp.item} across ${sp.n} order lines (${rp(sp.min)}–${rp(sp.max)} per unit)`}:{v:rpParts(A.gmv/(O.length||1))[0],u:rpParts(A.gmv/(O.length||1))[1],l:"average order value"}].filter(Boolean);
+    const cards=[{w:1.1,title:"GMV by product type",sub:"Grouped from item names; units in grey",chart:{type:"hbar",items:A.byFamily.slice(0,7).map(x=>({k:x.k,v:x.gmv,r:`${nf.format(x.qty)} units`})),fmt:rpM}}];
+    if(A.byCat.length) cards.push({w:1.1,title:"GMV by product category",sub:"“product_cat”; orders under each column",chart:{type:"column",cats:A.byCat.slice(0,6).map(x=>`${x.k}\n${pl(x.orders,"order")}`),series:[{name:"GMV",color:CAT[2],values:A.byCat.slice(0,6).map(x=>x.gmv)}],fmt:rpM,lblH:46},foot:N.catLine||null});
+    cards.push({w:.85,kpis:k3});
+    S.push({kicker:pre+"Sales last week · what sold",title:N.soldTitle,rows:[{cards}]});
 
     // Sales: who bought and how
-    const appName=k=>({WEB:"Web",PETANI:"Petani app","SAWITPRO-RETAIL":"SawitPRO retail","SAWITPRO-BISNIS":"SawitPRO bisnis"}[String(k).toUpperCase()]||k);
-    const segTable=(title,rows)=>`<table class="tbl seg"><thead><tr><th>${title}</th><th>Orders</th><th>GMV</th><th>Avg order</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc(x.k)}</td><td class="num">${x.n}</td><td class="num">${rp(x.gmv)}</td><td class="num">${rp(x.aov)}</td></tr>`).join("")}</tbody></table>`;
     const parG=A.partial.reduce((s,o)=>s+o.gmv,0), openG=A.openOrders.reduce((s,o)=>s+o.gmv,0), ncG=A.noCrm.reduce((s,o)=>s+o.gmv,0);
-    S.push(contentSlide(next(),pre+"Sales last week · who bought and how",N.whoTitle,`
-      <div style="display:grid;grid-template-columns:1fr 1.15fr .8fr;gap:16px;align-items:start">
-        ${A.byRegion.length?`<div class="card"><h3>GMV by customer region</h3><p class="sub">${esc(A.byProvince.map(p=>`${p.k} ${pct(p.gmv,A.gmv)}%`).join(" · "))}; customers in grey</p>${hbars(A.byRegion.slice(0,7).map(x=>({k:x.k,v:x.gmv,c:x.cust})),{fmt:rp,right:i=>`${i.c} cust.`})}`
-          :`<div class="card"><h3>GMV by customer role</h3><p class="sub">No region in this export; orders in grey</p>${hbars(A.byRole.map(x=>({k:roleName(x.k),v:x.gmv,o:x.n})),{fmt:rp,right:i=>`${i.o} order${i.o>1?"s":""}`})}`}
-          ${N.regionNote&&A.byRegion.length?`<p class="sub" style="margin:12px 0 0">${esc(N.regionNote)}</p>`:""}</div>
-        <div class="card" style="display:flex;flex-direction:column;gap:12px"><div><h3>How they ordered</h3><p class="sub" style="margin-bottom:8px">Average order value by ordering channel and customer type</p>
-          ${A.byApp.length?segTable("Channel",A.byApp.map(x=>({...x,k:appName(x.k)}))):""}</div>${A.byCust.length?segTable("Customer",A.byCust):""}
-          <div><h4 class="mini-h">Sales PIC</h4>${hbars(A.byPic.slice(0,4).map(x=>({k:x.p,v:x.g,o:x.n})),{fmt:rp,right:i=>`(${i.o})`,color:"#6E8F5A"})}</div></div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          ${A.partial.length?kpiHtml({v:rpParts(A.outstanding||parG)[0],u:rpParts(A.outstanding||parG)[1],l:A.outstanding?`still unpaid on ${A.partial.length} partially paid orders (${rp(parG)} GMV)`:`GMV on ${A.partial.length} partially paid orders`,hot:true}):""}
-          ${A.openOrders.length?kpiHtml({v:String(A.openOrders.length),u:`/${O.length}`,l:`orders still open, not completed (${rp(openG)})`}):""}
-          ${A.has.crm?kpiHtml({v:String(A.noCrm.length),u:`/${O.length}`,l:`orders with no CRM engagement (${rp(ncG)})`}):kpiHtml({v:String(pct(A.top2,A.gmv)),u:"%",l:"of GMV from the top 2 orders"})}
-        </div></div>`));
+    const left=A.byRegion.length?{w:1,title:"GMV by customer region",sub:`${A.byProvince.map(p=>`${p.k} ${pct(p.gmv,A.gmv)}%`).join(" · ")}; customers in grey`,chart:{type:"hbar",items:A.byRegion.slice(0,7).map(x=>({k:x.k,v:x.gmv,r:`${x.cust} cust.`})),fmt:rpM},foot:N.regionNote||null}
+      :{w:1,title:"GMV by customer role",sub:"No region in this export; orders in grey",chart:{type:"hbar",items:A.byRole.map(x=>({k:roleName(x.k),v:x.gmv,r:pl(x.n,"order")})),fmt:rpM}};
+    const segs=[...A.byApp.map(x=>({k:`${appName(x.k)}\n${pl(x.n,"order")}`,v:x.aov,c:CAT[0]})),...A.byCust.map(x=>({k:`${x.k.replace(" customer","")}\n${pl(x.n,"order")}`,v:x.aov,c:CAT[2]}))];
+    S.push({kicker:pre+"Sales last week · who bought and how",title:N.whoTitle,rows:[{cards:[left,
+      {w:1.15,split:[{title:"Average order value",sub:"By ordering channel and customer type",chart:{type:"column",cats:segs.map(x=>x.k),series:[{name:"Average order",values:segs.map(x=>x.v),colors:segs.map(x=>x.c)}],fmt:rpM,lblH:34,
+          legend:A.byCust.length?[{name:"Ordering channel",color:CAT[0]},{name:"Customer type",color:CAT[2]}]:null}},
+        {title:"Sales PIC",sub:"GMV; orders in grey",chart:{type:"hbar",items:A.byPic.slice(0,4).map(x=>({k:x.p,v:x.g,r:pl(x.n,"order")})),fmt:rpM,color:"#5E8C47",rowH:40}}]},
+      {w:.8,kpis:[A.partial.length&&{v:rpParts(A.outstanding||parG)[0],u:rpParts(A.outstanding||parG)[1],l:A.outstanding?`still unpaid on ${pl(A.partial.length,"partially paid order")} (${rp(parG)} GMV)`:`GMV on ${pl(A.partial.length,"partially paid order")}`,hot:true},
+        A.openOrders.length&&{v:String(A.openOrders.length),u:`/${O.length}`,l:`orders still open, not completed (${rp(openG)})`},
+        A.has.crm?{v:String(A.noCrm.length),u:`/${O.length}`,l:`orders with no CRM engagement (${rp(ncG)})`}:{v:String(pct(A.top2,A.gmv)),u:"%",l:"of GMV from the top 2 orders"}].filter(Boolean)}]}]});
   }
 
-  // Sales: order quality and timing
+  // Sales: order size and timing
   if(N.oqNotes){
-    const days=A.daily.filter(d=>d.orders||d.eng), dl=d=>`${DAY[d.getDay()]} ${fds(d)}`;
-    S.push(contentSlide(next(),pre+"Sales last week · order size and timing",N.oqTitle,`
-      <div style="display:grid;grid-template-columns:1.05fr 1fr .85fr;gap:16px;align-items:start">
-        <div class="card"><h3>GMV by day</h3><p class="sub">Order date; orders and CRM engagements that day in grey</p>${hbars(days.map(d=>({k:dl(d.d),v:d.gmv,o:d.orders,e:d.eng})),{fmt:rp,right:i=>`${i.o} ord.${A.has.crm?` · ${i.e} CRM`:""}`})}</div>
-        <div class="card"><h3>Orders by size</h3><p class="sub">Number of orders; share of GMV in grey</p>${hbars(A.bands.map(b=>({k:b.k,v:b.n,g:b.gmv})),{right:i=>`${pct(i.g,A.gmv)}% GMV`,color:"#6E8F5A"})}</div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          ${kpiHtml(A.customers>=6?{v:String(Math.round(A.top3Share*100)),u:"%",l:`of GMV from the top 3 of ${A.customers} customers`,hot:true}:{v:String(pct(A.custAgg[0]?.gmv||0,A.gmv)),u:"%",l:`of GMV from the largest of ${A.customers} customers`,hot:true})}
-          ${A.cycle.n?kpiHtml({v:String(A.cycle.median),u:" days",l:`median from CRM engagement to order (${A.cycle.n} matched wins)`})
-            :kpiHtml({v:rpParts(A.gmv/(A.orders.length||1))[0],u:rpParts(A.gmv/(A.orders.length||1))[1],l:"average order value"})}
-          ${A.discount>0?kpiHtml({v:(A.discount/(A.gmv||1)*100).toFixed(1),u:"%",l:`of GMV given as discount (${rp(A.discount)}, ${A.discOrders.length} orders)`})
-            :kpiHtml({v:String(A.multiOrderCust),u:`/${A.customers}`,l:"customers who ordered more than once"})}
-        </div></div>
-      ${N.oqNotes.length?`<div class="caveat tight" style="margin-top:14px">${N.oqNotes.join("<br>")}</div>`:""}`));
+    const days=A.daily.filter(d=>d.orders), cum=[]; A.custAgg.reduce((s,c)=>{ s+=c.gmv; cum.push(Math.round(s/(A.gmv||1)*100)); return s; },0);
+    const i80=cum.findIndex(v=>v>=80), nC=cum.length, BC=["Under Rp1M","Rp1–5M","Rp5–20M","Rp20–50M","Rp50M and up"];
+    S.push({kicker:pre+"Sales last week · order size and timing",title:N.oqTitle,rows:[{cards:[
+      {w:1.1,title:"GMV by day",sub:"Order date; orders under each column",chart:{type:"column",cats:days.map(d=>`${DAY[d.d.getDay()]} ${d.d.getDate()}\n${pl(d.orders,"order")}`),series:[{name:"GMV",color:CAT[0],values:days.map(d=>d.gmv)}],fmt:rpM,lblH:46}},
+      {w:1,title:"Customer concentration",sub:`Cumulative % of GMV, ${nC} customers ranked`,chart:{type:"line",cats:cum.map((_,i)=>`#${i+1}`),series:[{name:"Cumulative share of GMV",color:CAT[0],values:cum}],max:100,fmt:v=>v+"%",
+        ref:{v:80,label:i80>=0?`80% of GMV = top ${i80+1} of ${nC}`:"80% of GMV"},area:true,show:[...new Set([Math.min(2,nC-1),...(i80>=0?[i80]:[])])],xEvery:Math.max(1,Math.ceil(nC/7))}},
+      {w:.85,title:"Orders by size",sub:"Number of orders; share of GMV on top",chart:{type:"column",cats:A.bands.map(b=>b.k),series:[{name:"Orders",values:A.bands.map(b=>b.n),colors:A.bands.map(b=>RAMP[4-BC.indexOf(b.k)])}],vfmt:(v,i)=>`${v} · ${pct(A.bands[i].gmv,A.gmv)}%`,lblH:36}}]}],notes:N.oqNotes});
+  }
+
+  // Sales: where to grow
+  if(N.wgNotes){
+    const cards=[], Hm=A.heat;
+    if(Hm){ const cols=Hm.cols.map(c=>appName(c)); cards.push({w:1.3,title:`GMV by product type and ${Hm.dim}`,sub:"Rp million; darker = more",chart:{type:"heat",rows:Hm.rows,cols,rowW:150,val:(r,c)=>Hm.v(r,Hm.cols[cols.indexOf(c)])/1e6,fmt:v=>v>=10?String(Math.round(v)):v.toFixed(1)}}); }
+    if(A.cross&&A.cross.also.length) cards.push({w:1,title:"What else they bought",sub:`Share of the ${A.cross.n} ${A.cross.f.replace(/\s*\(.*\)/,"")} buyers`,chart:{type:"hbar",items:A.cross.also.map(x=>({k:x.k,v:pct(x.n,A.cross.n),r:`${x.n} of ${A.cross.n}`})),fmt:v=>v+"%",max:100,color:CAT[2]}});
+    if(A.openOrders.length>=2&&A.aging.length) cards.push({w:.85,title:"Open orders by age",sub:`Still “NEW”, as of ${fds(A.asOf)}`,chart:{type:"column",cats:A.aging.map(a=>a.k),series:[{name:"Open orders",values:A.aging.map(a=>a.n),colors:["#86AD6C","#5E8C47","#D9A21B","#B85A28"]}],vfmt:(v,i)=>v?`${v} · ${rp(A.aging[i].gmv)}`:"0",lblH:24}});
+    if(cards.length>=2) S.push({kicker:pre+"Sales last week · where to grow",title:N.wgTitle,rows:[{cards}],notes:N.wgNotes});
   }
 
   // Rejection reasons in detail
   if(A.reasonRows.length){
     const RL=A.reasonList.slice(0,7), dims=A.reasonDims, more=A.reasonList.length-RL.length;
-    const cols=dims.flatMap(k=>countBy(A.reasonRows.filter(r=>r[k]),r=>r[k]).slice(0,3).map(([g])=>({k,g})));
-    const mx=Math.max(1,...RL.flatMap(r=>cols.map(c=>A.reasonRows.filter(x=>x.reason===r.k&&x[c.k]===c.g).length)));
-    const cell=v=>`<td class="heat" style="background:rgba(74,101,59,${v?(.12+.78*v/mx).toFixed(2):0});color:${v/mx>.5?"#fff":"var(--ink)"}">${v||""}</td>`;
-    S.push(contentSlide(next(),pre+"Rejection reasons last week",N.rrTitle,`
-      <div style="display:grid;grid-template-columns:1fr 1.05fr;gap:18px;align-items:start">
-        <div class="card" style="padding:16px 20px"><h3>Every reason given</h3><p class="sub" style="margin-bottom:8px">${A.reasonRows.length} engagements that did not order; original CRM wording in grey${more>0?`; ${more} rarer reasons not shown`:""}</p>${legendOf([["Not interested","#8E9C84"],["Considering / prospect","#D9A21B"]])}
-          <div class="hbars rr">${RL.map(r=>`<div class="hb"><div class="top"><span class="k">${esc(r.k)}<small>${esc(r.raw)}</small></span><span class="n">${r.n}<em>${pct(r.n,A.reasonRows.length)}%</em></span></div>
-            <div class="track">${[[r.lost,"#8E9C84","not interested"],[r.warm,"#D9A21B","considering / prospect"],[r.other,"#C9CFC3","no status"]].filter(x=>x[0]).map(x=>`<div class="seg" style="flex:0 0 ${x[0]/RL[0].n*100}%;background:${x[1]}" data-tip="${esc(`${r.k} · ${x[2]}: ${x[0]}`)}"></div>`).join("")}</div></div>`).join("")}</div></div>
-        <div style="display:flex;flex-direction:column;gap:14px">
-          ${cols.length?`<div class="card" style="padding:14px 16px"><table class="tbl heatt"><thead><tr><th>Reason</th>${dims.map(k=>`<th colspan="${cols.filter(c=>c.k===k).length}" class="grp">${esc(LABEL[k])}</th>`).join("")}</tr>
-            <tr class="sub2"><th></th>${cols.map(c=>`<th>${esc(c.g)}</th>`).join("")}</tr></thead>
-            <tbody>${RL.map(r=>`<tr><td>${esc(r.k)}</td>${cols.map(c=>cell(A.reasonRows.filter(x=>x.reason===r.k&&x[c.k]===c.g).length)).join("")}</tr>`).join("")}</tbody></table></div>`:""}
-          ${N.rrNotes.length?`<div class="caveat tight">${N.rrNotes.join("<br>")}</div>`:""}</div></div>`));
+    const cols=dims.flatMap(k=>countBy(A.reasonRows.filter(r=>r[k]),r=>r[k]).slice(0,3).map(([g])=>({k,g,lab:`${LABEL[k]}\n${g}`})));
+    const cards=[{w:1,title:"Every reason given",sub:`${A.reasonRows.length} engagements that did not order${more>0?`; ${more} rarer reasons not shown`:""}; hover for the CRM wording`,
+      chart:{type:"hbar",legend:[NI,WM,...(RL.some(r=>r.other)?[NS]:[])],items:RL.map(r=>({k:r.k,segs:[[r.lost,OUTC.lost,`${r.raw} · not interested: ${r.lost}`],[r.warm,OUTC.warm,`${r.raw} · considering / prospect: ${r.warm}`],[r.other,OUTC.none,`${r.raw} · no status: ${r.other}`]]})),rowH:44}}];
+    if(cols.length) cards.push({w:1.05,title:`Reason by ${andList(dims.map(k=>lc(LABEL[k])))}`,sub:"Engagements per reason; darker = more",chart:{type:"heat",rows:RL.map(r=>r.k),cols:cols.map(c=>c.lab),rowW:170,headH:44,
+      val:(r,lab)=>{ const c=cols.find(x=>x.lab===lab); return A.reasonRows.filter(x=>x.reason===r&&x[c.k]===c.g).length; }}});
+    S.push({kicker:pre+"Rejection reasons last week",title:N.rrTitle,rows:[{cards}],notes:N.rrNotes});
   }
 
-  // Why leads say no
-  if(A.notWon.length){
-    const tb=A.themes.slice().sort((a,b)=>b.n-a.n).map(t=>({k:t.t,v:t.n,segs:[[t.lost,"#8E9C84",`${t.t} · not interested: ${t.lost}`],[t.warm,"#D9A21B",`${t.t} · considering / prospect: ${t.warm}`]],
-      tip:A.reasons.filter(([r])=>themeOf(r)===t.t).map(([r,c])=>`${r} (${c})`).join(", ")}));
-    S.push(contentSlide(next(),pre+"What the reasons mean",N.reasonTitle,`
-      <div style="display:grid;grid-template-columns:1fr 1.1fr;gap:18px">
-        <div class="card"><h3>Reasons, grouped by what would fix them</h3><p class="sub">${A.notWon.length} engagements that did not order; hover a bar for the original reasons</p>${legendOf([["Not interested","#8E9C84"],["Considering / prospect","#D9A21B"]])}${hbars(tb,{right:i=>pct(i.v,A.notWon.length)+"%"})}</div>
-        <div class="card"><h3>What the discussion notes say</h3><p class="sub">Signals read from “Detail pembahasan”, by lead status</p>${A.signals.length?legendOf([["Not interested","#8E9C84"],["Considering / prospect","#D9A21B"]])+hbars(A.signals.slice(0,6).map(x=>({k:x.label,v:x.n,segs:[[x.lost,"#8E9C84",`not interested: ${x.lost}`],[x.warm,"#D9A21B",`considering / prospect: ${x.warm}`]]})),{}):`<div class="empty">No discussion notes in this data</div>`}</div></div>`));
+  // Rejection reasons: who can be won back
+  if(N.plan){
+    const grp=[["Can be won back",A.notWon.filter(r=>r.recov)],["Closed for now",A.notWon.filter(r=>!r.recov)]];
+    const groups=grp.flatMap(([g,rs])=>countBy(rs,r=>r.theme||"No reason given").map(([t,n])=>({k:t,n,grp:g,color:THEME_C[t]||OUTC.none})));
+    const ser=[["Just asking",r=>r.theme==="Just asking",THEME_C["Just asking"]],["Locked in elsewhere",r=>r.theme==="Locked in elsewhere",THEME_C["Locked in elsewhere"]],["Other reasons",r=>r.theme!=="Just asking"&&r.theme!=="Locked in elsewhere",CAT[2]]];
+    const row1=[{w:1.15,title:"Every lead that didn't order",sub:"One square per engagement, by reason",chart:{type:"waffle",groups,legendW:220}}];
+    if(A.contacts.length>=2) row1.push({w:.9,title:"Contact outcome",sub:"Reasons by whether we actually talked",chart:{type:"column",stacked:true,cats:A.contacts,series:ser.map(([n,f,c])=>({name:n,color:c,values:A.contacts.map(k=>A.notWon.filter(r=>r.contact===k&&f(r)).length)})),lblH:30}});
+    if(A.signals.length) row1.push({w:1,title:"What the notes say",sub:"Signals read from the discussion notes",chart:{type:"hbar",legend:[NI,WM],items:A.signals.slice(0,5).map(x=>({k:x.label,segs:[[x.lost,OUTC.lost,`not interested: ${x.lost}`],[x.warm,OUTC.warm,`considering / prospect: ${x.warm}`]]})),rowH:40}});
+    S.push({kicker:pre+"Rejection reasons · who to call back",title:N.cbTitle,rows:[{cards:row1},{h:Math.min(220,64+N.plan.length*27),cards:[{table:{head:["Reason","Leads","Status","What to do","When"],align:["l","r","l","l","l"],rows:N.plan}}]}]});
   }
 
-  // Won vs the rest
+  // What separates winners
   if(N.driver){
     const D=N.driver, gs=A.best.groups.filter(x=>x.g!=="(not filled)");
-    S.push(contentSlide(next(),pre+"What separates winners",`${D.dim} decides the outcome. ${N.driverTitle}`,`
-      <div style="display:grid;grid-template-columns:.85fr 1.4fr;gap:18px">
-        <div class="card"><h3>Share ${A.posLabel}, by ${esc(lc(D.dim))}</h3><p class="sub">Across ${A.crm.filter(r=>r.outcome).length} CRM engagements with a status</p>${hbars(gs.map(g=>({k:g.g,v:Math.round(g.rate*100),w:g.w,n:g.n})),{fmt:v=>v+"%",right:i=>`${i.w} of ${i.n}`,scale:100})}</div>
-        <div class="card" style="padding:14px 16px"><table class="tbl"><thead><tr><th>Most common</th>${A.cohorts.map(([c,rs])=>`<th><i class="dot" style="background:${OUT_COLOR[c]}"></i>${esc(c)} (${rs.length})</th>`).join("")}</tr></thead>
-          <tbody>${A.profile.map(p=>`<tr><td class="dim">${esc(LABEL[p.k])}</td>${p.vals.map(v=>`<td>${esc(v.v)}<span class="sh">${Math.round(v.share*100)}%</span></td>`).join("")}</tr>`).join("")}</tbody></table></div></div>
-      <div class="caveat" style="margin-top:14px">${N.caveat}</div>`));
+    S.push({kicker:pre+"What separates winners",title:`${D.dim} decides the outcome. ${N.driverTitle}`,rows:[{cards:[
+      {w:.9,title:`Share ${A.posLabel}, by ${lc(D.dim)}`,sub:`${A.crm.filter(r=>r.outcome).length} CRM engagements with a status`,chart:{type:"column",cats:gs.map(g=>`${g.g}\n${g.w} of ${g.n}`),series:[{name:"Rate",values:gs.map(g=>Math.round(g.rate*100)),colors:gs.map(g=>g===D.hi?OUTC.won:"#86AD6C")}],fmt:v=>v+"%",max:100,lblH:36}},
+      {w:1.4,title:"Most common profile per cohort",sub:"Top value in each cohort and its share",table:{head:["",...A.cohorts.map(([c,rs])=>`${c} (${rs.length})`)],rows:A.profile.map(p=>[{v:LABEL[p.k],bold:true},...p.vals.map(v=>`${v.v} · ${Math.round(v.share*100)}%`)])}}]}],notes:[N.caveat]});
   }
 
-  // Team performance: funnel and PIC scorecard
+  // Team performance
   if(N.pf){
-    const FU=A.funnel, hasC=A.has.crm, hasS=A.has.sales;
-    const head=["PIC",...(hasC?["CRM eng.","Reached","Won · warm · lost"]:[]),...(hasS?["Orders","GMV"]:[]),...(hasC&&hasS?["Orders in CRM"]:[])];
-    const rows=A.picCard.slice(0,7).map(g=>[esc(g.p),...(hasC?[g.eng||"–",g.eng?`${pct(g.reached,g.eng)}%`:"–",g.eng?`${g.won} · ${g.warm} · ${g.lost}`:"–"]:[]),...(hasS?[g.orders||"–",g.orders?rp(g.gmv):"–"]:[]),...(hasC&&hasS?[g.orders?(g.inCrm?`${g.inCrm} of ${g.orders}`:`<span class="pill">0 of ${g.orders}</span>`):"–"]:[])]);
-    S.push(contentSlide(next(),pre+"Team performance · funnel and PIC scorecard",N.pfTitle,`
-      <div style="display:grid;grid-template-columns:.8fr 1.5fr;gap:18px;align-items:start">
-        <div class="card"><h3>CRM funnel</h3><p class="sub">Share of all engagements logged; step conversion in grey</p>${hasC?hbars(FU.map((f,i)=>({k:f[0],v:f[1],r:i?pct(f[1],FU[i-1][1]):null})),{scale:FU[0][1]||1,right:i=>i.r==null?"":`${i.r}% of previous`}):`<div class="empty">Upload a CRM file to see the funnel</div>`}</div>
-        <div class="card" style="padding:14px 16px"><table class="tbl"><thead><tr>${head.map((h,i)=>`<th${i?' class="num"':""}>${h}</th>`).join("")}</tr></thead>
-          <tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${i?' class="num"':""}>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>
-          <p class="sub" style="margin:8px 0 0">PIC names as written in the CRM and sales exports${A.picCard.length>7?`; top 7 of ${A.picCard.length}`:""}.</p></div></div>
-      ${N.pfNotes.length?`<div class="caveat tight" style="margin-top:14px">${N.pfNotes.join("<br>")}</div>`:""}`));
+    const hasS=A.has.sales, head=["PIC","CRM eng.","Reached","Won · warm · lost",...(hasS?["Orders","GMV","Orders in CRM"]:[])];
+    const rows=A.picCard.slice(0,7).map(g=>[g.p,g.eng||"–",g.eng?`${pct(g.reached,g.eng)}%`:"–",g.eng?`${g.won} · ${g.warm} · ${g.lost}`:"–",...(hasS?[g.orders||"–",g.orders?rp(g.gmv):"–",g.orders?(g.inCrm?`${g.inCrm} of ${g.orders}`:{v:`0 of ${g.orders}`,pill:true}):"–"]:[])]);
+    S.push({kicker:pre+"Team performance · funnel and PIC scorecard",title:N.pfTitle,rows:[{cards:[
+      {w:.85,title:"CRM funnel",sub:"Engagements at each step; step conversion at the right",chart:{type:"funnel",steps:A.funnel}},
+      {w:1.5,title:"PIC scorecard",sub:`CRM activity next to the orders each PIC closed${A.picCard.length>7?`; top 7 of ${A.picCard.length}`:""}`,table:{head,align:["l","r","r","r","r","r","r"],rows}}]}],notes:N.pfNotes});
   }
 
   // Recoverable demand
   if(A.warm.length){
-    const SL=Object.fromEntries(SIGNALS.map(s=>[s[0],s[1]]));
-    const rows=A.warm.slice().sort((a,b)=>b.signals.length-a.signals.length).slice(0,5);
-    S.push(contentSlide(next(),pre+"Recoverable demand",N.warmTitle,`
-      <div class="stats4">${[{v:String(A.warm.length),u:"",l:"Considering or prospect",hot:true},{v:String(A.intentWarm.length),u:"",l:"Asked about warehouse, delivery or price"},
-        {v:String(A.warm.filter(r=>/unable|tidak bisa/i.test(r.callResp||"")).length),u:"",l:"Could not be reached by phone"},{v:String(A.stockRows.length),u:"",l:"Stalled on stock or delivery time"}].map(kpiHtml).join("")}</div>
-      <div class="card" style="margin-top:14px;padding:14px 16px"><table class="tbl"><thead><tr><th>ID</th><th>PIC</th><th>Channel</th><th>Status</th><th>What they asked or said</th></tr></thead><tbody>
-        ${rows.map(r=>`<tr><td style="white-space:nowrap">${esc(r.id||"–")}</td><td>${esc(r.pic||"–")}</td><td style="white-space:nowrap">${esc(r.channel||"–")}</td><td><span class="pill">${esc(r.status)}</span></td><td>${esc(r.signals.map(s=>SL[s]).join("; ")||r.reason||"–")}</td></tr>`).join("")}</tbody></table>
-        <p class="sub" style="margin:8px 0 0">${A.warm.length>rows.length?`${rows.length} of ${A.warm.length} shown. `:""}Names and phone numbers are left out; look leads up by ID in the CRM.</p></div>`));
+    const SL=Object.fromEntries(SIGNALS.map(s=>[s[0],s[1]])), rows=A.warm.slice().sort((a,b)=>b.signals.length-a.signals.length).slice(0,6);
+    S.push({kicker:pre+"Recoverable demand",title:N.warmTitle,rows:[{h:104,cards:[{kpiRow:[{v:String(A.warm.length),u:"",l:"Considering or prospect",hot:true},{v:String(A.intentWarm.length),u:"",l:"Asked about warehouse, delivery or price"},
+      {v:String(A.warm.filter(r=>/unable|tidak bisa/i.test(r.callResp||"")).length),u:"",l:"Could not be reached by phone"},{v:String(A.stockRows.length),u:"",l:"Stalled on stock or delivery time"}]}]},
+      {cards:[{title:"Leads still in play",sub:`${A.warm.length>rows.length?`${rows.length} of ${A.warm.length} shown. `:""}Names and phone numbers are left out; look leads up by ID in the CRM`,
+        table:{head:["ID","PIC","Channel","Status","What they asked or said"],rows:rows.map(r=>[r.id||"–",r.pic||"–",r.channel||"–",{v:r.status,pill:true},r.signals.map(s=>SL[s]).join("; ")||r.reason||"–"])}}]}]});
   }
-
+  return S;
 }
+function teamSlides(A,N,pre,S,next){ teamSpecs(A,N,pre).forEach(sp=>S.push(panelSlide(next(),sp))); }
 
 /* ================= Whole deck (one or more teams) ================= */
 function deckNarrative(T){

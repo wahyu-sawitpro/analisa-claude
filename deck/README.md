@@ -33,24 +33,28 @@ With one team it is the single-team deck.
   order within 7 days. The success-story slide lists how each win was matched. Repeated engagement IDs are counted once.
 
 ## Slides (only the ones the data supports are shown)
-1. Cover
-2. Executive summary: KPIs, findings, bottom line
-3. Success story: how CRM wins happened (channel, source) and the sales orders they became
-4. Sales · what sold: GMV and units by product type (grouped from item names), GMV and orders by product category,
-   basket size and common product pairs, price gaps on the same SKU
-5. Sales · who bought and how: GMV and customers by region (regency/city, normalised) and province, order value by
-   ordering channel and new vs repeat, sales PIC, unpaid amounts on partially paid orders, open orders, orders missing from the CRM
-   Sales · order size and timing: GMV, orders and CRM engagements per day, orders by size band, customer concentration,
-   days from CRM engagement to order, discounts and shipping, how late CRM entries were written (`Last Modified Date`)
-6. Rejection reasons last week: every reason (English, with the original CRM wording), split by status, a heat table against
-   the two dimensions that best predict the reason (e.g. lead type, PIC), and notes on logging quality and location hot spots
-7. What the reasons mean: reasons grouped by the fix they need, plus signals read from the discussion notes
-8. What separates winners: the dimension that best separates orders from the rest, cohort profile, confounding caveat
-   Team performance: CRM funnel (logged → reached → showed interest → ordered) and a PIC scorecard joining each PIC's
-   CRM activity to the orders they closed, flagging sellers whose orders never appear in the CRM
-9. Recoverable demand: leads still in play and what they are asking
-10. Next steps: up to six actions with owner and timing
-11. Thank you
+Charts are drawn by `src/viz.js` once as geometry, rendered as SVG on the page and as plain shapes and text boxes in the
+PPTX (no native charts, so Google Slides keeps every label). Chart types: column, line (Pareto), waffle, funnel,
+100% stacked bars, heat matrix and horizontal bars. Categorical colours are checked for colour-blind separation.
+
+1. Cover, executive summary, teams at a glance
+2. Per team:
+   - Success story: how wins happened (channel, source, lead type as 100% bars) and the orders behind them
+   - Success story · what the wins are worth: average order of CRM wins vs orders with no CRM record, product mix of
+     wins vs other orders, share of GMV, days to order, biggest win, new vs repeat, potential GMV vs actual
+   - Sales · what sold: GMV by product type and by product category (columns), units anchor, basket, price gaps
+   - Sales · who bought and how: region (or customer role), average order by channel and customer type, sales PIC,
+     unpaid, open and CRM-less orders
+   - Sales · order size and timing: GMV by day, customer concentration (Pareto line with 80% mark), orders by size band
+   - Sales · where to grow: product × region heat matrix, what buyers of the most-bought product also buy
+     (cross-sell gap), open orders by age, entry product for new customers, regional product skew
+   - Rejection reasons: every reason by status, heat matrix against the dimensions that best predict the reason
+   - Rejection reasons · who to call back: waffle of every lead that didn't order (can be won back vs closed for now),
+     reasons by contact outcome, signals from the notes, and a call-back plan per reason (what to do, when)
+   - What separates winners: rate by the deciding dimension (columns) and cohort profile
+   - Team performance: CRM funnel and PIC scorecard
+   - Recoverable demand: leads still in play
+3. Next steps and closing
 
 ## Files
 - `index.html`: built deck, ready to open
@@ -81,6 +85,11 @@ With one team it is the single-team deck.
 - 9 of 19 orders are above Rp20M and make 83% of GMV; the top 3 of 19 customers are 50%.
 - 9 of 10 wins are dated the same day as their order, and wins were last edited a median 4 days after the engagement,
   so the CRM records sales after the fact rather than tracking leads.
+- Orders behind CRM wins average Rp31M vs Rp39M for orders with no CRM record; wins are 42% of GMV. Wins buy less
+  rock phosphate (6% of win GMV vs 65% elsewhere). Biggest win: Rp113M of NPK from a phone call on a canvassing lead.
+- 8 of 10 rock phosphate buyers didn't add KCL / MOP, its most common partner; 5 bought nothing else.
+  Kampar buys mostly NPK (42% of its GMV). 4 open orders (Rp228M) are 4+ days old.
+- 13 of 29 leads who didn't order can still be won back; 15 are locked into a shop, KUD or agent.
 - Discounts: Rp11.8M (1.8% of GMV) on 6 orders; shipping charged Rp22.6M on 10 orders.
 
 ## Plantation (28 Sep – 2 Oct 2026)
