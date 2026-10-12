@@ -10,7 +10,7 @@
 -- =====================================================================
 SELECT
   `source`.`order_week` AS `sale_order_date`,
-  `source`.`sum` AS `sum`
+  `source`.`gmv_sum` AS `sum`
 FROM
   (
     WITH
@@ -462,7 +462,7 @@ FROM
     )
     SELECT
       toMonday(sale_order_date) AS order_week,
-      sum(sales_amount + shipping_cost) AS `sum`
+      sum(sales_amount + shipping_cost) AS gmv_sum  -- alias `sum` bentrok dengan nama fungsi sum() di analyzer ClickHouse
     FROM
       (
         SELECT * FROM ecommerce_rows
