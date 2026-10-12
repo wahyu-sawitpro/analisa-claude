@@ -123,7 +123,33 @@ function heatChart(o,W,H){
       if(v) P.push(cT(rw+j*cw,y,cw,rh,fmt(v),{size:11.5,bold:t>.45,color:onC(fill),align:"center"})); }); });
   return P;
 }
-const CHARTS={hbar:hbarChart,column:columnChart,line:lineChart,waffle:waffleChart,funnel:funnelChart,stack100:stack100Chart,heat:heatChart};
+// Waterfall (bridge): totals as full columns, changes as floating up/down steps.
+const UP="#3E7B27", DOWN="#A23B72";   // up / down pair, checked for colour-blind separation
+function waterfallChart(o,W,H){
+  const P=[], S=o.steps, n=S.length, fmt=o.fmt||(v=>nf.format(v)), lblH=o.lblH||36, base=H-lblH, plotH=base-22, band=W/n, bw=Math.min(band*.6,70);
+  let run=0; const pts=S.map(s=>{ const a=s.total?0:run, b=s.total?s.v:run+s.v; run=s.total?s.v:b; return {s,a,b}; });
+  const mx=Math.max(1,...pts.flatMap(p=>[p.a,p.b])), y=v=>base-plotH*v/mx;
+  pts.forEach(({s,a,b},i)=>{ const cx=band*i+band/2, top=y(Math.max(a,b)), h=Math.max(2,Math.abs(y(a)-y(b))), col=s.total?(s.color||"#274E13"):s.v>=0?UP:DOWN;
+    P.push(cR(cx-bw/2,top,bw,h,col,`${s.k.replace("\n"," ")}: ${s.total?fmt(s.v):(s.v>=0?"+":"−")+fmt(Math.abs(s.v))}`,3));
+    P.push(cT(cx-50,top-18,100,16,s.total?fmt(s.v):(s.v>=0?"+":"−")+fmt(Math.abs(s.v)),{size:11.5,bold:true,align:"center",color:s.total?CINK:col}));
+    if(i<n-1) P.push(cL(cx+bw/2,y(b),cx+band-bw/2,y(b),CBASE,1,true));
+    P.push(cT(band*i+1,base+5,band-2,lblH-5,wrapTxt(s.k,band-4,11,3),{size:11,align:"center",valign:"top"})); });
+  P.push(cL(0,base,W,base,CBASE,1));
+  return P;
+}
+// Diverging bars: change per item around a zero line, gains to the right, losses to the left.
+function divergeChart(o,W,H){
+  const P=[], I=o.items||[]; if(!I.length) return [cT(0,H/2-10,W,20,"No change to show",{size:13,color:CMUTE,align:"center"})];
+  const fmt=o.fmt||(v=>nf.format(v)), lw=Math.min(W*.36,150), area=W-lw, pos=I.some(i=>i.v>0), neg=I.some(i=>i.v<0),
+    mid=pos&&neg?lw+area/2:pos?lw+2:W-2, half=(pos&&neg?area/2:area-4)-62, mx=Math.max(1,...I.map(i=>Math.abs(i.v))), rh=Math.min(o.rowH||34,H/I.length), bh=Math.min(16,rh-10);
+  P.push(cL(mid,0,mid,I.length*rh,CBASE,1));
+  I.forEach((it,i)=>{ const yy=i*rh, by=yy+(rh-bh)/2, w=Math.max(2,half*Math.abs(it.v)/mx), up=it.v>=0, t=(up?"+":"−")+fmt(Math.abs(it.v));
+    P.push(cT(0,yy,lw-8,rh,wrapTxt(it.k,lw-8,12,rh>=34?2:1),{size:12}));
+    P.push(cR(up?mid+1:mid-1-w,by,w,bh,up?UP:DOWN,`${it.k}: ${t}${it.tip?` (${it.tip})`:""}`,3));
+    P.push(cT(up?mid+w+5:mid-w-61,yy,56,rh,t,{size:11.5,bold:true,color:up?UP:DOWN,align:up?"left":"right"})); });
+  return P;
+}
+const CHARTS={hbar:hbarChart,column:columnChart,line:lineChart,waffle:waffleChart,funnel:funnelChart,stack100:stack100Chart,heat:heatChart,waterfall:waterfallChart,diverge:divergeChart};
 const layoutChart=(c,W,H)=>CHARTS[c.type](c,W,H);
 
 /* ---------- SVG renderer ---------- */

@@ -42,6 +42,11 @@ PPTX (no native charts, so Google Slides keeps every label). Chart types: column
    - Success story: how wins happened (channel, source, lead type as 100% bars) and the orders behind them
    - Success story · what the wins are worth: average order of CRM wins vs orders with no CRM record, product mix of
      wins vs other orders, share of GMV, days to order, biggest win, new vs repeat, potential GMV vs actual
+   - Sales · vs the week before (shown when the uploaded sales data covers two weeks, in one file or two):
+     GMV, orders, average order and customers with the change, GMV by day of week for both weeks (line), a customer
+     bridge (lost, returning and new customers as a waterfall) and what moved GMV by product type (diverging bars).
+     The notes explain an increase or a drop: order count vs order size, products, customers, the effect of the
+     largest order, and the biggest PIC and region swings; the next steps add a win-back or repeat action
    - Sales · what sold: GMV by product type and by product category (columns), units anchor, basket, price gaps
    - Sales · who bought and how: region (or customer role), average order by channel and customer type, sales PIC,
      unpaid, open and CRM-less orders
@@ -55,6 +60,12 @@ PPTX (no native charts, so Google Slides keeps every label). Chart types: column
    - Team performance: CRM funnel and PIC scorecard
    - Recoverable demand: leads still in play
 3. Next steps and closing
+
+## Comparing weeks
+Upload the week-before sales export (same columns as `sales from last week.csv`) next to last week's, or one export
+covering both weeks. Sales lines are grouped into Monday–Sunday weeks by order date: the latest week is analysed as
+"last week" and the one before is the comparison. The same order line in two files counts once. Without a second week
+the comparison slide is skipped and the upload bar suggests adding it.
 
 ## Files
 - `index.html`: built deck, ready to open

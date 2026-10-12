@@ -193,6 +193,16 @@ function analyse(sources){
   for(const d of sources){ const role=d.role&&d.role!=="auto"?d.role:detectRole(d.headers), label=srcLabel(d);
     if(role==="sales"){ const m=detectSales(d.headers); A.salesSources.push(label); for(const r of d.rows) if(Object.values(r).some(v=>!blank(v))) lines.push(canonSale(r,m,label)); }
     else { const m=detectCrm(d.headers); A.crmSources.push({label,map:m}); for(const r of d.rows) if(Object.values(r).some(v=>!blank(v))) crm.push(canonCrm(r,m,label)); } }
+  // Sales: the same order line in two uploaded files counts once
+  { const seen=new Map(); for(let i=lines.length-1;i>=0;i--){ const l=lines[i], k=[l.orderNo||l.invoice,l.item,l.qty,l.gmv].join("|");
+      if(l.orderNo||l.invoice){ if(seen.has(k)&&seen.get(k)!==l._src){ lines.splice(i,1); continue; } seen.set(k,l._src); } } }
+  // Two or more weeks of sales (one file or several): analyse the latest Monday–Sunday week, keep the week before to compare
+  const wkOf=d=>{ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()-(x.getDay()+6)%7); return +x; };
+  const weeks=[...new Set(lines.filter(l=>l.date).map(l=>wkOf(l.date)))].sort((a,b)=>b-a);
+  let prevLines=[];
+  if(weeks.length>=2){ prevLines=lines.filter(l=>l.date&&wkOf(l.date)===weeks[1]);
+    const keep=lines.filter(l=>!l.date||wkOf(l.date)===weeks[0]); lines.splice(0,lines.length,...keep);
+    A.weekStart=new Date(weeks[0]); A.prevStart=new Date(weeks[1]); A.olderWeeks=weeks.length-2; }
   // CRM: repeated IDs counted once, latest source wins
   const byId=new Map(), C=[]; let dupes=0;
   for(const o of crm){ if(o.id){ if(byId.has(o.id)){ C[byId.get(o.id)]=o; dupes++; continue; } byId.set(o.id,C.length); } C.push(o); }
@@ -247,6 +257,15 @@ function analyse(sources){
   A.team=countBy(lines,l=>l.team)[0]?.[0]||null;
   A.byRole=(()=>{ const m=new Map(); for(const o of O){ const k=o.lines[0].role; if(!k) continue; if(!m.has(k)) m.set(k,{k,n:0,gmv:0}); const g=m.get(k); g.n++; g.gmv+=o.gmv; } return [...m.values()].map(g=>({...g,aov:g.gmv/g.n})).sort((a,b)=>b.gmv-a.gmv); })();
   A.topOrderShare=O.length?O[0].gmv/(A.gmv||1):0;
+
+  // ---- Last week vs the week before
+  if(prevLines.length){ const c=weekSummary(lines), p=weekSummary(prevLines);
+    const delta=(mc,mp)=>[...new Set([...mc.keys(),...mp.keys()])].map(k=>({k,cur:mc.get(k)||0,prev:mp.get(k)||0})).map(x=>({...x,d:x.cur-x.prev})).filter(x=>x.d).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
+    const ret=[...c.cust.keys()].filter(k=>p.cust.has(k)), gain=[...c.cust.keys()].filter(k=>!p.cust.has(k)), lost=[...p.cust.keys()].filter(k=>!c.cust.has(k)), sum=(m,ks)=>ks.reduce((s,k)=>s+m.get(k),0);
+    A.wow={c,p,dG:c.gmv-p.gmv,pct:p.gmv?(c.gmv-p.gmv)/p.gmv:null,volume:(c.orders-p.orders)*p.aov,value:(c.aov-p.aov)*c.orders,
+      family:delta(c.family,p.family),region:delta(c.region,p.region),pic:delta(c.pic,p.pic),app:delta(c.app,p.app),cat:delta(c.cat,p.cat),
+      retained:{n:ret.length,cur:sum(c.cust,ret),prev:sum(p.cust,ret),down:ret.filter(k=>c.cust.get(k)<p.cust.get(k)).length,up:ret.filter(k=>c.cust.get(k)>p.cust.get(k)).length},gained:{n:gain.length,gmv:sum(c.cust,gain)},lost:{n:lost.length,gmv:sum(p.cust,lost),top:lost.map(k=>p.cust.get(k)).sort((a,b)=>b-a)[0]||0},
+      exTop:{cur:c.gmv-c.top,prev:p.gmv-p.top},start:A.weekStart,prevStart:A.prevStart}; }
 
   // ---- Link CRM to sales: phone, then order reference in notes, then first name + same PIC
   const picTok=p=>firstTok(p);
@@ -379,6 +398,18 @@ function analyse(sources){
   const posRows=scored.filter(pos), negRows=scored.filter(r=>!pos(r));
   A.together=DIMS.filter(k=>{ const p=dom(posRows,k), n=negRows.filter(r=>(r[k]??"(not filled)")===p.v).length/(negRows.length||1); return p.share>=.7&&p.v!=="(not filled)"&&n<=.3; });
   return A;
+}
+
+// Totals and breakdowns for one week of sales lines (used for week-on-week comparison).
+function weekSummary(L){
+  const om=new Map(); L.forEach((l,i)=>{ const k=l.orderNo||l.invoice||`line-${i}`; if(!om.has(k)) om.set(k,{gmv:0,lines:[]}); const o=om.get(k); o.gmv+=l.gmv||0; o.lines.push(l); });
+  const O=[...om.values()], gmv=O.reduce((s,o)=>s+o.gmv,0), cust=new Map();
+  O.forEach(o=>{ const f=o.lines[0], k=f.ph||f.nk||f.orderNo||f.invoice; cust.set(k,(cust.get(k)||0)+o.gmv); });
+  const by=f=>{ const m=new Map(); L.forEach(l=>{ const k=f(l); if(k) m.set(k,(m.get(k)||0)+(l.gmv||0)); }); return m; };
+  return {orders:O.length,gmv,aov:O.length?gmv/O.length:0,customers:cust.size,cust,top:Math.max(0,...O.map(o=>o.gmv)),
+    newOrders:O.filter(o=>o.lines.some(l=>/new/i.test(l.custStatus||""))).length,
+    family:by(l=>l.family),region:by(l=>l.region),pic:by(l=>l.pic),app:by(l=>l.app),cat:by(l=>l.category||(L.some(x=>x.category)?"(no category)":null)),
+    days:by(l=>l.date?String((l.date.getDay()+6)%7):null)};
 }
 
 /* ================= Teams ================= */

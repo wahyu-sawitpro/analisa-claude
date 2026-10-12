@@ -7,7 +7,7 @@ function analyzeNow(){
   state.dirty=false; renderSources(); note("");
   if(!on.length){ deckEl.innerHTML=`<div class="card"><div class="empty">All data sources are switched off. Turn one on above, then click Analyze.</div></div>`; SLIDES=[]; state.A=null; return; }
   const T=analyseTeams(on).map(t=>({...t,N:narrative(t.A)})), X=deckNarrative(T);
-  state.T=T; state.X=X; state.A=T[0].A; state.N=T[0].N;
+  state.T=T; state.X=X; state.A=T[0].A; state.N=T[0].N; renderSources();
   SLIDES=buildDeck(T,X);
   deckEl.innerHTML=SLIDES.map((s,i)=>`<section class="frame" aria-label="Slide ${i+1}">${s}</section>`).join("");
   const files=new Set(on.map(x=>x.name)).size;
@@ -75,7 +75,7 @@ function renderSources(){
   box.innerHTML=`<span class="lbl">${state.sample?"Sample data":"Data sources"}</span>${chips}
     <button class="link" type="button" id="addMore">+ Add files</button>${state.sample?"":`<button class="link" type="button" id="clearAll">Use sample data</button>`}
     <span class="spacer"></span>
-    ${state.dirty?`<button class="analyze" type="button" id="analyzeBtn" ${on?"":"disabled"}>Analyze ${on} file${on===1?"":"s"} →</button>`:`<span class="uptodate">✓ Deck is up to date</span>`}`;
+    ${state.dirty?`<button class="analyze" type="button" id="analyzeBtn" ${on?"":"disabled"}>Analyze ${on} file${on===1?"":"s"} →</button>`:`${state.T?.some(t=>t.A.has.sales)&&!state.T.some(t=>t.A.wow)?`<span class="wowhint">Add the week-before sales export to compare weeks</span>`:""}<span class="uptodate">✓ Deck is up to date</span>`}`;
   document.getElementById("staleNote").hidden=!state.dirty;
   deckEl.classList.toggle("stale",state.dirty);
 }
