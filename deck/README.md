@@ -51,6 +51,10 @@ PPTX (no native charts, so Google Slides keeps every label). Chart types: column
      GMV by month split into accounts that stopped ordering vs everyone else, GMV by week; a customer bridge from the
      first to the last month and the change by PIC and product category; orders by size band per month, the accounts
      that stopped ordering (anonymised, with PIC, product, region and last order), retention and orders not yet completed
+     Plus: volume vs price (tonnes sold from pack sizes, GMV per kg, and a waterfall splitting the change into more kg,
+     a cheaper product mix and price cuts per product); month by month (PIC and category heat matrices, new vs repeat
+     customers, top-5 customer share, month-end timing, channels and new regions); and who to win back first (lapsed
+     customers and repeat buyers per PIC, reorder interval, and CRM contact when a CRM export is uploaded)
    - Sales · what sold: GMV by product type and by product category (columns), units anchor, basket, price gaps
    - Sales · who bought and how: region (or customer role), average order by channel and customer type, sales PIC,
      unpaid, open and CRM-less orders
@@ -98,6 +102,12 @@ engagement export (41 engagements, all dated 5–9 Oct).
 - Three wholesale fertilizer accounts of one PIC (Rp1.06B in Jul, 44% of the month) stopped ordering after 25 Jul,
   7 Aug and 27 Aug. All other customers grew 67% (Rp1.35B → Rp2.25B); Khusus Petani +Rp655M.
 - Orders of Rp100M+ fell from 6 to 1; Rp20–100M orders rose from 16 to 38. Only 24 of 67 July customers ordered again.
+- Volume vs price: 322t → 394t of fertilizer (+22%), but GMV per kg fell 26% (Rp7,422 → Rp5,526). The extra
+  volume added Rp534M; a cheaper mix (rock phosphate 28% → 51% of kg) took Rp582M and price cuts Rp165M
+  (Urea Nitrea −28%).
+- Less concentrated: the top 5 customers were 58% of GMV in July and 32% in September.
+- 62 customers bought in Jul–Aug but not in September (Rp3.1B), 19 of them repeat buyers (Rp2.22B). Customers reorder
+  every 14 days (median). Of 18 customers who bought in both July and September, 14 spent more.
 - Rp569M of September GMV is not completed yet (Rp311M only partially paid).
 - Only 3 of the 41 October CRM engagements went to past buyers; 1 of 62 lapsed customers and none of the 3 stopped
   accounts were contacted, and the PIC of those accounts logged no engagements.

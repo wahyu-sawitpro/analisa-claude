@@ -228,13 +228,36 @@ function narrative(A){
       F.hasCust&&`<b>New customers</b> brought ${M.map(x=>`${rp(x.newGmv)} in ${x.label}`).join(", ")}; repeat customers ${M.map(x=>rp(x.gmv-x.newGmv)).join(" → ")}.`,
       `<b>Customers per month:</b> ${M.map(x=>`${x.label} ${x.customers}`).join(", ")}; orders per customer ${M.map(x=>(x.orders/(x.customers||1)).toFixed(1)).join(" → ")}.`
     ].filter(Boolean);
-    if(T.crm){ const K=T.crm, ns=T.stopped.length, drop=K.pics.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0];
-      N.tr5Title=K.lapsedHit<=Math.max(1,K.lapsed*.1)?`Only ${K.past} of ${K.n} CRM engagements (${K.span}) went to past buyers; ${K.lapsed-K.lapsedHit} of ${K.lapsed} lapsed customers were not contacted`
-        :`${K.lapsedHit} of ${K.lapsed} lapsed customers were contacted in the CRM (${K.span})`;
-      N.tr5Notes=[
-        ns&&`<b>${ns===1?"The account":`The ${ns} accounts`} that stopped ordering ${K.stoppedHit?`: ${K.stoppedHit} contacted`:"have no CRM engagement"}.</b>${drop?` ${esc(drop.p)} (${sg(drop.d)}) logged ${drop.eng||"no"} engagement${drop.eng===1?"":"s"}.`:""}`,
-        `<b>Lapsed customers</b> (bought in ${T.label} but not in ${Z.label}): ${K.lapsed}, worth ${rp(K.lapsedGmv)} over the period; ${K.lapsedHit} of them ${K.lapsedHit===1?"appears":"appear"} in the CRM.`,
+    // volume vs price
+    if(T.vol){ const V=T.vol, kgP=Math.round((Z.kg-F.kg)/F.kg*100), rP=Math.round((Z.rpkg-F.rpkg)/F.rpkg*100), t=v=>`${nf.format(Math.round(v/1000))}t`;
+      const share=(x,f)=>x.kg?(x.famKg.get(f)||0)/x.kg:0, fams=[...new Set([...F.famKg.keys(),...Z.famKg.keys()])].map(f=>({f,d:share(Z,f)-share(F,f),a:share(F,f),b:share(Z,f),rk:(Z.famKgG.get(f)||0)/(Z.famKg.get(f)||1)})).sort((a,b)=>b.d-a.d);
+      const gain=fams[0], loss=fams[fams.length-1], pd=T.prices.filter(x=>x.eff<0).slice(0,3);
+      Object.assign(V,{kgP,rP,t,gain,loss,pd});
+      N.tr6Title=kgP>0&&rP<0?`We sold ${kgP}% more fertilizer by weight (${t(F.kg)} → ${t(Z.kg)}), but each kg brought ${-rP}% less`:`Volume ${kgP>=0?"+":""}${kgP}% (${t(F.kg)} → ${t(Z.kg)}), GMV per kg ${rP>=0?"+":""}${rP}%`;
+      N.tr6Notes=[
+        `<b>Volume added ${sg(V.volume)}; GMV per kg took ${sg(V.rate)}</b> (Rp${nf.format(Math.round(F.rpkg))} → Rp${nf.format(Math.round(Z.rpkg))} per kg). Of that, ${sg(V.mix)} is a cheaper product mix and ${sg(V.price)} lower prices on the same products.`,
+        gain&&gain.d>.03&&`<b>Mix:</b> ${esc(gain.f)} went from ${Math.round(gain.a*100)}% to ${Math.round(gain.b*100)}% of kg sold (about Rp${nf.format(Math.round(gain.rk))}/kg)${loss&&loss.d<-.03?`, ${esc(loss.f)} from ${Math.round(loss.a*100)}% to ${Math.round(loss.b*100)}% (about Rp${nf.format(Math.round((F.famKgG.get(loss.f)||0)/(F.famKg.get(loss.f)||1)))}/kg)`:""}.`,
+        pd.length&&`<b>Price cuts:</b> ${pd.map(x=>`${esc(x.k)} Rp${nf.format(Math.round(x.from/1000))}k → Rp${nf.format(Math.round(x.to/1000))}k (${pcs(x.chg)}, ${sg(x.eff)})`).join("; ")}.`,
+        V.cover<.9&&`<b>${Math.round((1-V.cover)*100)}% of ${Z.label} GMV</b> is items without a weight (liquids, seeds, tests) and is shown as “Other items”.`
       ].filter(Boolean); }
+    // month by month: concentration, timing, channel, new regions
+    const th=x=>x.gmv?Math.round(x.thirds[2]/x.gmv*100):0, ap=T.app.slice(0,2), nr=T.newReg.slice(0,3);
+    N.tr4Notes=[N.tr4Notes[0],
+      `<b>Less reliance on a few buyers:</b> the top 5 customers were ${M.map(x=>`${Math.round(x.top5*100)}%`).join(" → ")} of GMV (${M.map(x=>x.label).join(", ")}).`,
+      `<b>Month-end heavy:</b> days 21–31 brought ${M.map(x=>`${th(x)}%`).join(" → ")} of each month's GMV${F.thirds[0]>F.gmv*.3?`; ${F.label} also had a strong start (${rp(F.thirds[0])} in days 1–10)`:""}.`,
+      (ap.length||nr.length)&&`<b>Channels and regions:</b> ${ap.map(x=>`${esc(appName(x.k))} ${sg(x.d)}`).join(", ")}${nr.length?`; new in ${Z.label}: ${nr.map(x=>`${esc(x.k)} ${rp(x.gmv)}`).join(", ")}`:""}.`
+    ].filter(Boolean).slice(0,4);
+    // who to win back first
+    { const LA=T.lapsedAll, rep=LA.filter(c=>c.orders>=2), K=T.crm;
+      T.lapsedSum={n:LA.length,gmv:LA.reduce((s,c)=>s+c.tot,0),rep:rep.length,repGmv:rep.reduce((s,c)=>s+c.tot,0)};
+      N.tr5Title=K&&K.lapsedHit<=Math.max(1,K.lapsed*.1)?`${LA.length} customers stopped buying before ${Z.label} (${rp(T.lapsedSum.gmv)}); only ${K.lapsedHit} ${K.lapsedHit===1?"was":"were"} contacted in the CRM`
+        :`${LA.length} customers stopped buying before ${Z.label} (${rp(T.lapsedSum.gmv)}); ${rep.length} of them were repeat buyers`;
+      N.tr5Notes=[
+        `<b>Start with the ${rep.length} repeat buyers</b> (2+ orders, ${rp(T.lapsedSum.repGmv)}): they already trust us. ${T.gapMed!=null?`Customers reorder every ${Math.round(T.gapMed)} days (median), so 30+ days of silence is a real gap.`:""}`,
+        T.lapsedPic[0]&&`<b>By PIC:</b> ${T.lapsedPic.slice(0,3).map(x=>`${esc(x.p)} ${x.n} (${rp(x.gmv)})`).join(", ")}.`,
+        `<b>Customers who bought in both ${F.label} and ${Z.label}:</b> ${T.bothUp} spent more, ${T.bothDown} spent less, so the problem is customers leaving, not customers shrinking.`,
+        K&&`<b>CRM ${K.span}:</b> only ${K.past} of ${K.n} engagements went to past buyers.`
+      ].filter(Boolean).slice(0,3); }
   }
 
   // Headline for the executive summary
@@ -383,6 +406,15 @@ function teamSpecs(A,N,pre){
         {w:.95,title:"GMV by month",sub:ns?`${T.acc} that stopped ordering vs everyone else`:"Orders under each column",chart:{type:"column",stacked:true,cats:M.map(x=>`${x.label}\n${pl(x.orders,"order")}`),
           series:ns?[{name:"All other customers",color:CAT[0],values:T.rest},{name:`${T.acc} that stopped`,color:CAT[3],values:T.stopBy}]:[{name:"GMV",color:CAT[0],values:M.map(x=>x.gmv)}],fmt:rpM,lblH:40}},
         {w:1.3,title:"GMV by week",sub:`Monday–Sunday weeks; best week and the last week labelled`,chart:{type:"line",cats:T.weeks.map(w=>fds(w.d)),series:[{name:"GMV",color:CAT[0],values:T.weeks.map(w=>w.gmv)}],fmt:rpM,area:true,show:[...new Set([pk,T.weeks.length-1])],xEvery:2}}]}],notes:N.trNotes});
+    if(T.vol){ const V=T.vol, oth=(Z.gmv-Z.kgGmv)-(F.gmv-F.kgGmv), ml=M.map(x=>x.label);
+      S.push({kicker:pre+`Sales trend · volume vs price`,title:N.tr6Title,rows:[{h:84,cards:[{kpiRow:[
+          {v:V.t(Z.kg).replace("t",""),u:"t",l:`fertilizer sold in ${Z.label}, ${chg(Z.kg,F.kg)} from ${V.t(F.kg)}`,hot:true},{v:`Rp${nf.format(Math.round(Z.rpkg))}`,u:"",l:`GMV per kg, ${chg(Z.rpkg,F.rpkg)} from Rp${nf.format(Math.round(F.rpkg))}`},
+          {v:rpParts(V.volume)[0],u:rpParts(V.volume)[1],l:`added by the extra volume`},{v:"−"+rpParts(-V.rate)[0],u:rpParts(-V.rate)[1],l:`lost to a lower GMV per kg (mix ${sgn(V.mix)}, price ${sgn(V.price)})`}]}]},
+        {cards:[
+          {w:.75,title:"Fertilizer sold",sub:"Tonnes, from pack sizes in item names",chart:{type:"column",cats:ml,series:[{name:"Tonnes",values:M.map(x=>Math.round(x.kg/1000)),colors:M.map((_,i)=>i===M.length-1?CAT[0]:"#86AD6C")}],fmt:v=>`${nf.format(v)}t`,lblH:24}},
+          {w:.75,title:"GMV per kg",sub:"Rupiah per kg sold",chart:{type:"column",cats:ml,series:[{name:"Rp per kg",values:M.map(x=>Math.round(x.rpkg)),colors:M.map((_,i)=>i===M.length-1?CAT[3]:"#D9B38F")}],fmt:v=>`Rp${nf.format(v)}`,lblH:24}},
+          {w:1.2,title:`${F.label} → ${Z.label} GMV: volume vs price`,sub:"Extra kg at the old price, then the effect of the lower price per kg",chart:{type:"waterfall",fmt:rpM,lblH:40,steps:[{k:F.label,v:F.gmv,total:true,color:"#8E9C84"},
+            {k:"More kg",v:V.volume},{k:"Cheaper\nmix",v:V.mix},{k:"Lower\nprices",v:V.price},...(Math.abs(oth)>=F.gmv*.01?[{k:"Other\nitems",v:oth}]:[]),{k:Z.label,v:Z.gmv,total:true}]}}]}],notes:N.tr6Notes}); }
     const CD=T.cat.length?T.cat:T.family, B=T.bridge;
     S.push({kicker:pre+`Sales trend · what changed from ${F.label} to ${Z.label}`,title:N.tr2Title,rows:[{cards:[
       {w:1.05,title:"Customer bridge",sub:`${F.label} GMV to ${Z.label} GMV by customer`,chart:{type:"waterfall",fmt:rpM,lblH:40,steps:[{k:F.label,v:F.gmv,total:true,color:"#8E9C84"},{k:`Not in ${Z.label}\n${B.lost.n} cust.`,v:-B.lost.gmv},
@@ -404,15 +436,17 @@ function teamSpecs(A,N,pre){
       {w:1.05,title:T.cat.length?"GMV by product category and month":"GMV by product type and month",sub:"Rp million; darker = more",chart:{type:"heat",rows:catRows,cols:ml,rowW:150,val:(r,c)=>((T.cat.length?M[ml.indexOf(c)].cat:M[ml.indexOf(c)].family).get(r)||0)/1e6,fmt:hf}}];
     if(F.hasCust) mm.push({w:.8,title:"New vs repeat customers",sub:"GMV per month by customer status",chart:{type:"column",stacked:true,cats:ml,series:[{name:"Repeat",color:CAT[0],values:M.map(x=>x.gmv-x.newGmv)},{name:"New",color:CAT[1],values:M.map(x=>x.newGmv)}],fmt:rpM,lblH:24}});
     S.push({kicker:pre+`Sales trend · month by month`,title:N.tr4Title,rows:[{cards:mm}],notes:N.tr4Notes});
-    // is the team chasing what was lost? (CRM engagements against the customers the trend lost)
-    if(T.crm){ const K=T.crm, big=x=>Math.abs(x.d)>=F.gmv*.01, dn=K.pics.filter(x=>x.d<0&&big(x)).sort((a,b)=>a.d-b.d).slice(0,3), upP=K.pics.filter(x=>x.d>0&&big(x)).sort((a,b)=>b.d-a.d).slice(0,3);
-      const P=[...dn,...upP,...K.pics.filter(x=>x.eng&&!dn.includes(x)&&!upP.includes(x)).sort((a,b)=>b.eng-a.eng)].slice(0,8);
-      S.push({kicker:pre+`Sales trend · is the team chasing lost sales?`,title:N.tr5Title,rows:[{h:84,cards:[{kpiRow:[
-          {v:String(K.n),u:"",l:`CRM engagements logged, ${K.span}`},{v:String(K.past),u:`/${K.n}`,l:`went to customers who bought in ${T.label} (${rp(K.pastGmv)})`,hot:true},
-          {v:String(K.lapsedHit),u:`/${K.lapsed}`,l:`lapsed customers contacted (bought before ${Z.label}, not in it; ${rp(K.lapsedGmv)})`},{v:String(K.stoppedHit),u:`/${ns}`,l:`accounts that stopped ordering contacted`}]}]},
-        {cards:[{title:"PIC: sales change next to CRM activity",sub:`Biggest drops and gains, plus every PIC with CRM activity. The CRM covers ${K.span} only: who the team calls now, matched to buyers by phone`,
-          table:{head:["PIC",`GMV ${F.label}`,`GMV ${Z.label}`,"Change","CRM engagements","Lapsed customers","Lapsed contacted"],align:["l","r","r","r","r","r","r"],
-            rows:P.map(x=>[{v:x.p,bold:true},x.prev?rp(x.prev):"–",x.cur?rp(x.cur):"–",x.d?{v:(x.d>0?"+":"−")+rp(Math.abs(x.d)),pill:x.d<0&&!x.eng}:"–",x.eng||{v:"0",pill:x.d<0},x.lapsed||"–",x.lapsed?`${x.lapsedHit} of ${x.lapsed}`:"–"])}}]}],notes:N.tr5Notes}); }
+    // who to win back first: lapsed customers per PIC, with CRM activity when a CRM export is there
+    { const K=T.crm, LS=T.lapsedSum, PP=T.lapsedPic.slice(0,5), eng=p=>K?(K.pics.find(x=>x.p===p)||{}):{};
+      const months0=M.slice(0,-1).map(x=>x.label);
+      S.push({kicker:pre+`Sales trend · who to win back first`,title:N.tr5Title,rows:[{h:84,cards:[{kpiRow:[
+          {v:String(LS.n),u:"",l:`customers bought in ${T.label} but not in ${Z.label} (${rp(LS.gmv)})`},{v:String(LS.rep),u:"",l:`of them repeat buyers, 2+ orders (${rp(LS.repGmv)})`,hot:true},
+          K?{v:String(K.lapsedHit),u:`/${K.lapsed}`,l:`contacted in the CRM (${K.span})`}:{v:String(Math.round(T.gapMed||0)),u:" days",l:"median time between a customer's orders"},
+          K?{v:String(K.stoppedHit),u:`/${T.stopped.length}`,l:"accounts that stopped ordering contacted"}:{v:`${T.bothUp}`,u:`/${T.bothUp+T.bothDown}`,l:`customers in both ${F.label} and ${Z.label} who spent more`}]}]},
+        {cards:[{title:"Lapsed customers by PIC",sub:`${T.lapsedPic.length>PP.length?`Top ${PP.length} of ${T.lapsedPic.length} PICs by lapsed GMV; `:""}PIC = the one on most of the customer's orders${K?`; CRM columns cover ${K.span}`:""}`,
+          table:{head:["PIC",`GMV ${F.label} → ${Z.label}`,"Lapsed","Lapsed GMV","Repeat buyers",...months0.map(m=>`Last order ${m}`),...(K?["CRM eng.","Contacted"]:[])],align:["l","r","r","r","r",...months0.map(()=>"r"),"r","r"],
+            rows:PP.map(x=>{ const d=T.pic.find(y=>y.k===x.p), e=eng(x.p); return [{v:x.p,bold:true},d?{v:(d.d>=0?"+":"−")+rp(Math.abs(d.d)),pill:d.d<0&&K&&!e.eng}:"–",x.n,rp(x.gmv),x.rep?`${x.rep} (${rp(x.repGmv)})`:"–",...x.byMonth,...(K?[e.eng||0,`${e.lapsedHit||0} of ${x.n}`]:[])]; })}}]}],notes:N.tr5Notes}); }
+
 
   }
 
@@ -572,8 +606,9 @@ function trendNarrative(T){
   const f=[], sg=v=>(v>=0?"+":"−")+rp(Math.abs(v)), K=TR.crm, mid=TR.low!==F&&TR.low!==Z?TR.low:null;
   f.push([TR.flat?`GMV flat from ${F.label} to ${Z.label}`:`GMV ${TR.up?"up":"down"} ${TR.pc}% from ${F.label} to ${Z.label}`,`${M_(TR)}${mid?`, with ${mid.label} the low point`:""}.`]);
   if(ns) f.push([`${TR.acc} stopped ordering`,`${rp(stopG)} in ${F.label} (${pct(stopG,F.gmv)}% of the month), nothing in ${Z.label}; ${andList([...new Set(TR.stopped.map(c=>c.cat).filter(Boolean))])}, handled by ${andList([...new Set(TR.stopped.map(c=>c.pic).filter(Boolean))])}.`]);
-  if(ns&&TR.restPct!=null) f.push([`Everyone else ${TR.rest[TR.rest.length-1]>=TR.rest[0]?"grew":"fell"} ${Math.abs(Math.round(TR.restPct*100))}%`,`${rp(TR.rest[0])} → ${rp(TR.rest[TR.rest.length-1])}; orders ${F.orders} → ${Z.orders}, average order ${rp(F.aov)} → ${rp(Z.aov)}${TR.cat.find(x=>x.d>0)?`; ${TR.cat.find(x=>x.d>0).k} ${sg(TR.cat.find(x=>x.d>0).d)}`:""}.`]);
-  if(K) f.push([`The CRM isn't chasing lost customers`,`${K.past} of ${K.n} engagements (${K.span}) went to past buyers; ${K.lapsedHit} of ${K.lapsed} lapsed customers and ${K.stoppedHit} of ${ns} stopped accounts were contacted.`]);
+  const V=TR.vol; if(V&&V.kgP>0&&V.rP<0) f.push([`More fertilizer sold, less per kg`,`${V.t(F.kg)} → ${V.t(Z.kg)} (+${V.kgP}%), but GMV per kg fell ${-V.rP}%: a cheaper mix ${sg(V.mix)}${V.pd[0]?`, price cuts ${sg(V.price)} (${V.pd[0].k} ${pcs(V.pd[0].chg)})`:""}.`]);
+  else if(ns&&TR.restPct!=null) f.push([`Everyone else ${TR.rest[TR.rest.length-1]>=TR.rest[0]?"grew":"fell"} ${Math.abs(Math.round(TR.restPct*100))}%`,`${rp(TR.rest[0])} → ${rp(TR.rest[TR.rest.length-1])}; orders ${F.orders} → ${Z.orders}, average order ${rp(F.aov)} → ${rp(Z.aov)}${TR.cat.find(x=>x.d>0)?`; ${TR.cat.find(x=>x.d>0).k} ${sg(TR.cat.find(x=>x.d>0).d)}`:""}.`]);
+  if(K) f.push([`${TR.lapsedSum.n} customers lapsed, and the CRM isn't chasing them`,`${TR.lapsedSum.rep} were repeat buyers (${rp(TR.lapsedSum.repGmv)}); ${K.lapsedHit} of ${K.lapsed} lapsed customers and ${K.stoppedHit} of ${ns} stopped accounts were contacted (${K.span}).`]);
   else f.push([`Only ${pct(TR.retained.n,TR.retained.of)}% of ${F.label} customers came back`,`${TR.retained.n} of ${TR.retained.of} ordered again later; ${TR.fresh.n} ${Z.label} customers are new to the period.`]);
   X.findings=f.slice(0,4);
   X.bottom={p:ns&&TR.explains?`The drop is ${TR.acc}, not the base: win them back and keep the ${Math.round(TR.restPct*100)}% growth everyone else delivered.`:down?`Find out what changed for the customers who stopped buying and win them back.`:`Keep what grew GMV and widen the customer base.`,
@@ -581,13 +616,15 @@ function trendNarrative(T){
   // actions: the trend's own first, then call lapsed customers, then the CRM team's own
   const act=[]; T.forEach(t=>{ const a=t.N.actions.filter(x=>/Win back|Close out/.test(x.t)).map(x=>({...x,team:X.multi?t.name:null})); act.push(...a);
     const k=t.A.trend&&t.A.trend.crm; if(k&&k.lapsed-k.lapsedHit>0) act.push({t:`Call the ${k.lapsed-k.lapsedHit} lapsed customers`,d:`They bought in ${t.A.trend.label} (${rp(k.lapsedGmv)}) but not in ${t.A.trend.Z.label}, and ${k.lapsedHit?`only ${k.lapsedHit} ${k.lapsedHit===1?"is":"are"}`:"none are"} in the CRM. Put them at the top of each PIC's call list with their last order and product, and log every call.`,o:"Each PIC",w:"Next 2 weeks",team:X.multi?t.name:null});
-    const tr=t.A.trend, up=tr&&tr.pic.filter(x=>x.d>0).slice(0,2);
+    const tr=t.A.trend, up=tr&&tr.pic.filter(x=>x.d>0).slice(0,2), v=tr&&tr.vol;
+    if(v&&v.rP<=-10) act.push({t:`Check what the ${-v.rP}% lower GMV per kg costs in margin`,d:`${v.gain&&v.gain.d>.03?`${v.gain.f} grew to ${Math.round(v.gain.b*100)}% of kg sold. `:""}${v.pd.length?`Prices fell on ${v.pd.slice(0,2).map(x=>`${x.k} (${pcs(x.chg)})`).join(" and ")}. `:""}Confirm the margin per product and pair low-priced products with higher-value ones in each offer.`,o:"Pricing + sales lead",w:"Next 2 weeks",team:X.multi?t.name:null});
     if(up&&up.length) act.push({t:`Repeat what ${andList(up.map(x=>x.k.split(" ")[0]))} did`,d:`${up.map(x=>`${x.k} ${sg(x.d)}`).join(", ")} from ${tr.F.label} to ${tr.Z.label}${tr.cat.find(x=>x.d>0)?`, led by ${tr.cat.find(x=>x.d>0).k}`:""}. Share their customer list and offer with the team.`,o:"Team lead",w:"Next team meeting",team:X.multi?t.name:null});
     if(t.NC) act.push(...t.NC.actions.slice(0,2).map(x=>({...x,team:X.multi?t.name:null}))); });
   X.actions=act.slice(0,6);
   X.gaps=T.flatMap(t=>t.NC?t.NC.gaps.map(g=>`${X.multi?t.name+": ":""}${g}`):[]);
   return X;
 }
+const pcs=v=>`${v<0?"−":"+"}${Math.abs(Math.round(v*100))}%`, sgn=v=>(v>=0?"+":"−")+rp(Math.abs(v));
 const crmSpan=C=>span(C.crm.map(r=>r.date)).replace(/ \d{4}$/,"");
 const M_=TR=>TR.M.map(x=>rp(x.gmv)).join(" → ");
 function dividerSlide(no,label,title,meta){

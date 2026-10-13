@@ -487,6 +487,8 @@ function weekSummary(L){
 
 // Month-by-month trend over every full month in the sales export: totals, the customer bridge from the first to the
 // last month, accounts that stopped ordering, and what changed by PIC, product and order size.
+// Kilograms on a sales line, from the pack size in the item name ("Urea 50kg" x 10 = 500 kg)
+const kgOf=l=>{ const m=String(l.item||"").match(/(\d+(?:[.,]\d+)?)\s*kg\b/i); return m&&l.qty?parseFloat(m[1].replace(",","."))*l.qty:null; };
 const TBANDS=[["Under Rp5M",0,5e6],["Rp5–20M",5e6,20e6],["Rp20–50M",20e6,50e6],["Rp50–100M",50e6,100e6],["Rp100M+",100e6,Infinity]];
 function monthTrend(L){
   const dated=L.filter(l=>l.date); if(!dated.length) return null;
@@ -496,7 +498,11 @@ function monthTrend(L){
   const M=months.map(m=>{ const ls=dated.filter(l=>mk(l.date)===m), om=new Map();
     ls.forEach((l,i)=>{ const k=l.orderNo||l.invoice||`line-${m}-${i}`; if(!om.has(k)) om.set(k,{gmv:0,lines:[]}); const o=om.get(k); o.gmv+=l.gmv||0; o.lines.push(l); });
     const O=[...om.values()], open=O.filter(o=>o.lines.some(l=>l.soStatus&&!/complete|done|selesai/i.test(l.soStatus))), part=O.filter(o=>o.lines.some(l=>/partial/i.test(l.payStatus||"")));
-    return {m,label:MON[m%12],...weekSummary(ls),O,newGmv:ls.filter(l=>/new/i.test(l.custStatus||"")).reduce((s,l)=>s+(l.gmv||0),0),hasCust:ls.some(l=>l.custStatus),disc:ls.reduce((s,l)=>s+(l.discount||0),0),
+    const kl=ls.map(l=>({l,kg:kgOf(l)})).filter(x=>x.kg), kg=kl.reduce((s,x)=>s+x.kg,0), kgGmv=kl.reduce((s,x)=>s+(x.l.gmv||0),0), ws=weekSummary(ls);
+    const cv=[...ws.cust.values()].sort((a,b)=>b-a), third=d=>d.getDate()<=10?0:d.getDate()<=20?1:2;
+    const famKg=new Map(), famKgG=new Map(); kl.forEach(x=>{ const f=x.l.family||"Other"; famKg.set(f,(famKg.get(f)||0)+x.kg); famKgG.set(f,(famKgG.get(f)||0)+(x.l.gmv||0)); });
+    return {m,label:MON[m%12],...ws,O,kg,kgGmv,famKg,famKgG,rpkg:kg?kgGmv/kg:null,top5:ws.gmv?cv.slice(0,5).reduce((s,v)=>s+v,0)/ws.gmv:0,top1:ws.gmv?(cv[0]||0)/ws.gmv:0,
+      thirds:[0,1,2].map(i=>ls.filter(l=>third(l.date)===i).reduce((s,l)=>s+(l.gmv||0),0)),newGmv:ls.filter(l=>/new/i.test(l.custStatus||"")).reduce((s,l)=>s+(l.gmv||0),0),hasCust:ls.some(l=>l.custStatus),disc:ls.reduce((s,l)=>s+(l.discount||0),0),
       openGmv:open.reduce((s,o)=>s+o.gmv,0),openN:open.length,partGmv:part.reduce((s,o)=>s+o.gmv,0),partN:part.length,
       bands:TBANDS.map(([k,a,b])=>{ const os=O.filter(o=>o.gmv>=a&&o.gmv<b); return {k,n:os.length,gmv:os.reduce((s,o)=>s+o.gmv,0)}; })}; });
   const F=M[0], Z=M[M.length-1], ckey=l=>l.ph||l.nk||l.orderNo||l.invoice;
@@ -517,7 +523,20 @@ function monthTrend(L){
   const W=new Map(); dated.filter(l=>months.includes(mk(l.date))).forEach(l=>{ const k=wkOf(l.date); W.set(k,(W.get(k)||0)+(l.gmv||0)); });
   const weeks=[...W].sort((a,b)=>a[0]-b[0]).map(([k,g])=>({d:new Date(k),gmv:g}));
   const low=M.slice().sort((a,b)=>a.gmv-b.gmv)[0];
-  return {M,F,Z,months,label:`${F.label}–${Z.label}`,dG:Z.gmv-F.gmv,pct:F.gmv?(Z.gmv-F.gmv)/F.gmv:null,total,low,weeks,peakWeek:weeks.slice().sort((a,b)=>b.gmv-a.gmv)[0],
+  // volume vs price: GMV = kg sold x Rp per kg; price effect per product from its average unit price in both months
+  const vol=F.rpkg&&Z.rpkg?{volume:(Z.kg-F.kg)*F.rpkg,rate:(Z.rpkg-F.rpkg)*Z.kg,cover:Z.kgGmv/(Z.gmv||1)}:null;
+  const ip=i=>{ const m=new Map(); dated.filter(l=>mk(l.date)===months[i]&&l.item&&l.qty&&l.unit).forEach(l=>{ const k=shortItem(l.item); if(!m.has(k)) m.set(k,{q:0,v:0}); const x=m.get(k); x.q+=l.qty; x.v+=l.unit*l.qty; }); return m; };
+  const pF=ip(0), pZ=ip(L1), prices=[...pZ].filter(([k])=>pF.has(k)).map(([k,z])=>{ const f=pF.get(k), a=f.v/f.q, b=z.v/z.q; return {k,from:a,to:b,chg:(b-a)/a,qty:z.q,eff:(b-a)*z.q}; }).filter(x=>Math.abs(x.chg)>=.01).sort((a,b)=>a.eff-b.eff);
+  if(vol){ vol.price=prices.reduce((s,x)=>s+x.eff,0); vol.mix=vol.rate-vol.price; }
+  // how often customers reorder, and who lapsed (bought before the last month, not in it), per PIC
+  const gaps=[]; cs.forEach(c=>{ const ds=[...new Set(c.lines.map(l=>+new Date(l.date.getFullYear(),l.date.getMonth(),l.date.getDate())))].sort((a,b)=>a-b); for(let i=1;i<ds.length;i++) gaps.push((ds[i]-ds[i-1])/864e5); });
+  gaps.sort((a,b)=>a-b); const lapsed=cs.filter(c=>!c.by[L1]).map(c=>({...c,orders:new Set(c.lines.map(l=>l.orderNo||l.invoice)).size,pic:countBy(c.lines,l=>l.pic)[0]?.[0]||"–",lastM:mk(c.last)}));
+  const lapsedPic=[...new Set(lapsed.map(c=>c.pic))].map(p=>{ const L=lapsed.filter(c=>c.pic===p); return {p,n:L.length,gmv:L.reduce((s,c)=>s+c.tot,0),rep:L.filter(c=>c.orders>=2).length,repGmv:L.filter(c=>c.orders>=2).reduce((s,c)=>s+c.tot,0),
+    byMonth:months.slice(0,-1).map(m=>L.filter(c=>c.lastM===m).length)}; }).sort((a,b)=>b.gmv-a.gmv);
+  const app=delta(Z.app,F.app), newReg=[...Z.region.keys()].filter(k=>!M.slice(0,-1).some(x=>x.region.has(k))).map(k=>({k,gmv:Z.region.get(k)})).sort((a,b)=>b.gmv-a.gmv);
+  const bothC=cs.filter(c=>c.by[0]&&c.by[L1]);
+  return {M,F,Z,months,vol,prices,gapMed:gaps.length?gaps[Math.floor(gaps.length/2)]:null,lapsedAll:lapsed,lapsedPic,app,newReg,
+    bothUp:bothC.filter(c=>c.by[L1]>c.by[0]).length,bothDown:bothC.filter(c=>c.by[L1]<c.by[0]).length,label:`${F.label}–${Z.label}`,dG:Z.gmv-F.gmv,pct:F.gmv?(Z.gmv-F.gmv)/F.gmv:null,total,low,weeks,peakWeek:weeks.slice().sort((a,b)=>b.gmv-a.gmv)[0],
     stopped,stopBy,rest,cust:cs,restPct:rest[0]?(rest[L1]-rest[0])/rest[0]:null,
     bridge:{lost:{n:lost.length,gmv:sum(lost,0)},both:{n:both.length,prev:sum(both,0),cur:sum(both,L1)},gained:{n:gained.length,gmv:sum(gained,L1)}},
     retained:{n:inF.filter(c=>c.by.slice(1).some(v=>v)).length,of:inF.length},fresh:{n:fresh.length,gmv:sum(fresh,L1)},
