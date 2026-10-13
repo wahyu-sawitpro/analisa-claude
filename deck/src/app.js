@@ -27,10 +27,7 @@ function note(msg,err,html){ const n=document.getElementById("notice"); if(!msg)
 const ROLE_SHORT={crm:"CRM",sales:"Sales"};
 const SAMPLE_SRCS=(SAMPLE?.sources||[]).map(s=>({...s,on:true,role:"auto",team:"auto"}));
 function sheetToDs(wb,name,sheet){
-  const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,raw:true,defval:null,blankrows:false});
-  let hi=aoa.findIndex(r=>r.filter(v=>!blank(v)).length>=2); if(hi<0) hi=0;
-  const headers=(aoa[hi]||[]).map((h,i)=>blank(h)?`Column ${i+1}`:String(h).replace(/^﻿/,"").trim());
-  return {name,sheet,headers,rows:aoa.slice(hi+1).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??null]))).filter(r=>Object.values(r).some(v=>!blank(v))),on:true,role:"auto",team:"auto"};
+  return aoaToSource(XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,raw:true,defval:null,blankrows:false}),name,sheet);
 }
 // Guess the delimiter of a text file from its header line (Indonesian Excel exports often use semicolons).
 const sniffFS=t=>{ const line=t.split(/\r?\n/,1)[0]; const c=[",",";","\t","|"].map(d=>[d,line.split(d).length]).sort((a,b)=>b[1]-a[1]); return c[0][1]>1?c[0][0]:","; };
@@ -52,7 +49,7 @@ async function readFile(file){
   if(wb.SheetNames.length===1) keep.forEach(d=>d.sheet=null);
   return keep;
 }
-const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v5"):localStorage.setItem("sp-deck-data-v5",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
+const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v6"):localStorage.setItem("sp-deck-data-v6",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
 async function loadFiles(list){
   const files=[...list]; if(!files.length) return;
   note(""); const failed=[], added=[];

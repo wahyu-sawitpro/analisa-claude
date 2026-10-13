@@ -15,7 +15,10 @@ const CRM_FIELDS=[
   ["reason",[/alasan|reason/]],
   ["status",[/respon\s*pengguna|status\s*leads|lead\s*status|^status$/]],
   ["callResp",[/call\s*response/]],
-  ["phone",[/phone\s*no|^phone$|nomor\s*tel|no\.?\s*hp|telp|telf|cleaned\s*phone/]],
+  ["phone",[/phone\s*no|^phone$/,/nomor\s*tel|telp|telf|cleaned\s*phone/,/no\.?\s*hp/]],
+  ["orderRef",[/^order\s*no|no\.?\s*order|order\s*number|^order$/]],
+  ["kabupaten",[/^kabupaten$|regency/]],
+  ["province",[/^province$|^provinsi$/]],
   ["name",[/nama\s*customer|nama\s*leads|customer\s*name|^nama$/]],
   ["pic",[/smallholders\s*team|pic\s*\(|^pic$|pic\s*name|sales\s*(rep|person)|petugas/]],
   ["channel",[/engagement\s*type|tipe\s*engag|jenis\s*engag|channel|metode/]],
@@ -139,6 +142,46 @@ const nameKey=v=>{ const s=clean(v); if(!s) return null; if(/^customer [0-9a-f]{
 const firstTok=v=>(clean(v)||"").toLowerCase().split(" ")[0]||null;
 const PERSON_RE=/^(phone|name)$/;
 
+/* ================= Reading sheets (with or without a header row) ================= */
+// A first row that already holds data (dates, order numbers, files, amounts) means the export has no header row:
+// column names are then inferred from what each column contains.
+const DATA_CELL=[/^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/,/^\d{4}[\/.-]\d{1,2}[\/.-]\d{1,2}/,/^#?B2[BC]\d{3,}$/i,/\.(pdf|jpe?g|png)$/i,/^\d{1,3}(,\d{3}){1,}$/,/^\+?\d{9,14}$/];
+const looksData=row=>row.filter(v=>!blank(v)&&DATA_CELL.some(re=>re.test(String(v).trim()))).length>=2;
+const MONTHS=/^(jan|feb|mar|apr|may|mei|jun|jul|aug|agu|sep|oct|okt|nov|dec|des)[a-z]*$/i;
+const PROV=/^(aceh|riau|kepulauan riau|jambi|bengkulu|lampung|sumatera( utara| barat| selatan)?|kepulauan bangka belitung|bangka belitung|kalimantan.*|jawa.*|banten|dki jakarta|sulawesi.*|papua.*)$/i;
+const PRODUCT_WORDS=/benih|pupuk|urea|dokter sawit|kcl|mop|npk|\brp\b|herbis|garlon|round ?up|gramoxone|kieserit|dolomit|topaz|uji/i;
+function inferHeaders(rows){
+  const n=Math.max(...rows.map(r=>r.length)), names=Array(n).fill(null);
+  const col=j=>rows.map(r=>r[j]).filter(v=>!blank(v)).map(v=>String(v).trim()), share=(vs,re)=>vs.length?vs.filter(v=>re.test(v)).length/vs.length:0;
+  const take=(j,nm)=>{ if(!names.includes(nm)) names[j]=nm; };
+  for(let j=0;j<n;j++){ const vs=col(j); if(!vs.length) continue;
+    if(share(vs,MONTHS)===1) take(j,"Month");
+    else if(share(vs,DATA_CELL[0])>=.6||share(vs,DATA_CELL[1])>=.6) take(j,"Tanggal");
+    else if(share(vs,DATA_CELL[2])>=.6) take(j,"Order no");
+    else if(share(vs,DATA_CELL[3])>=.6) take(j,"Attachment");
+    else if(share(vs,/^\+?0?\d{9,14}$/)>=.6) take(j,"Phone No");
+    else if(share(vs,/^\d{1,3}(,\d{3})+(\.\d+)?$|^\d{4,}$/)>=.6) take(j,"Potential GMV");
+    else if(share(vs,PROV)>=.8) take(j,"Province");
+    else if(share(vs,/,.*,/)>=.6) take(j,"Lokasi"); }
+  const text=j=>!names[j]&&col(j).length&&share(col(j),/\d{5,}/)<.3;
+  let prod=-1; for(let j=0;j<n;j++) if(text(j)&&share(col(j),PRODUCT_WORDS)>=.5&&col(j).join("").length/col(j).length>15){ names[j]="Product yang diminta customer"; prod=j; break; }
+  for(let j=0;j<n;j++) if(text(j)&&share(col(j),/\d+\s*(sak|items?|seeds|lsu|ssu|liter|kg)|\(\d+\)/i)>=.5){ names[j]="Qty detail"; break; }
+  if(prod>=0) for(let j=prod+1;j<n;j++) if(text(j)){ names[j]="Objective"; break; }
+  const loc=names.indexOf("Lokasi"); if(loc>=0){ const nx=[]; for(let j=loc+1;j<n&&nx.length<2;j++) if(text(j)) nx.push(j); if(nx[0]!==undefined) names[nx[0]]="Kecamatan"; if(nx[1]!==undefined) names[nx[1]]="Kabupaten"; }
+  const ph=names.indexOf("Phone No"), person=j=>text(j)&&share(col(j),/^[A-Za-z][A-Za-z.'\/ ]{1,40}$/)>=.8;
+  for(let j=0;j<n;j++) if(person(j)&&(ph<0||j<ph)){ names[j]="Nama Customer"; break; }
+  for(let j=Math.max(0,prod);j<n;j++) if(person(j)){ names[j]="PIC"; break; }
+  return names.map((nm,i)=>nm||`Column ${i+1}`);
+}
+// Array-of-arrays (one sheet) -> data source.
+function aoaToSource(aoa,name,sheet){
+  let hi=aoa.findIndex(r=>r.filter(v=>!blank(v)).length>=2); if(hi<0) hi=0;
+  const headerless=looksData(aoa[hi]||[]);
+  const headers=headerless?inferHeaders(aoa.slice(hi)):(aoa[hi]||[]).map((h,i)=>blank(h)?`Column ${i+1}`:String(h).replace(/^﻿/,"").trim());
+  const body=aoa.slice(headerless?hi:hi+1);
+  return {name,sheet,headers,headerless,rows:body.map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??null]))).filter(r=>Object.values(r).some(v=>!blank(v))),on:true,role:"auto",team:"auto"};
+}
+
 /* ================= Formatting ================= */
 const nf=new Intl.NumberFormat("en-US");
 const pct=(a,b)=>b?Math.round(a/b*100):0;
@@ -155,21 +198,23 @@ function span(ds){ ds=ds.filter(Boolean).sort((a,b)=>a-b); if(!ds.length) return
   return `${fd(a)} – ${fd(b)}`; }
 const STATUS_COLOR={"Ordered":"#274E13","Prospect":"#4A653B","Interested":"#4A653B","Considering":"#D9A21B","Not interested":"#8E9C84"};
 const EXTRA=["#5B7F95","#A8653A","#6E5A8A","#3F8C7A"];
-const LABEL={channel:"Engagement channel",source:"Lead source",leadType:"Lead type",pic:"PIC",custType:"Customer type",userType:"Buyer type",location:"Location",purpose:"Objective",_src:"Data source"};
+const LABEL={channel:"Engagement channel",source:"Lead source",leadType:"Lead type",pic:"PIC",custType:"Customer type",userType:"Buyer type",kabupaten:"Regency",location:"Location",purpose:"Objective",_src:"Data source"};
 function countBy(rows,f){const m=new Map();for(const r of rows){const k=f(r);if(k===null||k===undefined)continue;m.set(k,(m.get(k)||0)+1)}return [...m].sort((a,b)=>b[1]-a[1])}
 function sumBy(rows,f,v){const m=new Map();for(const r of rows){const k=f(r);if(k===null||k===undefined)continue;m.set(k,(m.get(k)||0)+v(r))}return [...m].sort((a,b)=>b[1]-a[1])}
 const srcLabel=d=>d.sheet&&!/^sheet\s*1$/i.test(d.sheet)?`${d.name} · ${d.sheet}`:d.name;
 const shortItem=s=>String(s||"").replace(/\s*\(\d+\s*butir\)/i,"").replace(/\s+-\s+Topaz.*$/i,"").trim();
 
 /* ================= Analysis ================= */
-function canonCrm(r,map,src){ const o={_raw:r,_src:src};
+function canonCrm(r,map,src,defStatus){ const o={_raw:r,_src:src};
   for(const k in map){ const v=r[map[k]];
     o[k]=k==="potential"||k==="ffb"||k==="needKg"?toNum(v):k==="date"||k==="closing"||k==="modified"||k==="fertDate"||k==="followDate"?toDate(v):k==="status"?canonStatus(v)
       :k==="channel"?trChannel(v):k==="reason"?trReason(v):k==="custType"||k==="userType"?(clean(v)||"").replace(/[^\p{L}\p{N} \/-]/gu,"").trim()||null:clean(v); }
   if(o.reason==="Other"&&o.reasonOther) o.reason=trReason(o.reasonOther);
   o.reasonRaw=map.reason?clean(r[map.reason]):null;
   o.ph=phoneKey(o.phone); o.nk=nameKey(o.name);
-  o.ref=(String(o.detail||"").match(/#?B2C\d{4,}/i)||[])[0]?.replace(/^#?/,"#").toUpperCase()||null;
+  const refOf=v=>(String(v||"").match(/#?B2[BC]\d{3,}/i)||[])[0]?.replace(/^#?/,"#").toUpperCase()||null;
+  o.ref=refOf(o.orderRef)||refOf(o.detail); o.refs=o.ref?[o.ref]:[]; o.refVal=o.ref?{[o.ref]:o.potential||0}:{};
+  if(!o.status&&defStatus) o.status=defStatus;
   const txt=norm(o.detail); o.signals=SIGNALS.filter(([,,re])=>re.test(txt)).map(s=>s[0]);
   if(o.status!==WON&&/(^|[^a-z])(closing|sudah order|already order|deal)\b/i.test(o.detail||"")&&!/(belum|tidak|gagal|batal|not)\s+(closing|order|deal)/i.test(o.detail||"")){ o.statusLogged=o.status; o.status=WON; }
   o.outcome=o.status===WON?"Won":WARM.has(o.status)?"Warm":o.status==="Not interested"?"Lost":null;
@@ -177,22 +222,27 @@ function canonCrm(r,map,src){ const o={_raw:r,_src:src};
   return o; }
 function canonSale(r,map,src){ const o={_raw:r,_src:src};
   for(const k in map){ const v=r[map[k]]; o[k]=["qty","gmv","salesAmount","nett","revenue","discount","shipping"].includes(k)?toNum(v):k==="date"?toDate(v):clean(v); }
-  o.ph=phoneKey(o.phone); o.nk=nameKey(o.name);
+  o.ph=phoneKey(o.phone); o.nk=nameKey(o.name); if(o.role) o.role=o.role.split(/[;,]/)[0].trim();
   o.family=familyOf(o.item); o.region=regionOf(o.city)||regionOf(o.province);
   o.unit=o.unitPrice??(o.qty?(o.salesAmount??o.gmv??0)/o.qty:null);
   return o; }
 // Product family from the item name (fertilizer type), so "RP Mahkota" and "RP Sasco" count together.
 const FAMILIES=[["Leaf & soil tests",/uji\s*(daun|hara|tanah)|dokter\s*sawit|\blsu\b|\bssu\b|soil\s*test|leaf\s*test/],["Seeds",/benih|seed|topaz|bibit/],["Kieserite (Mg)",/kieserit|kiserit/],["Rock phosphate (RP)",/\brp\b|rock\s*phos|fosfat/],["NPK",/\bnpk\b/],["KCL / MOP",/kcl|\bmop\b/],["Urea",/urea/],
-  ["ZA",/\bza\b/],["Borate",/borat|boron/],["Dolomite",/dolomit/],["TSP / SP-36",/\btsp\b|sp-?36/],["Herbicide & pesticide",/gramoxone|metsulindo|herbisida|herbicide|racun|insektisida|pestisida|round\s*up/]];
+  ["ZA",/\bza\b/],["Borate",/borat|boron/],["Dolomite",/dolomit/],["TSP / SP-36",/\btsp\b|sp-?36/],["Herbicide & pesticide",/gramoxone|metsulindo|herbisida|herbicide|racun|insektisida|pestisida|round\s*up|garlon|supretox|marxone/],["AC AKP",/\bakp\b|\bac\s+powder/]];
 const familyOf=v=>{ const s=norm(v); if(!s) return null; const f=FAMILIES.find(([,re])=>re.test(s)); return f?f[0]:clean(v).split(" ")[0]; };
-const regionOf=v=>{ const s=clean(v); if(!s) return null; const t=s.toUpperCase().replace(/^(KABUPATEN|KAB\.?|KOTA)\s+/,"").replace(/\s+CITY$/,"").trim();
+const regionOf=v=>{ const s=clean(v); if(!s) return null; const t=s.toUpperCase().replace(/^(KABUPATEN|KAB\.?|KOTA)\s+/,"").replace(/\s+(CITY|REGENCY)$/,"").trim();
   return t.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); };
 
 function analyse(sources){
   const A={crmSources:[],salesSources:[]}; const crm=[], lines=[];
   for(const d of sources){ const role=d.role&&d.role!=="auto"?d.role:detectRole(d.headers), label=srcLabel(d);
     if(role==="sales"){ const m=detectSales(d.headers); A.salesSources.push(label); for(const r of d.rows) if(Object.values(r).some(v=>!blank(v))) lines.push(canonSale(r,m,label)); }
-    else { const m=detectCrm(d.headers); A.crmSources.push({label,map:m}); for(const r of d.rows) if(Object.values(r).some(v=>!blank(v))) crm.push(canonCrm(r,m,label)); } }
+    else { const m=detectCrm(d.headers), succ=!m.status&&(/success|already\s*order|closing/i.test(d.name)||!!m.orderRef)?WON:null; A.crmSources.push({label,map:m,succ:!!succ});
+      let prev=null;
+      for(const r of d.rows){ if(!Object.values(r).some(v=>!blank(v))) continue; const o=canonCrm(r,m,label,succ);
+        // a row with only an order number (and amount) continues the closing above it: same customer, another order
+        if(prev&&o.ref&&!o.date&&!o.name&&!o.phone){ prev.refs.push(o.ref); prev.refVal[o.ref]=o.potential||0; if(o.potential) prev.potential=(prev.potential||0)+o.potential; continue; }
+        crm.push(o); prev=o; } } }
   // Sales: the same order line in two uploaded files counts once
   { const seen=new Map(); for(let i=lines.length-1;i>=0;i--){ const l=lines[i], k=[l.orderNo||l.invoice,l.item,l.qty,l.gmv].join("|");
       if(l.orderNo||l.invoice){ if(seen.has(k)&&seen.get(k)!==l._src){ lines.splice(i,1); continue; } seen.set(k,l._src); } } }
@@ -203,10 +253,21 @@ function analyse(sources){
   if(weeks.length>=2){ prevLines=lines.filter(l=>l.date&&wkOf(l.date)===weeks[1]);
     const keep=lines.filter(l=>!l.date||wkOf(l.date)===weeks[0]); lines.splice(0,lines.length,...keep);
     A.weekStart=new Date(weeks[0]); A.prevStart=new Date(weeks[1]); A.olderWeeks=weeks.length-2; }
+  // CRM rows outside the sales week belong to another week's review
+  // (a closing that names an order is placed in the week of that order, whatever date the log gives it)
+  if(weeks.length){ const w0=weeks[0], w1=w0+7*864e5, nos=L=>new Set(L.map(l=>String(l.orderNo||"").toUpperCase())), cur=nos(lines), pw=nos(prevLines);
+    const place=o=>o.refs.some(r=>cur.has(r))?0:o.refs.some(r=>pw.has(r))?-1:!o.date?0:+o.date<w0?-1:+o.date>=w1?1:0;
+    const out=crm.filter(o=>place(o)!==0);
+    A.crmBefore=out.filter(o=>place(o)<0).length; A.crmAfter=out.filter(o=>place(o)>0).length; A.weekStart=A.weekStart||new Date(w0);
+    if(out.length){ const keep=crm.filter(o=>!out.includes(o)); crm.splice(0,crm.length,...keep); } }
   // CRM: repeated IDs counted once, latest source wins
   const byId=new Map(), C=[]; let dupes=0;
   for(const o of crm){ if(o.id){ if(byId.has(o.id)){ C[byId.get(o.id)]=o; dupes++; continue; } byId.set(o.id,C.length); } C.push(o); }
   A.crm=C; A.dupes=dupes; A.lines=lines;
+  // Sales exports without a region: take it from the CRM closing log, matched by order number
+  if(!lines.some(l=>l.region)){ const geo=new Map(); C.forEach(r=>{ const g=r.kabupaten||(r.location||"").split(/[,-]/)[1]; if(g) r.refs.forEach(x=>geo.set(x,{region:regionOf(g),province:r.province})); });
+    lines.forEach(l=>{ const g=geo.get(String(l.orderNo||"").toUpperCase()); if(g){ l.region=g.region; if(!l.province&&g.province) l.province=g.province; } });
+    A.regionFromCrm=lines.some(l=>l.region); }
   A.has={crm:C.length>0,sales:lines.length>0};
   A.crmMap=Object.assign({},...A.crmSources.map(s=>s.map));
   A.won=C.filter(r=>r.outcome==="Won"); A.warm=C.filter(r=>r.outcome==="Warm"); A.lost=C.filter(r=>r.outcome==="Lost"); A.nostatus=C.filter(r=>!r.outcome);
@@ -214,6 +275,7 @@ function analyse(sources){
   A.statusKeys=STATUS_ORDER.filter(s=>C.some(r=>r.status===s)).concat([...new Set(C.map(r=>r.status).filter(s=>s&&!STATUS_ORDER.includes(s)))]);
   A.color=k=>STATUS_COLOR[k]||EXTRA[A.statusKeys.filter(x=>!STATUS_COLOR[x]).indexOf(k)%EXTRA.length];
   A.dates=[...C.map(r=>r.date),...lines.map(r=>r.date)].filter(Boolean).sort((a,b)=>a-b);
+  if(A.weekStart) A.dates=A.dates.filter(d=>d>=A.weekStart&&d<new Date(+A.weekStart+7*864e5));
 
   // ---- Sales orders (lines grouped by order number)
   const om=new Map();
@@ -270,8 +332,8 @@ function analyse(sources){
   // ---- Link CRM to sales: phone, then order reference in notes, then first name + same PIC
   const picTok=p=>firstTok(p);
   const near=(a,b,days)=>a&&b&&Math.abs(a-b)<=days*864e5;
-  const findOrders=r=>{ let m=r.ph?O.filter(o=>o.ph===r.ph):[]; if(m.length) return [m,"phone"];
-    if(r.ref){ m=O.filter(o=>o.no.toUpperCase()===r.ref); if(m.length) return [m,"order number"]; }
+  const findOrders=r=>{ let m=r.refs.length?O.filter(o=>r.refs.includes(o.no.toUpperCase())):[]; if(m.length) return [m,"order number"];
+    m=r.ph?O.filter(o=>o.ph===r.ph):[]; if(m.length) return [m,"phone"];
     if(r.nk){ m=O.filter(o=>o.nk===r.nk&&picTok(o.pic)===picTok(r.pic)); if(m.length) return [m,"name and PIC"]; }
     // last resort for won deals: same PIC, value within 2% of the CRM potential, ordered within 7 days
     if(r.outcome==="Won"&&r.potential){ m=O.filter(o=>!o.crm&&picTok(o.pic)===picTok(r.pic)&&Math.abs(o.gmv-r.potential)<=r.potential*.02&&(!r.date||near(o.date,r.date,7))); if(m.length===1) return [m,"value and date"]; }
@@ -280,6 +342,10 @@ function analyse(sources){
   A.matchCounts=countBy(C.filter(r=>r.matchBy),r=>r.matchBy);
   A.wonFromNotes=A.won.filter(r=>r.statusLogged!==undefined);
   A.wonLinked=A.won.filter(r=>r.orders.length);
+  // closings whose order numbers are not in the sales export (not invoiced yet, another team's export, or a typo)
+  const onos=new Set(O.map(o=>o.no.toUpperCase()));
+  A.missingRefs=A.has.sales?A.won.flatMap(r=>r.refs.filter(x=>!onos.has(x)).map(x=>({ref:x,v:r.refVal[x]||0,pic:r.pic,purpose:r.purpose}))):[];
+  A.missingVal=A.missingRefs.reduce((s,x)=>s+x.v,0);
   A.linkedOrders=O.filter(o=>o.crm&&o.crm.some(r=>r.outcome==="Won"));
   A.linkedGmv=A.linkedOrders.reduce((s,o)=>s+o.gmv,0);
   A.noCrm=O.filter(o=>!o.crm);
@@ -291,12 +357,13 @@ function analyse(sources){
   A.funnel=[["Engagements logged",C.length],["Reached the lead",C.filter(reached).length],["Showed interest",A.won.length+A.warm.length],["Ordered",A.won.length]];
 
   // ---- PIC scorecard: CRM activity next to the orders each PIC closed
-  const pk=v=>(clean(v)||"").toLowerCase()||null, pm=new Map();
+  // PIC names are written differently across exports ("Simon Sihar Simanjuntak" / "Simon Simanjuntak"): match on first + last name
+  const pk=v=>{ const t=(clean(v)||"").toLowerCase().replace(/[^a-z ]/g,"").split(" ").filter(w=>w.length>1); return t.length?t[0]+" "+(t.length>1?t[t.length-1]:""):null; }, pm=new Map();
   const pg=v=>{ const k=pk(v); if(!k) return null; if(!pm.has(k)) pm.set(k,{p:clean(v),eng:0,reached:0,won:0,warm:0,lost:0,orders:0,gmv:0,inCrm:0,ch:[]}); return pm.get(k); };
   for(const r of C){ const g=pg(r.pic); if(!g) continue; g.eng++; if(reached(r)) g.reached++; if(r.outcome==="Won") g.won++; else if(r.outcome==="Warm") g.warm++; else if(r.outcome==="Lost") g.lost++; if(r.channel) g.ch.push(r.channel); }
   for(const o of O){ const g=pg(o.pic); if(!g) continue; g.orders++; g.gmv+=o.gmv; if(o.crm) g.inCrm++; }
   A.picCard=[...pm.values()].map(g=>({...g,topCh:countBy(g.ch,x=>x)[0]?.[0]||null})).sort((a,b)=>b.gmv-a.gmv||b.eng-a.eng);
-  A.notLogging=A.has.crm?A.picCard.filter(g=>g.orders&&!g.eng):[];
+  A.notLogging=A.has.crm?A.picCard.filter(g=>g.orders&&!g.eng&&!g.inCrm):[];
 
   // ---- Speed: days from CRM engagement to the order, and how late CRM entries were written
   const dd=(a,b)=>Math.round((a-b)/864e5), med=a=>{ if(!a.length) return null; const s=a.slice().sort((x,y)=>x-y), m=s.length>>1; return s.length%2?s[m]:(s[m-1]+s[m])/2; };
@@ -328,7 +395,7 @@ function analyse(sources){
   A.mix=A.byFamily.slice(0,5).map(f=>({k:f.k,win:Math.round((mw.m.get(f.k)||0)/mw.t*100),rest:Math.round((mr.m.get(f.k)||0)/mr.t*100)}));
   A.wonNew=A.linkedOrders.filter(o=>o.isNew).length;
   A.bigWin=A.linkedOrders[0]?{o:A.linkedOrders[0],r:A.linkedOrders[0].crm.find(r=>r.outcome==="Won")}:null;
-  A.potWins=A.wonLinked.filter(r=>r.potential); A.potSum=A.potWins.reduce((s,r)=>s+r.potential,0); A.potActual=A.potWins.reduce((s,r)=>s+r.orders.reduce((a,o)=>a+o.gmv,0),0);
+  A.potWins=A.wonLinked.filter(r=>r.potential); A.potSum=A.potWins.reduce((s,r)=>{ const m=r.refs.filter(x=>r.orders.some(o=>o.no.toUpperCase()===x)); return s+(m.length?m.reduce((a,x)=>a+(r.refVal[x]||0),0):r.potential); },0); A.potActual=A.potWins.reduce((s,r)=>s+r.orders.reduce((a,o)=>a+o.gmv,0),0);
 
   // ---- Where to grow: product by region, what top-product buyers also buy, open orders by age
   const fams=A.byFamily.slice(0,5).map(f=>f.k);

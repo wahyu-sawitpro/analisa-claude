@@ -254,7 +254,7 @@ const SAMPLE=/*SAMPLE_DATA*/null;
 /*INCLUDE:export-pptx.js*/
 
 /* ================= Boot ================= */
-let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data-v5")||"null") }catch(e){}
+let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data-v6")||"null") }catch(e){}
 if(saved&&Array.isArray(saved.sources)&&saved.sources.some(d=>d.rows?.length)){
   state.sources=saved.sources; state.sample=false;
   if(saved.dirty){ state.dirty=true; renderSources(); deckEl.innerHTML=`<div class="card"><div class="empty">Your files are loaded. Click <b>&nbsp;Analyze&nbsp;</b> to build the deck.</div></div>`; }

@@ -1,5 +1,5 @@
 /* ================= Narrative (shared by HTML and PPTX) ================= */
-const lc=s=>String(s).replace(/^(?![A-Z]{2}|WhatsApp)./,c=>c.toLowerCase());
+const lc=s=>String(s).replace(/^\S+/,w=>/^[A-Z][a-z-]*$/.test(w)?w.toLowerCase():w);
 const andList=a=>a.length<2?a.join(""):a.slice(0,-1).join(", ")+" and "+a[a.length-1];
 const PRODUCT_RE=/\b(AC\s*(?:Powder\s*)?AKP|KCL(?:\s+(?:Mahkota|Sasco|Mentari|Canada))?|NPK(?:\s+(?:DGW|Sawit|Yaramila|Pak Tani))?|RP(?:\s+(?:Mahkota|Sasco|Cap Daun))?|Urea|ZA(?:\s+Cap Daun)?|Borate|Dolomit|herbisida|Gramoxone)\b/gi;
 function productsIn(rows){ const m=new Map();
@@ -107,19 +107,26 @@ function narrative(A){
     ].filter(Boolean).slice(0,3);
   }
 
+  const wk=A.weekStart, wkEnd=wk&&new Date(+wk+6*864e5);
+  N.outNote=A.crmBefore||A.crmAfter?`${[A.crmBefore&&`${A.crmBefore} dated before ${fds(wk)}`,A.crmAfter&&`${A.crmAfter} after ${fds(wkEnd)}`].filter(Boolean).join(" and ")} left out (other weeks).`:"";
+  if(A.missingRefs.length){ const mr=A.missingRefs;
+    N.missNote=`<b>${mr.length} closing${mr.length>1?"s":""} in the CRM${A.missingVal?` (${rp(A.missingVal)})`:""} name order numbers that are not in the sales export:</b> ${esc(mr.map(x=>x.ref).join(", "))}. Check whether they are invoiced, booked under another team, or mistyped.`; }
   // What the wins are worth
   if(won&&A.has.sales&&A.linkedOrders.length){
     const share=pct(A.linkedGmv,A.gmv), bw=A.bigWin, gap=A.mix.slice().sort((a,b)=>Math.abs(b.win-b.rest)-Math.abs(a.win-a.rest))[0];
     const days=bw?.r?.date&&bw.o.date?Math.round((bw.o.date-bw.r.date)/864e5):null, lt=countBy(A.won,r=>r.leadType)[0], ut=countBy(A.won,r=>r.userType);
-    N.wwTitle=A.noCrm.length?`Wins brought ${share}% of GMV; their orders average ${rp(A.aovWin)} vs ${rp(A.aovNoCrm)} for orders the CRM never saw`:`Wins brought ${share}% of GMV at ${rp(A.aovWin)} per order`;
+    N.wwTitle=A.missingVal>=A.linkedGmv*.5?`The CRM logged ${rp(A.linkedGmv+A.missingVal)} of closings; only ${rp(A.linkedGmv)} of it is in the sales export`
+      :A.noCrm.length?`Wins brought ${share}% of GMV; their orders average ${rp(A.aovWin)} vs ${rp(A.aovNoCrm)} for orders the CRM never saw`:`Wins brought ${share}% of GMV at ${rp(A.aovWin)} per order`;
     N.wwNotes=[
       bw&&`<b>Biggest win: ${rp(bw.o.gmv)}</b> (${esc(bw.o.items.slice(0,3).join(", "))}${bw.o.items.length>3?", …":""})${bw.r?.channel?` from ${esc(lc(bw.r.channel))}`:""}${bw.r?.source?` on a ${esc(lc(bw.r.source))} lead`:""}${bw.o.pic?` by ${esc(bw.o.pic)}`:""}${days!=null?`, ordered ${days<=0?"the same day":`${days} day${days>1?"s":""} later`}`:""}.`,
       gap&&A.orders.length>A.linkedOrders.length&&Math.abs(gap.win-gap.rest)>=10&&`<b>${gap.win>gap.rest?`Wins lean on ${esc(gap.k)}`:`Wins buy less ${esc(gap.k)}`}:</b> ${gap.win}% of win GMV vs ${gap.rest}% in other orders${gap.win>gap.rest?`, so ${esc(gap.k)} is the product the CRM motion sells best`:""}.`,
       lt&&`<b>${lt[1]} of ${won} wins came from ${esc(lc(lt[0]))}</b>${ut.length?`; buyers: ${esc(ut.map(([k,n])=>`${k} ${n}`).join(", "))}`:""}.`,
       A.hasCustStatus&&`<b>${A.wonNew} of ${A.linkedOrders.length} win orders are from new customers.</b>${A.wonNew/A.linkedOrders.length<.3?" CRM wins are mostly re-orders; new-customer growth comes from orders outside the CRM.":""}`,
-      A.potWins.length===won?`<b>The CRM's potential GMV was ${A.potActual>=A.potSum?"met":"missed"}:</b> ${rp(A.potSum)} expected on the ${won} wins, ${rp(A.potActual)} ordered (${A.potSum?Math.round((A.potActual/A.potSum-1)*100):0}%). A usable forecast for the next pipeline.`
-        :A.potWins.length&&`<b>Potential GMV was logged on only ${A.potWins.length} of ${won} wins</b> (${rp(A.potSum)} expected, ${rp(A.potActual)} ordered). Fill it on every lead to size the pipeline.`
+      A.potWins.length&&A.crmSources.some(x=>x.succ)?`<b>Values in the closing log ${Math.abs(A.potActual-A.potSum)<=A.potSum*.1?"match":"differ from"} the sales export</b> on the ${A.potWins.length} matched closing${A.potWins.length>1?"s":""}: ${rp(A.potSum)} logged, ${rp(A.potActual)} invoiced.`
+      :A.potWins.length===A.wonLinked.length?`<b>The CRM's potential GMV was ${A.potActual>=A.potSum?"met":"missed"}:</b> ${rp(A.potSum)} expected on the ${A.potWins.length} matched win${A.potWins.length>1?"s":""}, ${rp(A.potActual)} ordered (${A.potSum?Math.round((A.potActual/A.potSum-1)*100):0}%). A usable forecast for the next pipeline.`
+        :A.potWins.length&&`<b>Potential GMV was logged on only ${A.potWins.length} of ${A.wonLinked.length} matched wins</b> (${rp(A.potSum)} expected, ${rp(A.potActual)} ordered). Fill it on every lead to size the pipeline.`
     ].filter(Boolean).slice(0,4);
+    if(N.missNote){ N.wwNotes.splice(1,0,N.missNote); N.wwNotes.length=Math.min(N.wwNotes.length,4); }
   }
 
   // Where to grow
@@ -167,9 +174,10 @@ function narrative(A){
       :`GMV ${up?"up":"down"} ${pc!=null?pc+"%":sg(W.dG)} vs the week before (${rp(p.gmv)} → ${rp(c.gmv)})${lead?`, led by ${lead.k} (${sg(lead.d)})`:""}`;
     const pic=W.pic[0], reg=W.region[0];
     N.wowNotes=[
-      `<b>${flat?"Volume and value offset each other":`The ${up?"increase":"drop"} comes mostly from ${esc(drv)}`}.</b> Order count accounts for ${sg(W.volume)}, order size for ${sg(W.value)}.`,
+      c.orders===p.orders?`<b>Same number of orders (${c.orders}); ${flat?"order size held":`order size explains the ${up?"increase":"drop"}`}</b> (average ${rp(p.aov)} → ${rp(c.aov)}).`
+        :`<b>${flat?"Volume and value offset each other":`The ${up?"increase":"drop"} comes mostly from ${esc(drv)}`}.</b> Order count accounts for ${sg(W.volume)}, order size for ${sg(W.value)}.`,
       W.family.length&&`<b>Products:</b> ${famUp.length?esc(famUp.slice(0,2).map(x=>`${x.k} ${sg(x.d)}`).join(", ")):"no product type grew"}; ${famDn.length?esc(famDn.slice(0,2).map(x=>`${x.k} ${sg(x.d)}`).join(", ")):"no product type fell"}.`,
-      `<b>Customers:</b> ${W.retained.n} bought in both weeks (${rp(W.retained.prev)} → ${rp(W.retained.cur)}), ${W.gained.n?`${W.gained.n} ${W.gained.n===1?"is":"are"} new to the week (${rp(W.gained.gmv)})`:"none are new to the week"} and ${W.lost.n} from the week before didn't reorder (${rp(W.lost.gmv)}).${!up&&W.lost.gmv>=Math.abs(W.dG)*.5?" Customers who didn't come back explain most of the drop.":!up&&W.retained.prev-W.retained.cur>=Math.abs(W.dG)*.5?` Regular customers buying less explains most of the drop (${W.retained.down} of ${W.retained.n} spent less).`:up&&W.gained.gmv>=W.dG*.5?" New buyers explain most of the growth.":up&&W.retained.cur-W.retained.prev>=W.dG*.5?` Regular customers buying more explains most of the growth (${W.retained.up} of ${W.retained.n} spent more).`:""}`,
+      `<b>Customers:</b> ${W.retained.n?`${W.retained.n} bought in both weeks (${rp(W.retained.prev)} → ${rp(W.retained.cur)})`:"none bought in both weeks"}, ${W.gained.n?`${W.gained.n} ${W.gained.n===1?"is":"are"} new to the week (${rp(W.gained.gmv)})`:"none are new to the week"} and ${W.lost.n} from the week before didn't reorder (${rp(W.lost.gmv)}).${!up&&W.lost.gmv>=Math.abs(W.dG)*.5?" Customers who didn't come back explain most of the drop.":!up&&W.retained.prev-W.retained.cur>=Math.abs(W.dG)*.5?` Regular customers buying less explains most of the drop (${W.retained.down} of ${W.retained.n} spent less).`:up&&W.gained.gmv>=W.dG*.5?" New buyers explain most of the growth.":up&&W.retained.cur-W.retained.prev>=W.dG*.5?` Regular customers buying more explains most of the growth (${W.retained.up} of ${W.retained.n} spent more).`:""}`,
       exPct!=null&&c.orders>1&&p.orders>1&&`<b>Without each week's largest order</b> (${rp(c.top)} vs ${rp(p.top)}), GMV is ${exUp?"up":"down"} ${Math.abs(exPct)}%${exUp!==up&&!flat?`, so the headline ${up?"increase":"drop"} is one large order, not the underlying trend`:", so the trend holds beyond a single deal"}.`,
       (pic||reg)&&`<b>Biggest swings:</b> ${[pic&&`PIC ${esc(pic.k)} ${sg(pic.d)}`,reg&&`${esc(reg.k)} ${sg(reg.d)}`].filter(Boolean).join("; ")}.`
     ].filter(Boolean).slice(0,4);
@@ -192,6 +200,7 @@ function narrative(A){
   if(!A.has.sales&&!won&&nw){ const ca=A.notWon.filter(r=>r.theme==="Just asking").length; if(ca/nw>=.5) F.push(["We don't know why leads say no",`${pct(ca,nw)}% of reasons are a catch-all, so the team can't fix the pitch.`]); }
   if(won&&A.has.sales) F.push([`${A.wonLinked.length} of ${won} CRM wins confirmed in sales`,`They became ${A.linkedOrders.length} order${A.linkedOrders.length===1?"":"s"} worth ${rp(A.linkedGmv)}${A.matchCounts.find(m=>m[0]==="value and date")?"; one is matched only by value and date":""}.`]);
   if(A.has.sales&&A.byFamily[0]) F.push([`${A.byFamily[0].k} is ${pct(A.byFamily[0].gmv,A.gmv)}% of GMV`,`${rp(A.gmv)} from ${A.orders.length} orders${A.topOrderShare>=.5?`; one order alone is ${pct(A.orders[0].gmv,A.gmv)}% of GMV`:""}.`]);
+  if(A.missingRefs.length) F.splice(1,0,[`${A.missingRefs.length} CRM closing${A.missingRefs.length>1?"s":""}${A.missingVal?` (${rp(A.missingVal)})`:""} missing from sales`,`Their order numbers (${A.missingRefs.slice(0,3).map(x=>x.ref).join(", ")}${A.missingRefs.length>3?", …":""}) are not in the sales export.`]);
   if(A.wonFromNotes.length) F.push(["Closed deals are not marked as orders",`${A.wonFromNotes.length} win${A.wonFromNotes.length>1?"s are":" is"} still “${A.wonFromNotes[0].statusLogged||"blank"}” in the CRM although the notes say closing.`]);
   if(A.wow){ const W=A.wow; F.unshift([W.flat?"GMV flat vs the week before":`GMV ${W.up?"up":"down"} ${W.pc!=null?W.pc+"%":""} vs the week before`,`${rp(W.p.gmv)} → ${rp(W.c.gmv)}, mostly from ${W.drv}${W.lead?`; ${W.lead.k} moved most`:""}.`]); }
   N.findings=F.slice(0,4);
@@ -216,6 +225,7 @@ function narrative(A){
   const tests=A.byFamily?.find(f=>/test/i.test(f.k));
   if(tests) act.push({t:`Turn ${tests.cust} test customer${tests.cust>1?"s":""} into fertilizer orders`,d:`Leaf and soil tests (${rp(tests.gmv)}) end in a fertilizer recommendation. Book a follow-up when results are ready and quote the recommended products.`,o:countBy(A.orders.filter(o=>o.lines.some(l=>l.family===tests.k)),o=>o.pic)[0]?.[0]||"Test PIC",w:"When results are in"});
   if(A.has.sales&&A.topOrderShare>=.5&&A.orders.length>1) act.push({t:"Widen the base beyond one large order",d:`One order is ${pct(A.orders[0].gmv,A.gmv)}% of GMV. Line up repeat orders from the other ${A.orders.length-1} customers so next week doesn't depend on a single deal.`,o:"Team lead",w:"Next 2 weeks"});
+  if(A.missingRefs.length) act.splice(1,0,{t:`Reconcile ${A.missingRefs.length} closing${A.missingRefs.length>1?"s":""} missing from sales`,d:`${A.missingRefs.map(x=>x.ref).join(", ")}${A.missingVal?` (${rp(A.missingVal)})`:""} are logged as closed in the CRM but not in the sales export. Confirm the invoice, team and order number for each.`,o:"Sales ops + PIC",w:"This week"});
   if(A.wonFromNotes.length) act.push({t:"Mark closed deals as orders in the CRM",d:`${A.wonFromNotes.length} closed deal${A.wonFromNotes.length>1?"s are":" is"} still logged as “${A.wonFromNotes[0].statusLogged||"blank"}”. Update the status and add the order number, so wins are counted automatically.`,o:"Sales ops",w:"This week"});
   if(A.wow){ const W=A.wow;
     if(!W.up&&!W.flat&&W.retained.prev-W.retained.cur>W.lost.gmv&&W.retained.down) act.unshift({t:`Find out why ${W.retained.down} regular customer${W.retained.down>1?"s":""} bought less`,d:`Customers who ordered in both weeks spent ${rp(W.retained.prev)} → ${rp(W.retained.cur)}${W.family.find(x=>x.d<0)?`; ${W.family.find(x=>x.d<0).k} fell most`:""}. Check stock, price and delivery with each, and agree the next order size.`,o:"Sales PIC",w:"This week"});
@@ -261,17 +271,17 @@ function teamSpecs(A,N,pre){
 
   // Success story
   if(A.won.length){
-    const dims=["channel","source","leadType","userType"].filter(k=>A.won.some(r=>r[k])).slice(0,3);
+    const dims=["channel","source","leadType","userType","purpose","kabupaten","pic"].filter(k=>A.won.some(r=>r[k])).slice(0,3);
     const how={w:.85,title:`How the ${A.won.length} wins happened`,sub:"Each bar splits the CRM wins; count inside",
       chart:{type:"stack100",rows:dims.map(k=>({label:LABEL[k],segs:countBy(A.won,r=>r[k]??"(not filled)").map(([g,n],i)=>({k:g,n,color:g==="(not filled)"?OUTC.none:CAT[i]||"#B3BBAB"}))}))}};
     let right;
     if(A.has.sales){
       const kp=[{v:`${A.wonLinked.length}`,u:`/${A.won.length}`,l:"Wins confirmed in sales data",hot:true},{v:rpParts(A.linkedGmv)[0],u:rpParts(A.linkedGmv)[1],l:`GMV of ${pl(A.linkedOrders.length,"matched order")}`},
-        A.hasCustStatus?{v:String(A.wonNew),u:`/${A.linkedOrders.length}`,l:"Matched orders from new customers"}:{v:String(A.wonFromNotes.length||A.won.length),u:`/${A.won.length}`,l:A.wonFromNotes.length?"Wins found only in the notes (“Closing …”)":"Wins with a CRM status of ordered"}];
+        A.hasCustStatus?{v:String(A.wonNew),u:`/${A.linkedOrders.length}`,l:"Matched orders from new customers"}:{v:String(A.wonFromNotes.length||A.won.length),u:`/${A.won.length}`,l:A.wonFromNotes.length?"Wins found only in the notes (“Closing …”)":A.crmSources.some(x=>x.succ)?"closings logged in the CRM this week":"Wins with a CRM status of ordered"}];
       const by=andList(A.matchCounts.filter(m=>A.won.some(r=>r.matchBy===m[0])).map(([k])=>`${k} (${A.won.filter(r=>r.matchBy===k).length})`));
       right={w:1.45,split:[{h:104,kpiRow:kp},{title:"Orders behind the wins",sub:A.linkedOrders.length>5?`Top 5 of ${A.linkedOrders.length} by GMV`:"Matched from the sales export",
-        table:{head:["Order","PIC","Products","GMV","Customer"],align:["l","l","l","r","l"],rows:A.linkedOrders.slice(0,5).map(o=>[o.no,o.pic||"–",o.items.slice(0,2).join(", ")+(o.items.length>2?` +${o.items.length-2}`:""),rp(o.gmv),!A.hasCustStatus?"–":o.isNew?{v:"New",pill:true}:"Repeat"])},
-        foot:`Matched by ${by||"–"}.${A.wonFromNotes.length?` ${A.wonFromNotes.length} counted as wins from “Closing” in the notes.`:""}`}]};
+        table:{head:["Order","PIC","Products","GMV",...(A.hasCustStatus?["Customer"]:[])],align:["l","l","l","r","l"],rows:A.linkedOrders.slice(0,5).map(o=>[o.no,o.pic||"–",o.items.slice(0,2).join(", ")+(o.items.length>2?` +${o.items.length-2}`:""),rp(o.gmv),...(A.hasCustStatus?[o.isNew?{v:"New",pill:true}:"Repeat"]:[])])},
+        foot:`Matched by ${by||"–"}.${A.wonFromNotes.length?` ${A.wonFromNotes.length} counted as wins from “Closing” in the notes.`:""}${N.outNote?` ${N.outNote}`:""}`}]};
     } else right={w:1.45,title:"The wins",sub:"Upload the sales file to see what these wins were worth",table:{head:["ID","PIC","Channel","Source","Notes"],rows:A.won.slice(0,7).map(r=>[r.id||"–",r.pic||"–",r.channel||"–",r.source||"–",(r.detail||"").slice(0,60)])}};
     S.push({kicker:pre+"Success story",title:N.winTitle,rows:[{cards:[how,right]}]});
   }
@@ -279,10 +289,12 @@ function teamSpecs(A,N,pre){
   // Success story: what the wins are worth
   if(N.wwNotes){
     const cats=[[`CRM wins\n${pl(A.linkedOrders.length,"order")}`,A.aovWin,OUTC.won],A.noCrm.length&&[`No CRM record\n${pl(A.noCrm.length,"order")}`,A.aovNoCrm,"#8E9C84"],[`All orders\n${O.length}`,A.aovAll,"#86AD6C"]].filter(Boolean);
-    const rest=O.length>A.linkedOrders.length;
+    const rest=O.length>A.linkedOrders.length, recon=!A.noCrm.length&&A.missingRefs.length;
+    const first=recon?{w:.95,title:"CRM closings vs the sales export",sub:"Value of closings logged this week",chart:{type:"column",cats:[`In the sales export\n${pl(A.linkedOrders.length,"order")}`,`Not in the export\n${pl(A.missingRefs.length,"order")}`],series:[{name:"Value",values:[A.linkedGmv,A.missingVal],colors:[OUTC.won,DOWN]}],fmt:rpM,lblH:36}}
+      :{w:.95,title:"Average order value",sub:"Orders behind CRM wins vs the rest",chart:{type:"column",cats:cats.map(c=>c[0]),series:[{name:"Average order",values:cats.map(c=>c[1]),colors:cats.map(c=>c[2])}],fmt:rpM,lblH:36}};
     S.push({kicker:pre+"Success story · what the wins are worth",title:N.wwTitle,rows:[{cards:[
-      {w:.95,title:"Average order value",sub:"Orders behind CRM wins vs the rest",chart:{type:"column",cats:cats.map(c=>c[0]),series:[{name:"Average order",values:cats.map(c=>c[1]),colors:cats.map(c=>c[2])}],fmt:rpM,lblH:36}},
-      {w:1.25,title:"Product mix: wins vs other orders",sub:"Share of each group's GMV by product type",chart:{type:"column",cats:A.mix.map(m=>m.k),series:[{name:"CRM wins",color:CAT[0],values:A.mix.map(m=>m.win)},...(rest?[{name:"Other orders",color:CAT[2],values:A.mix.map(m=>m.rest)}]:[])],fmt:v=>v+"%",lblH:36}},
+      first,
+      {w:1.25,title:rest?"Product mix: wins vs other orders":"Product mix of the wins",sub:"Share of each group's GMV by product type",chart:{type:"column",cats:A.mix.map(m=>m.k),series:[{name:"CRM wins",color:CAT[0],values:A.mix.map(m=>m.win)},...(rest?[{name:"Other orders",color:CAT[2],values:A.mix.map(m=>m.rest)}]:[])],fmt:v=>v+"%",lblH:36}},
       {w:.72,kpis:[{v:String(pct(A.linkedGmv,A.gmv)),u:"%",l:"of the team's GMV came from orders behind CRM wins",hot:true},
         A.cycle.n?{v:String(A.cycle.median),u:" days",l:`median from CRM engagement to order (${A.cycle.sameDay} of ${A.cycle.n} same day)`}:{v:rpParts(A.aovWin)[0],u:rpParts(A.aovWin)[1],l:"average order behind a win"},
         A.hasCustStatus?{v:String(A.wonNew),u:`/${A.linkedOrders.length}`,l:"win orders from new customers"}:{v:String(A.wonLinked.length),u:`/${A.won.length}`,l:"wins confirmed in sales"}]}]}],notes:N.wwNotes});
