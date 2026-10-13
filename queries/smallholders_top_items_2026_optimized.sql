@@ -6,9 +6,7 @@
 --                  sama dengan kolom qty di combined_sales)
 --   customer_count: jumlah customer unik yang membeli item tsb
 --   total_gmv    : sum(sales_amount + shipping_cost), sama dengan gmv di
---                  final_result asli. Catatan: invoice datamart_ecommerce yang
---                  juga lolos branch 2b ikut terhitung dua kali (sama seperti
---                  query GMV asli); begitu juga total_qty.
+--                  final_result asli (branch 2b di-comment, jadi tidak dobel).
 -- Diurutkan dari order_count terbanyak.
 -- Turunan dari smallholders_invoice_count_monthly_2026_optimized.sql
 -- (filter & catatan di file itu tetap berlaku).
