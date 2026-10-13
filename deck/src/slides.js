@@ -183,6 +183,39 @@ function narrative(A){
     ].filter(Boolean).slice(0,4);
   }
 
+  // Month-by-month trend (when the sales export covers two or more full months)
+  if(A.trend){ const T=A.trend, F=T.F, Z=T.Z, L1=T.M.length-1, up=T.dG>=0, pc=T.pct==null?null:Math.round(Math.abs(T.pct)*100), flat=pc!=null&&pc<3;
+    const sg=v=>(v>=0?"+":"−")+rp(Math.abs(v)), ns=T.stopped.length, stopDrop=T.stopBy[0]-T.stopBy[L1], rpc=T.restPct==null?null:Math.round(T.restPct*100);
+    const explains=!up&&!flat&&ns&&stopDrop>=Math.abs(T.dG)*.6&&T.rest[L1]>=T.rest[0], mid=T.low!==F&&T.low!==Z?T.low:null;
+    const acc=ns===1?"1 account":`${ns} accounts`, B=T.bridge, Ret=T.retained;
+    Object.assign(T,{up,pc,flat,explains,acc});
+    N.trTitle=(flat?`GMV is flat from ${F.label} to ${Z.label} (${rp(F.gmv)} → ${rp(Z.gmv)})`:`GMV ${up?"up":"down"} ${pc}% from ${F.label} to ${Z.label} (${rp(F.gmv)} → ${rp(Z.gmv)})`)
+      +(explains?`: ${acc} stopped ordering, everyone else grew ${rpc}%`:mid?`, after a dip in ${mid.label}`:"");
+    const picsOf=cs=>andList([...new Set(cs.map(c=>c.pic).filter(Boolean))]);
+    N.trNotes=[
+      ns&&`<b>${acc} stopped ordering:</b> ${rp(T.stopped.reduce((s,c)=>s+c.tot,0))} over the period, ${rp(T.stopBy[0])} in ${F.label} (${pct(T.stopBy[0],F.gmv)}% of that month) and nothing in ${Z.label}. ${ns===1?"It was":"All were"} handled by ${esc(picsOf(T.stopped))}; last orders on ${andList(T.stopped.map(c=>fds(c.last)))}.`,
+      mid&&`<b>${mid.label} was the low point</b> at ${rp(mid.gmv)}: ${mid.orders} orders from ${mid.customers} customers, vs ${F.orders} from ${F.customers} in ${F.label}.`,
+      ns&&rpc!=null&&`<b>Everyone else ${T.rest[L1]>=T.rest[0]?"grew":"fell"} ${Math.abs(rpc)}%</b> (${rp(T.rest[0])} → ${rp(T.rest[L1])}); orders ${F.orders} → ${Z.orders}, average order ${rp(F.aov)} → ${rp(Z.aov)}.`,
+      !ns&&`<b>Orders ${F.orders} → ${Z.orders}, average order ${rp(F.aov)} → ${rp(Z.aov)}</b>, customers ${F.customers} → ${Z.customers}.`,
+      T.peakWeek&&`<b>Best week:</b> week of ${fds(T.peakWeek.d)} at ${rp(T.peakWeek.gmv)}.`
+    ].filter(Boolean).slice(0,4);
+    const pd=T.pic.filter(x=>x.d<0), pu=T.pic.filter(x=>x.d>0), CD=T.cat.length?T.cat:T.family, cd=CD.filter(x=>x.d<0), cu=CD.filter(x=>x.d>0);
+    N.tr2Title=`${B.lost.n} of ${F.customers} ${F.label} customers didn't buy in ${Z.label}`+(pd[0]?`; ${pd[0].k} ${sg(pd[0].d)}${cd[0]?` and ${cd[0].k} ${sg(cd[0].d)}`:""} moved most`:cu[0]?`; ${cu[0].k} grew most (${sg(cu[0].d)})`:"");
+    N.tr2Notes=[
+      `<b>Customers:</b> ${B.lost.n} ${F.label} customers didn't buy in ${Z.label} (${rp(B.lost.gmv)}), ${B.both.n} bought in both (${rp(B.both.prev)} → ${rp(B.both.cur)}) and ${B.gained.n} ${Z.label} customers didn't buy in ${F.label} (${rp(B.gained.gmv)}).`,
+      `<b>Retention:</b> ${Ret.n} of ${Ret.of} ${F.label} customers (${pct(Ret.n,Ret.of)}%) ordered again in a later month; ${T.fresh.n} ${Z.label} customers are new to the whole period (${rp(T.fresh.gmv)}).`,
+      (pd.length||pu.length)&&`<b>PICs:</b> ${[pd.slice(0,2).map(x=>`${esc(x.k)} ${sg(x.d)}`).join(", "),pu.slice(0,3).map(x=>`${esc(x.k)} ${sg(x.d)}`).join(", ")].filter(Boolean).join("; ")}.`,
+      (cd.length||cu.length)&&`<b>Products:</b> ${[cd.slice(0,2).map(x=>`${esc(x.k)} ${sg(x.d)}`).join(", "),cu.slice(0,2).map(x=>`${esc(x.k)} ${sg(x.d)}`).join(", ")].filter(Boolean).join("; ")}.`
+    ].filter(Boolean).slice(0,4);
+    const bF=F.bands, bZ=Z.bands, big=b=>b[4].n, mid2=b=>b[2].n+b[3].n;
+    N.tr3Title=big(bF)>big(bZ)?`Orders of Rp100M+ fell from ${big(bF)} to ${big(bZ)}; Rp20–100M orders went ${mid2(bF)} → ${mid2(bZ)}`:`Order sizes from ${F.label} to ${Z.label}: average ${rp(F.aov)} → ${rp(Z.aov)}`;
+    N.tr3Notes=[
+      `<b>Very large orders:</b> ${big(bF)} orders of Rp100M+ in ${F.label} (${rp(bF[4].gmv)}) vs ${big(bZ)} in ${Z.label} (${rp(bZ[4].gmv)}).`,
+      (F.disc||Z.disc)&&`<b>Discounts</b> went ${rp(F.disc)} → ${rp(Z.disc)}${Z.disc<F.disc&&Z.gmv>=F.gmv*.8?", so the recovery was not bought with discounts":""}.`,
+      Z.openGmv&&`<b>${rp(Z.openGmv)} of ${Z.label} GMV is not completed yet</b> (${Z.openN} order${Z.openN===1?"":"s"})${Z.partGmv?`; ${rp(Z.partGmv)} is only partially paid`:""}.`
+    ].filter(Boolean);
+  }
+
   // Headline for the executive summary
   const dh=N.driver&&won?`${N.driver.hi.g} converts (${N.driver.hi.w} of ${N.driver.hi.n}); ${lc(N.driver.lo.g)} doesn't (${N.driver.lo.w} of ${N.driver.lo.n})`:null;
   const sF0=A.byFamily?.[0], sTail=sF0?` ${sF0.k} is ${pct(sF0.gmv,A.gmv||1)}% of GMV${A.outstanding>=A.gmv*.1?`, and ${rp(A.outstanding)} is still unpaid`:""}.`:"";
@@ -203,6 +236,8 @@ function narrative(A){
   if(A.missingRefs.length) F.splice(1,0,[`${A.missingRefs.length} CRM closing${A.missingRefs.length>1?"s":""}${A.missingVal?` (${rp(A.missingVal)})`:""} missing from sales`,`Their order numbers (${A.missingRefs.slice(0,3).map(x=>x.ref).join(", ")}${A.missingRefs.length>3?", …":""}) are not in the sales export.`]);
   if(A.wonFromNotes.length) F.push(["Closed deals are not marked as orders",`${A.wonFromNotes.length} win${A.wonFromNotes.length>1?"s are":" is"} still “${A.wonFromNotes[0].statusLogged||"blank"}” in the CRM although the notes say closing.`]);
   if(A.wow){ const W=A.wow; F.unshift([W.flat?"GMV flat vs the week before":`GMV ${W.up?"up":"down"} ${W.pc!=null?W.pc+"%":""} vs the week before`,`${rp(W.p.gmv)} → ${rp(W.c.gmv)}, mostly from ${W.drv}${W.lead?`; ${W.lead.k} moved most`:""}.`]); }
+  if(A.trend){ const T=A.trend; F.splice(A.wow?1:0,0,[T.flat?`GMV flat from ${T.F.label} to ${T.Z.label}`:`GMV ${T.up?"up":"down"} ${T.pc}% from ${T.F.label} to ${T.Z.label}`,
+    `${rp(T.F.gmv)} → ${rp(T.Z.gmv)}${T.explains?`; ${T.acc} that stopped ordering explain the drop, all other customers grew ${Math.round(T.restPct*100)}%`:`; orders ${T.F.orders} → ${T.Z.orders}`}.`]); }
   N.findings=F.slice(0,4);
 
   // Bottom line
@@ -231,6 +266,9 @@ function narrative(A){
     if(!W.up&&!W.flat&&W.retained.prev-W.retained.cur>W.lost.gmv&&W.retained.down) act.unshift({t:`Find out why ${W.retained.down} regular customer${W.retained.down>1?"s":""} bought less`,d:`Customers who ordered in both weeks spent ${rp(W.retained.prev)} → ${rp(W.retained.cur)}${W.family.find(x=>x.d<0)?`; ${W.family.find(x=>x.d<0).k} fell most`:""}. Check stock, price and delivery with each, and agree the next order size.`,o:"Sales PIC",w:"This week"});
     else if(!W.up&&!W.flat&&W.lost.n>=1) act.unshift({t:`Win back ${W.lost.n} customer${W.lost.n>1?"s":""} who bought the week before`,d:`They spent ${rp(W.lost.gmv)} the week before and nothing last week${W.family.find(x=>x.d<0)?`; ${W.family.find(x=>x.d<0).k} fell most`:""}. Ask what stopped them (stock, price, delivery or timing) and book the next order.`,o:"Sales PIC",w:"This week"});
     else if(W.up&&!W.flat) act.splice(1,0,{t:`Repeat what lifted GMV ${W.pc!=null?W.pc+"%":""}`,d:`The increase came from ${W.drv}${W.lead?`, led by ${W.lead.k}`:""}. ${W.gained.n?`Book a second order with the ${W.gained.n} new buyer${W.gained.n>1?"s":""} within two weeks.`:"Keep the same call list and offer next week."}`,o:"Team lead",w:"Next week"}); }
+  if(A.trend){ const T=A.trend, Z=T.Z, ns=T.stopped.length;
+    if(ns&&!T.up) act.splice(1,0,{t:`Win back ${T.acc} that stopped ordering`,d:`${andList(T.stopped.map(c=>c.label))} bought ${rp(T.stopped.reduce((s,c)=>s+c.tot,0))} in ${T.label} and nothing in ${Z.label}. Ask what changed (price, supplier, season) and agree the next order; don't let a few accounts carry the month.`,o:andList([...new Set(T.stopped.map(c=>c.pic).filter(Boolean))])||"Account PIC",w:"This week"});
+    if(Z.openGmv>=Z.gmv*.1) act.push({t:`Close out ${rp(Z.openGmv)} of ${Z.label} orders`,d:`${Z.openN} ${Z.label} order${Z.openN===1?" is":"s are"} not completed${Z.partGmv?` and ${rp(Z.partGmv)} is only partially paid`:""}. Confirm delivery and payment dates so the month's GMV is realised.`,o:"Order PIC + finance",w:"This week"}); }
   N.actions=act.slice(0,6);
   if(!N.bottom.p) N.bottom.p=N.actions[0]?`${N.actions[0].t}.`:"Keep logging every engagement so wins and losses can be compared.";
 
@@ -311,6 +349,32 @@ function teamSpecs(A,N,pre){
         {w:1.05,title:"Customer bridge",sub:"Lost, returning and new customers",chart:{type:"waterfall",fmt:rpM,lblH:40,steps:[{k:"Week before",v:p.gmv,total:true,color:"#8E9C84"},{k:`Lost\n${W.lost.n} cust.`,v:-W.lost.gmv},
           {k:`Both weeks\n${W.retained.n} cust.`,v:W.retained.cur-W.retained.prev},{k:`New\n${W.gained.n} cust.`,v:W.gained.gmv},{k:"Last week",v:c.gmv,total:true}]}},
         {w:1,title:"What moved GMV",sub:"Change by product type; hover for both weeks",chart:{type:"diverge",items:W.family.slice(0,6).map(x=>({k:x.k,v:x.d,tip:`${rp(x.prev)} → ${rp(x.cur)}`})),fmt:rpM}}]}],notes:N.wowNotes});
+  }
+
+  // Sales trend over the months in the export
+  if(A.trend){
+    const T=A.trend, F=T.F, Z=T.Z, M=T.M, ns=T.stopped.length, chg=(a,b)=>b?`${a>b?"▲":a<b?"▼":"="} ${Math.abs(Math.round((a-b)/b*100))}%`:"new";
+    const pk=T.weeks.indexOf(T.peakWeek), MC=M.length<=3?["#B3CC9F","#5E8C47","#274E13"].slice(3-M.length):RAMP.slice(0,M.length).reverse();
+    S.push({kicker:pre+`Sales trend · ${T.label}`,title:N.trTitle,rows:[{h:84,cards:[{kpiRow:[
+        {v:rpParts(Z.gmv)[0],u:rpParts(Z.gmv)[1],l:`${Z.label} GMV, ${chg(Z.gmv,F.gmv)} from ${rp(F.gmv)} in ${F.label}`,hot:true},{v:String(Z.orders),u:"",l:`orders in ${Z.label}, ${chg(Z.orders,F.orders)} from ${F.orders}`},
+        {v:String(Z.customers),u:"",l:`customers, ${chg(Z.customers,F.customers)} from ${F.customers}`},{v:rpParts(Z.aov)[0],u:rpParts(Z.aov)[1],l:`average order, ${chg(Z.aov,F.aov)} from ${rp(F.aov)}`}]}]},
+      {cards:[
+        {w:.95,title:"GMV by month",sub:ns?`${T.acc} that stopped ordering vs everyone else`:"Orders under each column",chart:{type:"column",stacked:true,cats:M.map(x=>`${x.label}\n${pl(x.orders,"order")}`),
+          series:ns?[{name:"All other customers",color:CAT[0],values:T.rest},{name:`${T.acc} that stopped`,color:CAT[3],values:T.stopBy}]:[{name:"GMV",color:CAT[0],values:M.map(x=>x.gmv)}],fmt:rpM,lblH:40}},
+        {w:1.3,title:"GMV by week",sub:`Monday–Sunday weeks; best week and the last week labelled`,chart:{type:"line",cats:T.weeks.map(w=>fds(w.d)),series:[{name:"GMV",color:CAT[0],values:T.weeks.map(w=>w.gmv)}],fmt:rpM,area:true,show:[...new Set([pk,T.weeks.length-1])],xEvery:2}}]}],notes:N.trNotes});
+    const CD=T.cat.length?T.cat:T.family, B=T.bridge;
+    S.push({kicker:pre+`Sales trend · what changed from ${F.label} to ${Z.label}`,title:N.tr2Title,rows:[{cards:[
+      {w:1.05,title:"Customer bridge",sub:`${F.label} GMV to ${Z.label} GMV by customer`,chart:{type:"waterfall",fmt:rpM,lblH:40,steps:[{k:F.label,v:F.gmv,total:true,color:"#8E9C84"},{k:`Not in ${Z.label}\n${B.lost.n} cust.`,v:-B.lost.gmv},
+        {k:`Both months\n${B.both.n} cust.`,v:B.both.cur-B.both.prev},{k:`Not in ${F.label}\n${B.gained.n} cust.`,v:B.gained.gmv},{k:Z.label,v:Z.gmv,total:true}]}},
+      {w:1,title:"Change by PIC",sub:`${F.label} → ${Z.label} GMV; hover for both months`,chart:{type:"diverge",items:T.pic.slice(0,6).map(x=>({k:x.k,v:x.d,tip:`${rp(x.prev)} → ${rp(x.cur)}`})),fmt:rpM}},
+      {w:1,title:T.cat.length?"Change by product category":"Change by product type",sub:`${F.label} → ${Z.label} GMV; hover for both months`,chart:{type:"diverge",items:CD.slice(0,6).map(x=>({k:x.k,v:x.d,tip:`${rp(x.prev)} → ${rp(x.cur)}`})),fmt:rpM}}]}],notes:N.tr2Notes});
+    const cards=[{w:.85,title:"Orders by size",sub:"Orders per month, by order value (Rp)",chart:{type:"column",cats:["Under 5M","5–20M","20–50M","50–100M","100M+"],series:M.map((x,i)=>({name:x.label,color:MC[i],values:x.bands.map(b=>b.n)})),lblH:36}}];
+    if(ns) cards.push({w:1.7,title:`${T.acc} that stopped ordering`,sub:"Names and phone numbers are left out; look accounts up by PIC and month",
+      table:{colW:[10,20,22,...M.map(()=>10),10],head:["Account","PIC","Product · region",...M.map(x=>x.label),"Last order"],align:["l","l","l",...M.map(()=>"r"),"l"],rows:T.stopped.map(c=>[{v:c.label.replace("Account ",""),bold:true},c.pic||"–",[c.cat,c.region].filter(Boolean).join(" · ")||"–",...c.by.map(v=>v?rp(v):"–"),fds(c.last)])}});
+    cards.push({w:.58,kpis:[{v:String(pct(T.retained.n,T.retained.of)),u:"%",l:`of ${F.label} customers ordered again later (${T.retained.n} of ${T.retained.of})`,hot:true},
+      {v:String(T.fresh.n),u:"",l:`${Z.label} customers new to the period (${rp(T.fresh.gmv)})`},
+      Z.openGmv?{v:rpParts(Z.openGmv)[0],u:rpParts(Z.openGmv)[1],l:`of ${Z.label} GMV not completed yet (${pl(Z.openN,"order")})`}:{v:rpParts(Z.aov)[0],u:rpParts(Z.aov)[1],l:`average ${Z.label} order`}]});
+    S.push({kicker:pre+`Sales trend · order size and accounts`,title:N.tr3Title,rows:[{cards}],notes:N.tr3Notes});
   }
 
   // Sales: what sold
@@ -440,6 +504,7 @@ function deckNarrative(T){
   X.cmpRows=[
     ["Sales GMV",T.map(t=>t.A.has.sales?rp(t.A.gmv):"–")],
     ...(T.some(t=>t.A.wow)?[["GMV vs the week before",T.map(t=>t.A.wow?`${rp(t.A.wow.p.gmv)} → ${rp(t.A.wow.c.gmv)} (${t.A.wow.pc!=null?(t.A.wow.up?"+":"−")+t.A.wow.pc+"%":"new"})`:"–")]]:[]),
+    ...(T.some(t=>t.A.trend)?[["GMV by month",T.map(t=>t.A.trend?`${t.A.trend.label}: ${t.A.trend.M.map(x=>rp(x.gmv)).join(" → ")}`:"–")]]:[]),
     ["Orders · customers",T.map(t=>t.A.has.sales?`${t.A.orders.length} · ${t.A.customers}`:"–")],
     ["Average order value",T.map(t=>t.A.orders.length?rp(t.A.gmv/t.A.orders.length):"–")],
     ["Top product type",T.map(t=>F(t)?`${F(t).k} (${pct(F(t).gmv,t.A.gmv)}%)`:"–")],

@@ -249,7 +249,7 @@ function analyse(sources){
   // Two or more weeks of sales (one file or several): analyse the latest Monday–Sunday week, keep the week before to compare
   const wkOf=d=>{ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()-(x.getDay()+6)%7); return +x; };
   const weeks=[...new Set(lines.filter(l=>l.date).map(l=>wkOf(l.date)))].sort((a,b)=>b-a);
-  let prevLines=[];
+  const allLines=lines.slice(); let prevLines=[];
   if(weeks.length>=2){ prevLines=lines.filter(l=>l.date&&wkOf(l.date)===weeks[1]);
     const keep=lines.filter(l=>!l.date||wkOf(l.date)===weeks[0]); lines.splice(0,lines.length,...keep);
     A.weekStart=new Date(weeks[0]); A.prevStart=new Date(weeks[1]); A.olderWeeks=weeks.length-2; }
@@ -328,6 +328,9 @@ function analyse(sources){
       family:delta(c.family,p.family),region:delta(c.region,p.region),pic:delta(c.pic,p.pic),app:delta(c.app,p.app),cat:delta(c.cat,p.cat),
       retained:{n:ret.length,cur:sum(c.cust,ret),prev:sum(p.cust,ret),down:ret.filter(k=>c.cust.get(k)<p.cust.get(k)).length,up:ret.filter(k=>c.cust.get(k)>p.cust.get(k)).length},gained:{n:gain.length,gmv:sum(c.cust,gain)},lost:{n:lost.length,gmv:sum(p.cust,lost),top:lost.map(k=>p.cust.get(k)).sort((a,b)=>b-a)[0]||0},
       exTop:{cur:c.gmv-c.top,prev:p.gmv-p.top},start:A.weekStart,prevStart:A.prevStart}; }
+
+  // ---- Month-by-month trend when the sales export covers two or more full months
+  A.trend=monthTrend(allLines);
 
   // ---- Link CRM to sales: phone, then order reference in notes, then first name + same PIC
   const picTok=p=>firstTok(p);
@@ -477,6 +480,45 @@ function weekSummary(L){
     newOrders:O.filter(o=>o.lines.some(l=>/new/i.test(l.custStatus||""))).length,
     family:by(l=>l.family),region:by(l=>l.region),pic:by(l=>l.pic),app:by(l=>l.app),cat:by(l=>l.category||(L.some(x=>x.category)?"(no category)":null)),
     days:by(l=>l.date?String((l.date.getDay()+6)%7):null)};
+}
+
+// Month-by-month trend over every full month in the sales export: totals, the customer bridge from the first to the
+// last month, accounts that stopped ordering, and what changed by PIC, product and order size.
+const TBANDS=[["Under Rp5M",0,5e6],["Rp5–20M",5e6,20e6],["Rp20–50M",20e6,50e6],["Rp50–100M",50e6,100e6],["Rp100M+",100e6,Infinity]];
+function monthTrend(L){
+  const dated=L.filter(l=>l.date); if(!dated.length) return null;
+  const ts=dated.map(l=>+l.date), lo=Math.min(...ts), hi=Math.max(...ts), mk=d=>d.getFullYear()*12+d.getMonth(), DAY3=3*864e5;
+  const months=[]; for(let m=mk(new Date(lo));m<=mk(new Date(hi));m++){ const a=new Date(Math.floor(m/12),m%12,1), b=new Date(Math.floor(m/12),m%12+1,0); if(lo<=+a+DAY3&&hi>=+b-DAY3) months.push(m); }
+  if(months.length<2) return null;
+  const M=months.map(m=>{ const ls=dated.filter(l=>mk(l.date)===m), om=new Map();
+    ls.forEach((l,i)=>{ const k=l.orderNo||l.invoice||`line-${m}-${i}`; if(!om.has(k)) om.set(k,{gmv:0,lines:[]}); const o=om.get(k); o.gmv+=l.gmv||0; o.lines.push(l); });
+    const O=[...om.values()], open=O.filter(o=>o.lines.some(l=>l.soStatus&&!/complete|done|selesai/i.test(l.soStatus))), part=O.filter(o=>o.lines.some(l=>/partial/i.test(l.payStatus||"")));
+    return {m,label:MON[m%12],...weekSummary(ls),O,disc:ls.reduce((s,l)=>s+(l.discount||0),0),
+      openGmv:open.reduce((s,o)=>s+o.gmv,0),openN:open.length,partGmv:part.reduce((s,o)=>s+o.gmv,0),partN:part.length,
+      bands:TBANDS.map(([k,a,b])=>{ const os=O.filter(o=>o.gmv>=a&&o.gmv<b); return {k,n:os.length,gmv:os.reduce((s,o)=>s+o.gmv,0)}; })}; });
+  const F=M[0], Z=M[M.length-1], ckey=l=>l.ph||l.nk||l.orderNo||l.invoice;
+  // customers across the months
+  const C=new Map(); dated.filter(l=>months.includes(mk(l.date))).forEach(l=>{ const k=ckey(l); if(!k) return; if(!C.has(k)) C.set(k,{k,by:months.map(()=>0),lines:[]}); const c=C.get(k); c.by[months.indexOf(mk(l.date))]+=l.gmv||0; c.lines.push(l); });
+  const cs=[...C.values()].map(c=>({...c,tot:c.by.reduce((s,v)=>s+v,0),last:new Date(Math.max(...c.lines.map(l=>+l.date)))}));
+  const total=M.reduce((s,x)=>s+x.gmv,0);
+  // accounts that stopped: bought before the last month, nothing in it, and big enough to move the total
+  const stopped=cs.filter(c=>!c.by[c.by.length-1]&&c.tot>=Math.max(total*.04,F.gmv*.08)).sort((a,b)=>b.tot-a.tot).slice(0,5).map((c,i)=>{ const top=(f)=>countBy(c.lines,f)[0]?.[0]||null;
+    return {...c,label:`Account ${String.fromCharCode(65+i)}`,pic:top(l=>l.pic),region:top(l=>l.region),cat:sumBy(c.lines,l=>l.category||l.family,l=>l.gmv||0)[0]?.[0]||null}; });
+  const stopBy=months.map((_,i)=>stopped.reduce((s,c)=>s+c.by[i],0)), rest=M.map((x,i)=>x.gmv-stopBy[i]);
+  const inF=cs.filter(c=>c.by[0]), inZ=cs.filter(c=>c.by[c.by.length-1]), both=inF.filter(c=>c.by[c.by.length-1]);
+  const lost=inF.filter(c=>!c.by[c.by.length-1]), gained=inZ.filter(c=>!c.by[0]), fresh=inZ.filter(c=>c.by.slice(0,-1).every(v=>!v));
+  const sum=(a,i)=>a.reduce((s,c)=>s+c.by[i],0), L1=months.length-1;
+  const delta=(mc,mp)=>[...new Set([...mc.keys(),...mp.keys()])].map(k=>({k,cur:mc.get(k)||0,prev:mp.get(k)||0})).map(x=>({...x,d:x.cur-x.prev})).filter(x=>x.d).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
+  // weekly GMV inside the months
+  const wkOf=d=>{ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()-(x.getDay()+6)%7); return +x; };
+  const W=new Map(); dated.filter(l=>months.includes(mk(l.date))).forEach(l=>{ const k=wkOf(l.date); W.set(k,(W.get(k)||0)+(l.gmv||0)); });
+  const weeks=[...W].sort((a,b)=>a[0]-b[0]).map(([k,g])=>({d:new Date(k),gmv:g}));
+  const low=M.slice().sort((a,b)=>a.gmv-b.gmv)[0];
+  return {M,F,Z,months,label:`${F.label}–${Z.label}`,dG:Z.gmv-F.gmv,pct:F.gmv?(Z.gmv-F.gmv)/F.gmv:null,total,low,weeks,peakWeek:weeks.slice().sort((a,b)=>b.gmv-a.gmv)[0],
+    stopped,stopBy,rest,restPct:rest[0]?(rest[L1]-rest[0])/rest[0]:null,
+    bridge:{lost:{n:lost.length,gmv:sum(lost,0)},both:{n:both.length,prev:sum(both,0),cur:sum(both,L1)},gained:{n:gained.length,gmv:sum(gained,L1)}},
+    retained:{n:inF.filter(c=>c.by.slice(1).some(v=>v)).length,of:inF.length},fresh:{n:fresh.length,gmv:sum(fresh,L1)},
+    pic:delta(Z.pic,F.pic),cat:delta(Z.cat,F.cat),family:delta(Z.family,F.family),region:delta(Z.region,F.region)};
 }
 
 /* ================= Teams ================= */

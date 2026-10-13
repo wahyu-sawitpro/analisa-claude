@@ -47,6 +47,10 @@ PPTX (no native charts, so Google Slides keeps every label). Chart types: column
      bridge (lost, returning and new customers as a waterfall) and what moved GMV by product type (diverging bars).
      The notes explain an increase or a drop: order count vs order size, products, customers, the effect of the
      largest order, and the biggest PIC and region swings; the next steps add a win-back or repeat action
+   - Sales trend (shown when the sales exports cover two or more full months, e.g. a Jul–Sep export): three slides.
+     GMV by month split into accounts that stopped ordering vs everyone else, GMV by week; a customer bridge from the
+     first to the last month and the change by PIC and product category; orders by size band per month, the accounts
+     that stopped ordering (anonymised, with PIC, product, region and last order), retention and orders not yet completed
    - Sales · what sold: GMV by product type and by product category (columns), units anchor, basket, price gaps
    - Sales · who bought and how: region (or customer role), average order by channel and customer type, sales PIC,
      unpaid, open and CRM-less orders
@@ -67,12 +71,17 @@ covering both weeks. Sales lines are grouped into Monday–Sunday weeks by order
 "last week" and the one before is the comparison. The same order line in two files counts once. Without a second week
 the comparison slide is skipped and the upload bar suggests adding it.
 
+## Month-by-month trend
+Add a longer sales export (for example `Smallholder sales jul - sep.csv`) next to the weekly files. Months the data
+covers in full (from the first to the last few days) form the trend; a partial month such as the current one is left
+out. The weekly slides still use the latest week, and the same order line in two files counts once.
+
 ## Files
 - `index.html`: built deck, ready to open
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: last week's five exports (3 Smallholder, 2 Plantation) with phone numbers and names replaced by anonymous tokens
+- `src/sample-data.json`: last week's five exports (3 Smallholder, 2 Plantation) plus the Smallholder Jul–Sep sales export, with phone numbers and names replaced by anonymous tokens
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
 ## Findings for the week of 5–11 Oct 2026 (sample data)
@@ -86,6 +95,11 @@ Smallholder
   One closing names order #B2C25867 (Rp33.2M), which is not in the sales export (refund and adjustment noted).
 - Lead source: TikTok 3 of 3 ordered, database 1 of 23. 29 of 41 leads who didn't order can still be won back.
 - Joko Prestiwo and Simon Sutrado Simanjuntak closed 4 orders (Rp85.2M) with no CRM entry.
+
+- Jul–Sep: GMV Rp2.41B → Rp1.64B → Rp2.25B (−7% Jul to Sep). Three wholesale fertilizer accounts of one PIC
+  (Rp1.06B in Jul, 44% of the month) stopped ordering after 25 Jul, 7 Aug and 27 Aug; all other customers grew 67%
+  (Rp1.35B → Rp2.25B). Orders of Rp100M+ fell from 6 to 1 while Rp20–100M orders rose from 16 to 38. 24 of 67 July
+  customers ordered again later; Rp569M of September GMV is not completed yet.
 
 Plantation
 - Rp16.5M from 4 orders, down 69% from Rp53.1M: same number of orders, much smaller (last week's Rp40.8M seed order did not repeat).

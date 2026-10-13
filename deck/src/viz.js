@@ -52,7 +52,7 @@ function columnChart(o,W,H){
   const gw=Math.min(band*.62,o.stacked||S.length===1?70:S.length*34), bw=o.stacked?gw:(gw-(S.length-1)*3)/S.length;
   o.cats.forEach((c,i)=>{ const cx=band*i+band/2; let y=base; const cl=String(c).split("\n")[0];
     S.forEach((se,si)=>{ const v=se.values[i]||0; if(!v){ if(S.length===1&&!o.stacked&&o.labels!==false) P.push(cT(cx-30,base-18,60,16,(o.vfmt||fmt)(0,i,si),{size:11.5,bold:true,align:"center"})); return; } const h=Math.max(2,plotH*v/mx), col=se.colors?.[i]||se.color, tip=`${cl}${S.length>1?` · ${se.name}`:""}: ${fmt(v)}`;
-      if(o.stacked){ P.push(cR(cx-gw/2,y-h,gw,Math.max(1.5,h-(y<base?2:0)),col,tip,3)); if(h>=16&&gw>=22) P.push(cT(cx-gw/2,y-h,gw,h,String(v),{size:10,bold:true,color:onC(col),align:"center"})); y-=h; }
+      if(o.stacked){ P.push(cR(cx-gw/2,y-h,gw,Math.max(1.5,h-(y<base?2:0)),col,tip,3)); if(h>=16&&gw>=22) P.push(cT(cx-gw/2,y-h,gw,h,o.fmt?fmt(v):String(v),{size:10,bold:true,color:onC(col),align:"center"})); y-=h; }
       else { const x=cx-gw/2+si*(bw+3); P.push(cR(x,base-h,bw,h,col,tip,4));
         if(o.labels!==false) P.push(cT(x-24,base-h-18,bw+48,16,(o.vfmt||fmt)(v,i,si),{size:S.length>2?10:11.5,bold:true,align:"center"})); } });
     if(o.stacked&&o.labels!==false) P.push(cT(cx-40,y-18,80,16,(o.vfmt||fmt)(tot(i),i),{size:11.5,bold:true,align:"center"}));
