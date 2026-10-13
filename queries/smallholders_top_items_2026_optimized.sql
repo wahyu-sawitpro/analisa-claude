@@ -5,6 +5,10 @@
 --   total_qty    : total kuantitas (dm.quantity / d.qty / e.quantity,
 --                  sama dengan kolom qty di combined_sales)
 --   customer_count: jumlah customer unik yang membeli item tsb
+--   total_gmv    : sum(sales_amount + shipping_cost), sama dengan gmv di
+--                  final_result asli. Catatan: invoice datamart_ecommerce yang
+--                  juga lolos branch 2b ikut terhitung dua kali (sama seperti
+--                  query GMV asli); begitu juga total_qty.
 -- Diurutkan dari order_count terbanyak.
 -- Turunan dari smallholders_invoice_count_monthly_2026_optimized.sql
 -- (filter & catatan di file itu tetap berlaku).
@@ -266,25 +270,38 @@ WITH
     -- (C) Baris sumber penjualan (pengganti combined_sales)
     -- ------------------------------------------------------------------
     ecommerce_rows AS (
-      -- branch 1: datamart_ecommerce. Tanpa window count() (hanya dipakai
-      -- untuk sales_amount), jadi semua filter langsung di tabel sumber.
-      SELECT
-        CAST(toDate(dm.sale_order_created_time) AS Nullable(Date)) AS sale_order_date,
-        CAST(dm.item AS Nullable(String)) AS item_name,
-        CAST(dm.invoice_no AS Nullable(String)) AS invoice_no,
-        CAST(dm.user_id AS Nullable(String)) AS user_id,
-        CAST(ifNull(dm.quantity, 0) AS Int64) AS qty
-        -- CAST(ifNull(dm.total_price_idr + ifNull(dm.total_shipping_cost /
-        --   nullIf(count(dm.item) OVER (PARTITION BY dm.invoice_no), 0), 0), 0) AS Int64) AS sales_amount,
-        -- CAST(ifNull(dm.total_shipping_cost, 0) AS Int64) AS shipping_cost
+      -- branch 1: datamart_ecommerce. Window count() per invoice (pembagi
+      -- ongkir di sales_amount) harus dihitung sebelum filter tanggal & item;
+      -- filter level-invoice (= PARTITION BY) tetap aman di dalam.
+      SELECT sale_order_date, item_name, invoice_no, user_id, qty, sales_amount, shipping_cost
       FROM
-        sawitpro_datamart.datamart_ecommerce dm
-        INNER JOIN default.sale_order so ON so.id = dm.sale_order_id
+        (
+          SELECT
+            CAST(toDate(dm.sale_order_created_time) AS Nullable(Date)) AS sale_order_date,
+            CAST(dm.item AS Nullable(String)) AS item_name,
+            CAST(dm.invoice_no AS Nullable(String)) AS invoice_no,
+            CAST(dm.user_id AS Nullable(String)) AS user_id,
+            CAST(ifNull(dm.quantity, 0) AS Int64) AS qty,
+            CAST(
+              ifNull(
+                dm.total_price_idr + ifNull(
+                  dm.total_shipping_cost / nullIf(count(dm.item) OVER (PARTITION BY dm.invoice_no), 0),
+                  0
+                ),
+                0
+              ) AS Int64
+            ) AS sales_amount,
+            CAST(ifNull(dm.total_shipping_cost, 0) AS Int64) AS shipping_cost
+          FROM
+            sawitpro_datamart.datamart_ecommerce dm
+            INNER JOIN default.sale_order so ON so.id = dm.sale_order_id
+          WHERE
+            dm.invoice_status IN ('PAID', 'PARTIAL_PAID')
+            AND dm.sale_order_status NOT IN ('CANCELLED', 'CANCELED', 'DRAFT')
+            AND dm.invoice_no IN (SELECT invoice_no FROM smallholder_invoices)
+        )
       WHERE
-        dm.invoice_status IN ('PAID', 'PARTIAL_PAID')
-        AND dm.sale_order_status NOT IN ('CANCELLED', 'CANCELED', 'DRAFT')
-        AND dm.invoice_no IN (SELECT invoice_no FROM smallholder_invoices)
-        AND toYear(sale_order_date) >= 2026
+        toYear(sale_order_date) >= 2026
         AND sale_order_date >= period_start
         AND sale_order_date < period_end
     ),
@@ -295,9 +312,9 @@ WITH
         CAST(item AS Nullable(String)) AS item_name,
         CAST(invoice_no AS Nullable(String)) AS invoice_no,
         CAST(user_id AS Nullable(String)) AS user_id,
-        CAST(ifNull(qty, 0) AS Int64) AS qty
-        -- CAST(ifNull(potential_gmvs, 0) AS Int64) AS sales_amount,
-        -- CAST(ifNull(shipping_cost, 0) AS Int64) AS shipping_cost
+        CAST(ifNull(qty, 0) AS Int64) AS qty,
+        CAST(ifNull(potential_gmvs, 0) AS Int64) AS sales_amount,
+        CAST(ifNull(shipping_cost, 0) AS Int64) AS shipping_cost
       FROM
         (
           SELECT
@@ -310,8 +327,8 @@ WITH
             toString(d.sale_order_status) AS sale_order_status,
             d.order_line_state AS order_line_state,
             d.source_name AS source_name,
-            -- CAST(d.potential_gmv AS Nullable(Float64)) AS potential_gmvs,
-            -- CAST(ifNull(toFloat64OrNull(toString(d.shipping_cost)), 0) AS Nullable(Float64)) AS shipping_cost,
+            CAST(d.potential_gmv AS Nullable(Float64)) AS potential_gmvs,
+            CAST(ifNull(toFloat64OrNull(toString(d.shipping_cost)), 0) AS Nullable(Float64)) AS shipping_cost,
             COALESCE(NULLIF(dop1.pic_teams, ''), NULLIF(dop_fallback.pic_teams, '')) AS pic_teams_raw,
             COALESCE(NULLIF(dop1.pic_names, ''), NULLIF(dop_fallback.pic_names, '')) AS pic_names,
             multiIf(
@@ -390,9 +407,9 @@ WITH
         CAST(item AS Nullable(String)) AS item_name,
         CAST(invoice_no AS Nullable(String)) AS invoice_no,
         CAST(user_id AS Nullable(String)) AS user_id,
-        CAST(ifNull(qty, 0) AS Int64) AS qty
-        -- CAST(ifNull(potential_gmvs, 0) AS Int64) AS sales_amount,
-        -- CAST(ifNull(shipping_cost, 0) AS Int64) AS shipping_cost
+        CAST(ifNull(qty, 0) AS Int64) AS qty,
+        CAST(ifNull(potential_gmvs, 0) AS Int64) AS sales_amount,
+        CAST(ifNull(shipping_cost, 0) AS Int64) AS shipping_cost
       FROM
         (
           SELECT
@@ -403,8 +420,8 @@ WITH
             e.item AS item,
             e.invoice_status AS invoice_status,
             toString(e.sale_order_status) AS sale_order_status,
-            -- CAST(e.potential_gmv AS Nullable(Float64)) AS potential_gmvs,
-            -- CAST(ifNull(toFloat64OrNull(toString(e.total_shipping_cost)), 0) AS Nullable(Float64)) AS shipping_cost,
+            CAST(e.potential_gmv AS Nullable(Float64)) AS potential_gmvs,
+            CAST(ifNull(toFloat64OrNull(toString(e.total_shipping_cost)), 0) AS Nullable(Float64)) AS shipping_cost,
             COALESCE(NULLIF(dop.pic_teams, ''), NULLIF(dop_fallback_ec.pic_teams, '')) AS pic_teams_raw,
             COALESCE(NULLIF(dop.pic_names, ''), NULLIF(dop_fallback_ec.pic_names, '')) AS pic_names,
             multiIf(
@@ -462,12 +479,13 @@ SELECT
   trimBoth(item_name) AS item,
   uniqExact(invoice_no) AS order_count,
   sum(qty) AS total_qty,
-  uniqExactIf(trimBoth(user_id), trimBoth(ifNull(user_id, '')) != '') AS customer_count
+  uniqExactIf(trimBoth(user_id), trimBoth(ifNull(user_id, '')) != '') AS customer_count,
+  sum(sales_amount + shipping_cost) AS total_gmv
 FROM
   (
-    SELECT sale_order_date AS order_date, item_name, invoice_no, user_id, qty FROM ecommerce_rows
+    SELECT sale_order_date AS order_date, item_name, invoice_no, user_id, qty, sales_amount, shipping_cost FROM ecommerce_rows
     UNION ALL
-    SELECT sale_order_date AS order_date, item_name, invoice_no, user_id, qty FROM shopify_rows
+    SELECT sale_order_date AS order_date, item_name, invoice_no, user_id, qty, sales_amount, shipping_cost FROM shopify_rows
   )
 WHERE
   toYear(order_date) >= 2026
