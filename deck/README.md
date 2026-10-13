@@ -71,21 +71,39 @@ covering both weeks. Sales lines are grouped into Monday–Sunday weeks by order
 "last week" and the one before is the comparison. The same order line in two files counts once. Without a second week
 the comparison slide is skipped and the upload bar suggests adding it.
 
-## Month-by-month trend
-Add a longer sales export (for example `Smallholder sales jul - sep.csv`) next to the weekly files. Months the data
-covers in full (from the first to the last few days) form the trend; a partial month such as the current one is left
-out. The weekly slides still use the latest week, and the same order line in two files counts once.
+## Two kinds of review
+- **Weekly review** (default): the sales data ends part-way through a month, e.g. the last two weeks. The deck covers
+  last week, compares it with the week before and, when a longer export is also uploaded, adds the trend slides.
+- **Sales trend / decline review**: the sales data ends on a full month and covers two or more full months, e.g. a
+  Jul–Sep export. The cover becomes “Sales Decline Review · <Team> Sales Jul–Sep” (or “Sales Trend Review” when GMV
+  rose), the executive summary and next steps are about the change across the months, and the sales slides cover the
+  whole period (“Sales Jul–Sep · …”). CRM exports are analysed on their own and labelled with their own dates
+  (“CRM 5–9 Oct · …”), since they rarely cover the same months; their engagements are matched to buyers by phone to
+  show whether the team is calling the customers it lost.
+
+Months the data covers in full form the trend; a partial month is left out. The same order line in two files counts once.
 
 ## Files
 - `index.html`: built deck, ready to open
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: last week's five exports (3 Smallholder, 2 Plantation) plus the Smallholder Jul–Sep sales export, with phone numbers and names replaced by anonymous tokens
+- `src/sample-data.json`: the Smallholder Jul–Sep sales export and the CRM engagement export, with phone numbers and names replaced by anonymous tokens
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
-## Findings for the week of 5–11 Oct 2026 (sample data)
-The sample is the five exports for this week: Smallholder sales (last 2 weeks), Smallholder CRM rejection reasons and
+## Findings for Jul–Sep 2026 (sample data: sales decline review)
+The sample is the two Smallholder exports in the repo: sales Jul–Sep (371 order lines, 237 orders) and the CRM
+engagement export (41 engagements, all dated 5–9 Oct).
+- GMV Rp2.41B → Rp1.64B → Rp2.25B (−7% Jul to Sep), August the low point (52 orders from 36 customers).
+- Three wholesale fertilizer accounts of one PIC (Rp1.06B in Jul, 44% of the month) stopped ordering after 25 Jul,
+  7 Aug and 27 Aug. All other customers grew 67% (Rp1.35B → Rp2.25B); Khusus Petani +Rp655M.
+- Orders of Rp100M+ fell from 6 to 1; Rp20–100M orders rose from 16 to 38. Only 24 of 67 July customers ordered again.
+- Rp569M of September GMV is not completed yet (Rp311M only partially paid).
+- Only 3 of the 41 October CRM engagements went to past buyers; 1 of 62 lapsed customers and none of the 3 stopped
+  accounts were contacted, and the PIC of those accounts logged no engagements.
+
+## Findings for the week of 5–11 Oct 2026 (earlier weekly sample)
+That sample was the five exports for that week: Smallholder sales (last 2 weeks), Smallholder CRM rejection reasons and
 success story, Plantation sales (last 2 weeks) and the Plantation CRM closing log (“success story + additional data”).
 
 Smallholder
@@ -95,11 +113,6 @@ Smallholder
   One closing names order #B2C25867 (Rp33.2M), which is not in the sales export (refund and adjustment noted).
 - Lead source: TikTok 3 of 3 ordered, database 1 of 23. 29 of 41 leads who didn't order can still be won back.
 - Joko Prestiwo and Simon Sutrado Simanjuntak closed 4 orders (Rp85.2M) with no CRM entry.
-
-- Jul–Sep: GMV Rp2.41B → Rp1.64B → Rp2.25B (−7% Jul to Sep). Three wholesale fertilizer accounts of one PIC
-  (Rp1.06B in Jul, 44% of the month) stopped ordering after 25 Jul, 7 Aug and 27 Aug; all other customers grew 67%
-  (Rp1.35B → Rp2.25B). Orders of Rp100M+ fell from 6 to 1 while Rp20–100M orders rose from 16 to 38. 24 of 67 July
-  customers ordered again later; Rp569M of September GMV is not completed yet.
 
 Plantation
 - Rp16.5M from 4 orders, down 69% from Rp53.1M: same number of orders, much smaller (last week's Rp40.8M seed order did not repeat).

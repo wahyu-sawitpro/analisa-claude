@@ -82,7 +82,7 @@ function buildPptx(T,DX){
       {text:DX.bottom.p,options:{fontSize:16,bold:true,color:"FFFFFF",breakLine:true,paraSpaceAfter:10}},{text:DX.bottom.s,options:{fontSize:10.5,color:"D8E3CF"}}],{x:X(774),y:X(338),w:X(362),h:X(286),fit:"shrink"}); }
 
   // Teams at a glance
-  if(DX.multi){ const sl=content("Teams at a glance",DX.cmpTitle), tot=T.reduce((s,t)=>s+t.A.gmv,0), TC=["274E13","D9A21B","6E8F5A","5B7F95"];
+  if(DX.multi&&!DX.trend){ const sl=content("Teams at a glance",DX.cmpTitle), tot=T.reduce((s,t)=>s+t.A.gmv,0), TC=["274E13","D9A21B","6E8F5A","5B7F95"];
     if(tot){ box(sl,80,180,1080,96); heading(sl,100,192,600,"Share of GMV");
       let x=100; T.forEach((t,i)=>{ const w=Math.max(4,1040*t.A.gmv/tot); sl.addShape(pres.shapes.RECTANGLE,{x:X(x),y:X(222),w:X(w-2),h:X(38),fill:{color:TC[i]},line:{color:TC[i],width:0}});
         if(t.A.gmv/tot>.12) txt(sl,`${t.name} · ${rp(t.A.gmv)} (${pct(t.A.gmv,tot)}%)`,{x:X(x+10),y:X(222),w:X(w-20),h:X(38),fontSize:11,bold:true,color:"FFFFFF",valign:"middle"});
@@ -102,6 +102,7 @@ function buildPptx(T,DX){
       txt(sl,[t.A.has.sales&&`${rp(t.A.gmv)} from ${t.A.orders.length} orders`,t.A.crm.length&&`${t.A.crm.length} CRM engagements`].filter(Boolean).join(" · "),{x:X(131),y:X(460),w:X(900),h:0.4,fontSize:16,bold:true,color:"E4ECDD"});
       txt(sl,String(i+1).padStart(2,"0"),{x:X(900),y:X(500),w:X(300),h:X(170),fontSize:130,bold:true,color:"FFFFFF",transparency:85,align:"right"}); }
     teamBlock(t.A,t.N,DX.multi?`${t.name} · `:"");
+    if(t.C&&t.NC) teamBlock(t.C,t.NC,`${DX.multi?`${t.name} · `:""}CRM ${crmSpan(t.C)} · `);
   });
 
   // Draw chart primitives (see viz.js) as plain shapes and text boxes.
@@ -134,7 +135,7 @@ function buildPptx(T,DX){
   function teamBlock(A,N,pre){ teamSpecs(A,N,pre).forEach(panelSlide); }
 
   // Next steps
-  { const sl=content("Next steps",`${DX.actions.length} actions for the coming week`);
+  { const sl=content("Next steps",`${DX.actions.length} actions ${DX.trend?"to recover sales":"for the coming week"}`);
     const nc=DX.actions.length>4?3:2, cw=nc===3?(1080-2*14)/3:532, gap=nc===3?14:16;
     DX.actions.forEach((a,i)=>{ const x=80+(i%nc)*(cw+gap), y=180+Math.floor(i/nc)*205; box(sl,x,y,cw,190);
       txt(sl,[{text:`${i+1}  `,options:{color:"D9A21B",bold:true,fontSize:12}},{text:a.t,options:{color:"274E13",bold:true,fontSize:nc===3?12:13}}],{x:X(x+18),y:X(y+14),w:X(cw-36),h:X(40),fit:"shrink"});

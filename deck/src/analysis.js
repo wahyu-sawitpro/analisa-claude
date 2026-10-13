@@ -233,7 +233,7 @@ const familyOf=v=>{ const s=norm(v); if(!s) return null; const f=FAMILIES.find((
 const regionOf=v=>{ const s=clean(v); if(!s) return null; const t=s.toUpperCase().replace(/^(KABUPATEN|KAB\.?|KOTA)\s+/,"").replace(/\s+(CITY|REGENCY)$/,"").trim();
   return t.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()); };
 
-function analyse(sources){
+function analyse(sources,opt={}){
   const A={crmSources:[],salesSources:[]}; const crm=[], lines=[];
   for(const d of sources){ const role=d.role&&d.role!=="auto"?d.role:detectRole(d.headers), label=srcLabel(d);
     if(role==="sales"){ const m=detectSales(d.headers); A.salesSources.push(label); for(const r of d.rows) if(Object.values(r).some(v=>!blank(v))) lines.push(canonSale(r,m,label)); }
@@ -250,12 +250,15 @@ function analyse(sources){
   const wkOf=d=>{ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()-(x.getDay()+6)%7); return +x; };
   const weeks=[...new Set(lines.filter(l=>l.date).map(l=>wkOf(l.date)))].sort((a,b)=>b-a);
   const allLines=lines.slice(); let prevLines=[];
-  if(weeks.length>=2){ prevLines=lines.filter(l=>l.date&&wkOf(l.date)===weeks[1]);
+  // Trend review (a multi-month export): analyse every full month together instead of the latest week
+  if(opt.trend){ A.mode="trend"; A.trend=monthTrend(lines);
+    if(A.trend){ const mk=d=>d.getFullYear()*12+d.getMonth(); lines.splice(0,lines.length,...lines.filter(l=>l.date&&A.trend.months.includes(mk(l.date)))); } }
+  if(!opt.trend&&weeks.length>=2){ prevLines=lines.filter(l=>l.date&&wkOf(l.date)===weeks[1]);
     const keep=lines.filter(l=>!l.date||wkOf(l.date)===weeks[0]); lines.splice(0,lines.length,...keep);
     A.weekStart=new Date(weeks[0]); A.prevStart=new Date(weeks[1]); A.olderWeeks=weeks.length-2; }
   // CRM rows outside the sales week belong to another week's review
   // (a closing that names an order is placed in the week of that order, whatever date the log gives it)
-  if(weeks.length){ const w0=weeks[0], w1=w0+7*864e5, nos=L=>new Set(L.map(l=>String(l.orderNo||"").toUpperCase())), cur=nos(lines), pw=nos(prevLines);
+  if(!opt.trend&&weeks.length){ const w0=weeks[0], w1=w0+7*864e5, nos=L=>new Set(L.map(l=>String(l.orderNo||"").toUpperCase())), cur=nos(lines), pw=nos(prevLines);
     const place=o=>o.refs.some(r=>cur.has(r))?0:o.refs.some(r=>pw.has(r))?-1:!o.date?0:+o.date<w0?-1:+o.date>=w1?1:0;
     const out=crm.filter(o=>place(o)!==0);
     A.crmBefore=out.filter(o=>place(o)<0).length; A.crmAfter=out.filter(o=>place(o)>0).length; A.weekStart=A.weekStart||new Date(w0);
@@ -330,7 +333,7 @@ function analyse(sources){
       exTop:{cur:c.gmv-c.top,prev:p.gmv-p.top},start:A.weekStart,prevStart:A.prevStart}; }
 
   // ---- Month-by-month trend when the sales export covers two or more full months
-  A.trend=monthTrend(allLines);
+  if(!opt.trend) A.trend=monthTrend(allLines);
 
   // ---- Link CRM to sales: phone, then order reference in notes, then first name + same PIC
   const picTok=p=>firstTok(p);
@@ -493,7 +496,7 @@ function monthTrend(L){
   const M=months.map(m=>{ const ls=dated.filter(l=>mk(l.date)===m), om=new Map();
     ls.forEach((l,i)=>{ const k=l.orderNo||l.invoice||`line-${m}-${i}`; if(!om.has(k)) om.set(k,{gmv:0,lines:[]}); const o=om.get(k); o.gmv+=l.gmv||0; o.lines.push(l); });
     const O=[...om.values()], open=O.filter(o=>o.lines.some(l=>l.soStatus&&!/complete|done|selesai/i.test(l.soStatus))), part=O.filter(o=>o.lines.some(l=>/partial/i.test(l.payStatus||"")));
-    return {m,label:MON[m%12],...weekSummary(ls),O,disc:ls.reduce((s,l)=>s+(l.discount||0),0),
+    return {m,label:MON[m%12],...weekSummary(ls),O,newGmv:ls.filter(l=>/new/i.test(l.custStatus||"")).reduce((s,l)=>s+(l.gmv||0),0),hasCust:ls.some(l=>l.custStatus),disc:ls.reduce((s,l)=>s+(l.discount||0),0),
       openGmv:open.reduce((s,o)=>s+o.gmv,0),openN:open.length,partGmv:part.reduce((s,o)=>s+o.gmv,0),partN:part.length,
       bands:TBANDS.map(([k,a,b])=>{ const os=O.filter(o=>o.gmv>=a&&o.gmv<b); return {k,n:os.length,gmv:os.reduce((s,o)=>s+o.gmv,0)}; })}; });
   const F=M[0], Z=M[M.length-1], ckey=l=>l.ph||l.nk||l.orderNo||l.invoice;
@@ -515,7 +518,7 @@ function monthTrend(L){
   const weeks=[...W].sort((a,b)=>a[0]-b[0]).map(([k,g])=>({d:new Date(k),gmv:g}));
   const low=M.slice().sort((a,b)=>a.gmv-b.gmv)[0];
   return {M,F,Z,months,label:`${F.label}–${Z.label}`,dG:Z.gmv-F.gmv,pct:F.gmv?(Z.gmv-F.gmv)/F.gmv:null,total,low,weeks,peakWeek:weeks.slice().sort((a,b)=>b.gmv-a.gmv)[0],
-    stopped,stopBy,rest,restPct:rest[0]?(rest[L1]-rest[0])/rest[0]:null,
+    stopped,stopBy,rest,cust:cs,restPct:rest[0]?(rest[L1]-rest[0])/rest[0]:null,
     bridge:{lost:{n:lost.length,gmv:sum(lost,0)},both:{n:both.length,prev:sum(both,0),cur:sum(both,L1)},gained:{n:gained.length,gmv:sum(gained,L1)}},
     retained:{n:inF.filter(c=>c.by.slice(1).some(v=>v)).length,of:inF.length},fresh:{n:fresh.length,gmv:sum(fresh,L1)},
     pic:delta(Z.pic,F.pic),cat:delta(Z.cat,F.cat),family:delta(Z.family,F.family),region:delta(Z.region,F.region)};
@@ -533,7 +536,7 @@ function detectTeam(d){
 }
 // Split the selected sources into one analysis per team. Sales files with a team column are split row by row.
 function analyseTeams(sources){
-  const parts=new Map(), add=(t,d)=>{ if(!parts.has(t)) parts.set(t,[]); parts.get(t).push(d); };
+  const TR=trendMode(sources), parts=new Map(), add=(t,d)=>{ if(!parts.has(t)) parts.set(t,[]); parts.get(t).push(d); };
   for(const d of sources){
     const role=d.role&&d.role!=="auto"?d.role:detectRole(d.headers), col=role==="sales"&&(!d.team||d.team==="auto")?detectSales(d.headers).team:null;
     const split=col?countBy(d.rows,r=>teamOf(r[col])):[];
@@ -545,5 +548,28 @@ function analyseTeams(sources){
   if(parts.has("_")&&named.length===1){ parts.get(named[0]).push(...parts.get("_")); parts.delete("_"); }
   const order=["Smallholder","Plantation"];
   return [...parts].sort((a,b)=>(order.indexOf(a[0])+1||9)-(order.indexOf(b[0])+1||9))
-    .map(([name,srcs])=>{ const A=analyse(srcs); return {name:name==="_"?(A.team?A.team.replace(/s$/,""):"Team"):name,A,sources:srcs}; });
+    .map(([name,srcs])=>{ const sales=srcs.filter(d=>d.role==="sales"), crm=srcs.filter(d=>d.role!=="sales");
+      // trend review: sales over the months, CRM analysed on its own (its dates rarely match the sales months)
+      let A=TR&&sales.length?analyse(sales,{trend:true}):null, C=null;
+      if(A&&A.trend){ if(crm.length){ C=analyse(crm); C.mode="crm"; linkTrendCrm(A,C); } } else A=analyse(srcs);
+      return {name:name==="_"?(A.team?A.team.replace(/s$/,""):"Team"):name,A,C,sources:srcs}; });
+}
+// A trend review is for exports that end on a full month and cover at least two full months (e.g. Jul–Sep).
+function trendMode(sources){
+  const ds=[]; for(const d of sources){ const role=d.role&&d.role!=="auto"?d.role:detectRole(d.headers); if(role!=="sales") continue;
+    const c=detectSales(d.headers).date; if(c) for(const r of d.rows){ const x=toDate(r[c]); if(x) ds.push(+x); } }
+  if(!ds.length) return false; const hi=new Date(Math.max(...ds)), lo=Math.min(...ds), D3=3*864e5;
+  if(+hi<+new Date(hi.getFullYear(),hi.getMonth()+1,0)-D3) return false;
+  return lo<=+new Date(hi.getFullYear(),hi.getMonth()-1,1)+D3;
+}
+// Who the CRM engagements reached, against the customers the trend lost: past buyers, lapsed customers, stopped accounts, per PIC.
+function linkTrendCrm(A,C){
+  const T=A.trend, last=T.months.length-1, ph=new Map(), pk=v=>{ const t=(clean(v)||"").toLowerCase().replace(/[^a-z ]/g,"").split(" ").filter(w=>w.length>1); return t.length?t[0]+" "+(t[t.length-1]||""):null; };
+  T.cust.forEach(c=>c.lines.forEach(l=>{ if(l.ph) ph.set(l.ph,c); }));
+  const hit=new Map(); C.crm.forEach(r=>{ const c=r.ph&&ph.get(r.ph); if(c) hit.set(c.k,c); });
+  const lapsed=T.cust.filter(c=>!c.by[last]), H=[...hit.values()], eng=countBy(C.crm,r=>pk(r.pic)), mainPic=c=>countBy(c.lines,l=>l.pic)[0]?.[0];
+  const pics=T.pic.map(x=>{ const e=eng.find(([k])=>k===pk(x.k)); const lp=lapsed.filter(c=>mainPic(c)===x.k); return {p:x.k,d:x.d,prev:x.prev,cur:x.cur,eng:e?e[1]:0,lapsed:lp.length,lapsedHit:lp.filter(c=>hit.has(c.k)).length}; });
+  const others=eng.filter(([k])=>!T.pic.some(x=>pk(x.k)===k)).map(([k,n])=>({p:C.crm.find(r=>pk(r.pic)===k).pic,d:0,prev:0,cur:0,eng:n,lapsed:0,lapsedHit:0}));
+  T.crm={n:C.crm.length,span:span(C.crm.map(r=>r.date)),past:H.length,pastGmv:H.reduce((s,c)=>s+c.tot,0),lapsed:lapsed.length,lapsedGmv:lapsed.reduce((s,c)=>s+c.tot,0),
+    lapsedHit:H.filter(c=>!c.by[last]).length,stoppedHit:T.stopped.filter(s=>hit.has(s.k)).length,pics:[...pics,...others]};
 }
