@@ -397,7 +397,7 @@ FROM
       WHERE
         upper(invoice_status) IN ('PAID', 'PARTIAL_PAID')
         AND upper(sale_order_status) NOT IN ('CANCELLED', 'CANCELED', 'DRAFT')
-        AND order_line_state <> 'cancel'
+        AND ifNull(order_line_state, '') <> 'cancel'  -- NULL bukan cancel, tetap dihitung
         AND Sales_App <> 'Marketplace'
         AND pic_teams = 'Smallholders'
         AND item NOT IN ('Biaya Layanan', 'Minyak Goreng 1 Liter - Minyak Hemat Petani Hebat')

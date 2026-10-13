@@ -399,80 +399,83 @@ WITH
         AND Sales_App <> 'Marketplace'
         AND pic_teams = 'Smallholders'
         AND item NOT IN ('Biaya Layanan', 'Minyak Goreng 1 Liter - Minyak Hemat Petani Hebat')
-      UNION ALL
-      -- branch 2b: `sh` bagian datamart_ecommerce (lolos karena ifNull di
-      -- filter order_line_state). order_line_state selalu NULL di sini.
-      SELECT
-        CAST(toDate(dates) AS Nullable(Date)) AS sale_order_date,
-        CAST(item AS Nullable(String)) AS item_name,
-        CAST(invoice_no AS Nullable(String)) AS invoice_no,
-        CAST(user_id AS Nullable(String)) AS user_id,
-        CAST(ifNull(qty, 0) AS Int64) AS qty,
-        CAST(ifNull(potential_gmvs, 0) AS Int64) AS sales_amount,
-        CAST(ifNull(shipping_cost, 0) AS Int64) AS shipping_cost
-      FROM
-        (
-          SELECT
-            CAST(toTimeZone(e.sale_order_created_time, 'Asia/Jakarta') AS Nullable(Date)) AS dates,
-            e.invoice_no AS invoice_no,
-            e.user_id AS user_id,
-            CAST(e.quantity AS Nullable(Float64)) AS qty,
-            e.item AS item,
-            e.invoice_status AS invoice_status,
-            toString(e.sale_order_status) AS sale_order_status,
-            CAST(e.potential_gmv AS Nullable(Float64)) AS potential_gmvs,
-            CAST(ifNull(toFloat64OrNull(toString(e.total_shipping_cost)), 0) AS Nullable(Float64)) AS shipping_cost,
-            COALESCE(NULLIF(dop.pic_teams, ''), NULLIF(dop_fallback_ec.pic_teams, '')) AS pic_teams_raw,
-            COALESCE(NULLIF(dop.pic_names, ''), NULLIF(dop_fallback_ec.pic_names, '')) AS pic_names,
-            multiIf(
-              so_main.app_type = '', 'OTHERS',
-              so_main.app_type = 'ADMIN_WEB', 'DRAFT ORDER',
-              so_main.app_type = 'MEMBER', 'AGEN',
-              so_main.app_type
-            ) AS app_type_prev,
-            -- source_name branch ini selalu 'shopify_draft_order'/'PRO-APP'
-            -- -> selalu Non-Marketplace, order_source = upper(app_type_prev)
-            upper(app_type_prev) AS order_source,
-            if(
-              concat('#', splitByChar('/', ifnull(invoice_no, '')) [2]) like '%B2B%'
-              AND (app_type_prev ilike '%Draft%' OR order_source = 'MITRA')
-              AND pic_names IS NULL,
-              'Unclaimed',
-              pic_teams_raw
-            ) AS pic_teams
-          FROM
-            sawitpro_datamart.datamart_ecommerce AS e
-            INNER JOIN default.sale_order AS so_main ON e.sale_order_id = so_main.id
-            -- INNER join tetap: membuang user fraud (dan menjaga multiplisitas)
-            INNER JOIN (
-              SELECT id FROM default.user WHERE fraud_flag != 5
-            ) AS u_e ON u_e.id = e.user_id
-            LEFT JOIN pic_sh AS dop ON dop.invoice_no = e.invoice_no
-            -- ALL join: bisa menggandakan baris -> wajib dipertahankan
-            LEFT JOIN (
-              SELECT il.order_lark AS order_no, dp.pic_teams, dp.pic_names
-              FROM lark_sh AS il
-              INNER JOIN pic_sh AS dp ON il.invoice_lark = dp.invoice_no
-              WHERE il.order_lark != ''
-            ) AS dop_fallback_ec ON dop_fallback_ec.order_no = e.order_no
-          WHERE
-            ((e.invoice_status = 'PAID') OR (toString(e.sale_order_status) IN ('COMPLETED', '32')))
-            -- anti-join ke fct dipersempit ke invoice Smallholders (hasil sama)
-            AND e.invoice_no NOT IN (
-              SELECT invoice_no
-              FROM sawitpro_datamart.fct_new_sale_order_shopify
-              WHERE invoice_no IN (SELECT invoice_no FROM smallholder_invoices)
-            )
-            AND e.invoice_no IN (SELECT invoice_no FROM smallholder_invoices)
-            AND dates >= '2026-01-01'
-            AND dates >= period_start
-            AND dates < period_end
-        )
-      WHERE
-        upper(invoice_status) IN ('PAID', 'PARTIAL_PAID')
-        AND upper(sale_order_status) NOT IN ('CANCELLED', 'CANCELED', 'DRAFT')
-        AND pic_teams = 'Smallholders'
-        AND item NOT IN ('Biaya Layanan', 'Minyak Goreng 1 Liter - Minyak Hemat Petani Hebat')
+      -- [DI-COMMENT] branch 2b: invoice datamart_ecommerce ini sudah dihitung
+      -- di branch 1 (ecommerce_rows), jadi GMV/qty-nya dobel (terbukti di
+      -- smallholders_gmv_2026_diff_check.sql: 2b = 1_datamart, 31 invoice yang sama).
+--       UNION ALL
+--       -- branch 2b: `sh` bagian datamart_ecommerce (lolos karena ifNull di
+--       -- filter order_line_state). order_line_state selalu NULL di sini.
+--       SELECT
+--         CAST(toDate(dates) AS Nullable(Date)) AS sale_order_date,
+--         CAST(item AS Nullable(String)) AS item_name,
+--         CAST(invoice_no AS Nullable(String)) AS invoice_no,
+--         CAST(user_id AS Nullable(String)) AS user_id,
+--         CAST(ifNull(qty, 0) AS Int64) AS qty,
+--         CAST(ifNull(potential_gmvs, 0) AS Int64) AS sales_amount,
+--         CAST(ifNull(shipping_cost, 0) AS Int64) AS shipping_cost
+--       FROM
+--         (
+--           SELECT
+--             CAST(toTimeZone(e.sale_order_created_time, 'Asia/Jakarta') AS Nullable(Date)) AS dates,
+--             e.invoice_no AS invoice_no,
+--             e.user_id AS user_id,
+--             CAST(e.quantity AS Nullable(Float64)) AS qty,
+--             e.item AS item,
+--             e.invoice_status AS invoice_status,
+--             toString(e.sale_order_status) AS sale_order_status,
+--             CAST(e.potential_gmv AS Nullable(Float64)) AS potential_gmvs,
+--             CAST(ifNull(toFloat64OrNull(toString(e.total_shipping_cost)), 0) AS Nullable(Float64)) AS shipping_cost,
+--             COALESCE(NULLIF(dop.pic_teams, ''), NULLIF(dop_fallback_ec.pic_teams, '')) AS pic_teams_raw,
+--             COALESCE(NULLIF(dop.pic_names, ''), NULLIF(dop_fallback_ec.pic_names, '')) AS pic_names,
+--             multiIf(
+--               so_main.app_type = '', 'OTHERS',
+--               so_main.app_type = 'ADMIN_WEB', 'DRAFT ORDER',
+--               so_main.app_type = 'MEMBER', 'AGEN',
+--               so_main.app_type
+--             ) AS app_type_prev,
+--             -- source_name branch ini selalu 'shopify_draft_order'/'PRO-APP'
+--             -- -> selalu Non-Marketplace, order_source = upper(app_type_prev)
+--             upper(app_type_prev) AS order_source,
+--             if(
+--               concat('#', splitByChar('/', ifnull(invoice_no, '')) [2]) like '%B2B%'
+--               AND (app_type_prev ilike '%Draft%' OR order_source = 'MITRA')
+--               AND pic_names IS NULL,
+--               'Unclaimed',
+--               pic_teams_raw
+--             ) AS pic_teams
+--           FROM
+--             sawitpro_datamart.datamart_ecommerce AS e
+--             INNER JOIN default.sale_order AS so_main ON e.sale_order_id = so_main.id
+--             -- INNER join tetap: membuang user fraud (dan menjaga multiplisitas)
+--             INNER JOIN (
+--               SELECT id FROM default.user WHERE fraud_flag != 5
+--             ) AS u_e ON u_e.id = e.user_id
+--             LEFT JOIN pic_sh AS dop ON dop.invoice_no = e.invoice_no
+--             -- ALL join: bisa menggandakan baris -> wajib dipertahankan
+--             LEFT JOIN (
+--               SELECT il.order_lark AS order_no, dp.pic_teams, dp.pic_names
+--               FROM lark_sh AS il
+--               INNER JOIN pic_sh AS dp ON il.invoice_lark = dp.invoice_no
+--               WHERE il.order_lark != ''
+--             ) AS dop_fallback_ec ON dop_fallback_ec.order_no = e.order_no
+--           WHERE
+--             ((e.invoice_status = 'PAID') OR (toString(e.sale_order_status) IN ('COMPLETED', '32')))
+--             -- anti-join ke fct dipersempit ke invoice Smallholders (hasil sama)
+--             AND e.invoice_no NOT IN (
+--               SELECT invoice_no
+--               FROM sawitpro_datamart.fct_new_sale_order_shopify
+--               WHERE invoice_no IN (SELECT invoice_no FROM smallholder_invoices)
+--             )
+--             AND e.invoice_no IN (SELECT invoice_no FROM smallholder_invoices)
+--             AND dates >= '2026-01-01'
+--             AND dates >= period_start
+--             AND dates < period_end
+--         )
+--       WHERE
+--         upper(invoice_status) IN ('PAID', 'PARTIAL_PAID')
+--         AND upper(sale_order_status) NOT IN ('CANCELLED', 'CANCELED', 'DRAFT')
+--         AND pic_teams = 'Smallholders'
+--         AND item NOT IN ('Biaya Layanan', 'Minyak Goreng 1 Liter - Minyak Hemat Petani Hebat')
     )
 -- hasil akhir: ranking item
 SELECT
