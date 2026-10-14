@@ -735,7 +735,7 @@ function acquisition(sources){
       const w=wk||new Date(jd.getFullYear(),jd.getMonth(),jd.getDate()-((jd.getDay()+6)%7));
       const under=m.type?isUnder(r[m.type]):!blank(r[m.duta]);
       const test=under&&(String(r[m.test]??"").trim()==="1"||/^true$/i.test(String(r[m.test]??""))||/test/i.test(String(r[m.dutaName]??"")));
-      R.push({w:+w,jd,under,test,real:under&&!test,src:clean(r[m.source])||(under?"Duta":"Unknown"),camp:clean(r[m.campaign])||"(no campaign)",
+      R.push({w:+w,jd,under,test,real:under&&!test,src:clean(r[m.source])||(under?"Duta":"Unknown"),camp:(clean(r[m.campaign])||"").replace(/_/g," ").trim()||"No campaign",
         status:clean(r[m.status]),duta:clean(r[m.duta]),dname:dutaLabel(r[m.dutaName])||clean(r[m.duta]),phone:!blank(r[m.phone])}); } }
   const all=[...new Set(R.map(r=>r.w))].sort((a,b)=>a-b), lastW=all[all.length-1], lastJ=Math.max(...R.filter(r=>r.w===lastW&&r.jd).map(r=>+r.jd));
   const dropped=all.length>2&&lastJ<lastW+6*864e5?{w:lastW,n:R.filter(r=>r.w===lastW).length,to:new Date(lastJ)}:null;

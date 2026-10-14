@@ -80,7 +80,7 @@ deck (other files are left out). Last week = the latest full registration week; 
 before the Sunday, e.g. the week of 12 Oct with data to 14 Oct) is left out and the slide says so. Slides:
 - **Duta vs non-Duta:** last week vs the week before (count, change, change %, share). Internal-team Dutas
   (`is_test_duta` = 1) and external Dutas are both Duta; the farmers-by-Duta table shows each Duta's user name without
-  "Test", type, last week, the week before, all weeks and Sale / Leads.
+  "Test", type, last week, the week before and all weeks. Slides use plain labels, not raw field names.
 - **What moved the total:** waterfall by channel (`utm_source`) and the largest campaign moves (`utm_source_name`, non-Duta).
 - **Weekly trend:** farmers per week by channel, and farmers per day last week vs the week before.
 - **Channels in detail:** channel table with the 4-week average, campaign table, farmers without a phone number.
