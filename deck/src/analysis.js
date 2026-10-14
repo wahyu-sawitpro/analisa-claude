@@ -723,6 +723,8 @@ function forecastStock(lines,P,target){
 
 /* ================= Farmer acquisition (Duta vs non-Duta) ================= */
 const ACQ_SRC_ORDER=["Organic","GADN","Meta","Identified Campaigns","Duta"];
+// Duta display name: internal-team Duta accounts carry "Test" in the name; show the user name without it.
+const dutaLabel=v=>{ const t=(clean(v)||"").replace(/\btest\b/ig,"").replace(/\s+/g," ").trim(); return t?t.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase()):null; };
 const isUnder=v=>/under|^duta$/i.test(String(v||""))&&!/non/i.test(String(v||""));
 // Weekly registrations from the export: the last full week against the week before, split by Duta / non-Duta, channel and campaign.
 // A week that is still in progress (its data stops before the Sunday) is left out.
@@ -734,7 +736,7 @@ function acquisition(sources){
       const under=m.type?isUnder(r[m.type]):!blank(r[m.duta]);
       const test=under&&(String(r[m.test]??"").trim()==="1"||/^true$/i.test(String(r[m.test]??""))||/test/i.test(String(r[m.dutaName]??"")));
       R.push({w:+w,jd,under,test,real:under&&!test,src:clean(r[m.source])||(under?"Duta":"Unknown"),camp:clean(r[m.campaign])||"(no campaign)",
-        status:clean(r[m.status]),duta:clean(r[m.duta]),phone:!blank(r[m.phone])}); } }
+        status:clean(r[m.status]),duta:clean(r[m.duta]),dname:dutaLabel(r[m.dutaName])||clean(r[m.duta]),phone:!blank(r[m.phone])}); } }
   const all=[...new Set(R.map(r=>r.w))].sort((a,b)=>a-b), lastW=all[all.length-1], lastJ=Math.max(...R.filter(r=>r.w===lastW&&r.jd).map(r=>+r.jd));
   const dropped=all.length>2&&lastJ<lastW+6*864e5?{w:lastW,n:R.filter(r=>r.w===lastW).length,to:new Date(lastJ)}:null;
   const weeks=dropped?all.slice(0,-1):all;
@@ -751,6 +753,12 @@ function acquisition(sources){
   const camps=P?[...new Set([...L.camp.keys(),...P.camp.keys()])].map(k=>({k,p:P.camp.get(k)||0,l:L.camp.get(k)||0})).map(o=>({...o,d:o.l-o.p})).sort((a,b)=>a.d-b.d):[];
   const base=W.slice(Math.max(0,W.length-5),-1), avg=base.length?base.reduce((s,x)=>s+x.total,0)/base.length:null;
   const peak=W.reduce((m,x)=>x.total>m.total?x:m,W[0]);
-  return {weeks:W,L,P,srcs,dSrc,camps,avg,avgN:base.length,peak,dropped,rows:R.length,realAll:R.filter(r=>r.real).length,underAll:R.filter(r=>r.under).length,
+  // per Duta: farmers last week, the week before and over all weeks shown; internal team (is_test_duta) or external
+  const inW=new Set(weeks), U=R.filter(r=>r.under&&inW.has(r.w)), dk=[...new Set(U.map(r=>r.dname||"(no Duta name)"))];
+  const dutas=dk.map(k=>{ const x=U.filter(r=>(r.dname||"(no Duta name)")===k);
+    return {k,internal:x.some(r=>r.test),l:x.filter(r=>r.w===L.w).length,p:P?x.filter(r=>r.w===P.w).length:0,tot:x.length,
+      sale:x.filter(r=>/sale/i.test(r.status||"")).length,leads:x.filter(r=>/lead/i.test(r.status||"")).length,weeks:new Set(x.map(r=>r.w)).size}; })
+    .sort((a,b)=>b.l-a.l||b.tot-a.tot||a.k.localeCompare(b.k));
+  return {weeks:W,L,P,dutas,srcs,dSrc,camps,avg,avgN:base.length,peak,dropped,rows:R.length,realAll:R.filter(r=>r.real).length,underAll:R.filter(r=>r.under).length,
     realWeeks:W.filter(x=>x.real).length,lastDate:dropped?dropped.to:new Date(lastJ),dates:R.map(r=>r.jd).filter(Boolean),files:sources.map(srcLabel)};
 }

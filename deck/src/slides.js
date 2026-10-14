@@ -363,26 +363,23 @@ const srcC=(k,i)=>SRC_C[k]||EXTRA[i%EXTRA.length];
 function acqSpecs(Q,pre){
   const S=[], L=Q.L, P=Q.P, W=Q.weeks, d=P?L.total-P.total:0, dn=P?L.non-P.non:0, du=P?L.under-P.under:0;
   const drops=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d), ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), top=drops[0];
-  // 1. Duta vs non-Duta
+  // 1. Duta vs non-Duta (internal-team Dutas and external Dutas are both Duta)
+  const D=Q.dutas, act=D.filter(x=>x.l), intN=D.filter(x=>x.internal).length;
   const rowsT=[
-    [{v:"Under Duta",bold:true},P?nf.format(P.under):"–",{v:nf.format(L.under),bold:true},P?sg(du):"–",P?spc(L.under,P.under):"–",P?`${(L.under/L.total*100).toFixed(1)}%`:"–"],
-    ["   of which test Duta accounts",P?nf.format(P.test):"–",nf.format(L.test),P?sg(L.test-P.test):"–",P?spc(L.test,P.test):"–",""],
-    ["   of which real Dutas",P?nf.format(P.real):"–",nf.format(L.real),P?sg(L.real-P.real):"–",P?spc(L.real,P.real):"–",""],
+    [{v:"Duta",bold:true},P?nf.format(P.under):"–",{v:nf.format(L.under),bold:true},P?sg(du):"–",P?spc(L.under,P.under):"–",`${(L.under/L.total*100).toFixed(1)}%`],
+    ["   Internal-team Dutas",P?nf.format(P.test):"–",nf.format(L.test),P?sg(L.test-P.test):"–",P?spc(L.test,P.test):"–",""],
+    ["   External Dutas",P?nf.format(P.real):"–",nf.format(L.real),P?sg(L.real-P.real):"–",P?spc(L.real,P.real):"–",""],
     [{v:"Non Duta",bold:true},P?nf.format(P.non):"–",{v:nf.format(L.non),bold:true},P?sg(dn):"–",P?spc(L.non,P.non):"–",`${(L.non/L.total*100).toFixed(1)}%`],
     [{v:"Total farmers",bold:true},P?{v:nf.format(P.total),bold:true}:"–",{v:nf.format(L.total),bold:true},P?{v:sg(d),bold:true}:"–",P?{v:spc(L.total,P.total),bold:true}:"–","100%"]];
+  const rowsD=D.slice(0,12).map(x=>[{v:x.k,bold:!!x.l},x.internal?"Internal team":"External",P?(x.p?nf.format(x.p):"–"):"–",x.l?{v:nf.format(x.l),bold:true}:"–",nf.format(x.tot),`${x.sale} / ${x.leads}`]);
   S.push({kicker:pre+"Acquisition · Duta vs non-Duta",
-    title:P?`${nf.format(L.total)} farmers joined last week, ${sg(d)} (${spc(L.total,P.total)}) on the week before; ${L.real?`${L.real} came through a real Duta`:"none came through a real Duta"}`:`${nf.format(L.total)} farmers joined in the week of ${L.label}`,
-    rows:[{h:84,cards:[{kpiRow:[
-      {v:nf.format(L.total),u:"",l:`farmers registered ${L.label}${P?` (${nf.format(P.total)} the week before, ${spc(L.total,P.total)})`:""}`,hot:true},
-      {v:nf.format(L.non),u:"",l:`non-Duta (${(L.non/L.total*100).toFixed(1)}% of farmers)${P?`, ${sg(dn)} on the week before`:""}`},
-      {v:nf.format(L.under),u:"",l:`under a Duta${P?`, ${sg(du)} on the week before`:""}; ${L.test} from test Duta accounts`},
-      {v:nf.format(L.real),u:"",l:`from real Dutas last week; ${Q.weeks.reduce((s,x)=>s+x.real,0)} in all ${W.length} weeks`}]}]},
+    title:P?`Dutas brought ${nf.format(L.under)} farmers last week (${sg(du)}), ${(L.under/L.total*100).toFixed(1)}% of ${nf.format(L.total)}; non-Duta ${nf.format(L.non)} (${sg(dn)})`:`Dutas brought ${nf.format(L.under)} of ${nf.format(L.total)} farmers in the week of ${L.label}`,
+    rows:[
       {cards:[
-        {w:1.45,title:"Duta vs non-Duta, last week vs the week before",sub:P?`${P.label} vs ${L.label}`:L.label,table:{colW:[30,13,13,12,11,13],head:["Farmers",P?`Week before (${P.short})`:"Week before",`Last week (${L.short})`,"Change","Change %","Share last week"],align:["l","r","r","r","r","r"],rows:rowsT}},
-        {w:1,title:"Under-Duta farmers by week",sub:"Test Duta accounts vs real Dutas",chart:{type:"column",stacked:true,cats:W.map(x=>x.short),
-          series:[{name:"Test Duta account",color:"#B9C2B0",values:W.map(x=>x.test)},{name:"Real Duta",color:CAT[3],values:W.map(x=>x.real)}],lblH:24}}]}],
+        {w:1.1,title:"Duta vs non-Duta, last week vs the week before",sub:P?`${P.label} vs ${L.label}`:L.label,table:{colW:[30,13,13,12,11,13],head:["Farmers",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change","Change %","Share last week"],align:["l","r","r","r","r","r"],rows:rowsT}},
+        {w:1,title:"Farmers by Duta",sub:`Last week first; ${W.length} weeks = ${W[0].short} – ${L.short}`,table:{colW:[30,22,13,13,12,16],head:["Duta","Type",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,`${W.length} weeks`,"Sale / Leads"],align:["l","l","r","r","r","r"],rows:rowsD}}]}],
     notes:[
-      `<b>Under Duta is a test channel today:</b> ${L.test} of the ${L.under} under-Duta farmers last week${P?` and ${P.test} of ${P.under} the week before`:""} sit under Duta accounts flagged as test (is_test_duta = 1 or “Test” in the name); their status was Sale ${L.sale} / Leads ${L.leads}${P?` (week before ${P.sale} / ${P.leads})`:""}. Across ${W.length} weeks only ${Q.weeks.reduce((s,x)=>s+x.real,0)} farmer${Q.weeks.reduce((s,x)=>s+x.real,0)===1?"":"s"} came through a real Duta.`,
+      `<b>Dutas:</b> ${L.under} farmers last week came through ${act.length} Duta${act.length===1?"":"s"} (${act.map(x=>`${x.k} ${x.l}`).join(", ")||"none"}), all ${L.real?"":"from "}${L.real?`${L.test} internal team, ${L.real} external`:"internal-team Dutas"}. ${intN} of the ${D.length} Dutas with farmers in ${W.length} weeks are internal team; external Dutas brought ${Q.weeks.reduce((s,x)=>s+x.real,0)}.`,
       Q.dropped&&`<b>Week left out:</b> the week of ${fds(new Date(Q.dropped.w))} (${nf.format(Q.dropped.n)} farmers to ${fds(Q.dropped.to)}) is still in progress, so last week is ${L.label}.`].filter(Boolean)});
   // 2. What moved the total
   if(P){ const steps=[{k:`Week before\n${P.short}`,v:P.total,total:true},...Q.dSrc.filter(x=>x.d).sort((a,b)=>a.d-b.d).map(x=>({k:x.k,v:x.d})),{k:`Last week\n${L.short}`,v:L.total,total:true,color:CAT[0]}];
@@ -425,25 +422,27 @@ function acqSpecs(Q,pre){
   return S;
 }
 function acqNarrative(T){
-  const Q=T[0].A.acq, L=Q.L, P=Q.P, d=P?L.total-P.total:0, top=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0], ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), realAll=Q.weeks.reduce((s,x)=>s+x.real,0);
+  const Q=T[0].A.acq, L=Q.L, P=Q.P, d=P?L.total-P.total:0, top=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0], ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), extAll=Q.weeks.reduce((s,x)=>s+x.real,0);
+  const D=Q.dutas, act=D.filter(x=>x.l), intD=D.filter(x=>x.internal), extD=D.filter(x=>!x.internal), lead=[...D].sort((a,b)=>b.tot-a.tot)[0];
   const topC=Q.camps[0], gainC=Q.camps[Q.camps.length-1], X={multi:false,acq:true,gaps:[],dates:Q.dates};
   X.eyebrow="Farmer Acquisition"; X.title="Duta vs Non-Duta Last Week"; X.period=`Week of ${L.label} ${new Date(L.w).getFullYear()}`; X.meta=P?`vs ${P.label}`:`${nf.format(L.total)} farmers`;
-  X.headline=P?`${nf.format(L.total)} farmers joined last week, ${sg(d)} (${spc(L.total,P.total)}); ${pct(L.non,L.total)}% came without a Duta and ${L.real?`${L.real} through a real Duta`:"none through a real Duta"}`:`${nf.format(L.total)} farmers joined in the week of ${L.label}`;
+  X.headline=P?`${nf.format(L.total)} farmers joined last week, ${sg(d)} (${spc(L.total,P.total)}): ${nf.format(L.under)} through Dutas (${sg(L.under-P.under)}) and ${nf.format(L.non)} without (${sg(L.non-P.non)})`:`${nf.format(L.total)} farmers joined in the week of ${L.label}`;
   X.kpis=[{v:nf.format(L.total),u:"",l:`farmers registered ${L.label}${P?`, ${sg(d)} (${spc(L.total,P.total)}) on ${P.label}`:""}`,hot:true},
     {v:nf.format(L.non),u:"",l:`non-Duta${P?`: ${sg(L.non-P.non)} (${spc(L.non,P.non)}) on the week before`:""}`},
-    {v:nf.format(L.under),u:"",l:`under a Duta${P?`: ${sg(L.under-P.under)} (${spc(L.under,P.under)}); all ${L.test===L.under?"":`but ${L.under-L.test} `}from test Duta accounts`:""}`},
-    {v:nf.format(L.real),u:"",l:`from real Dutas last week; ${realAll} in ${Q.weeks.length} weeks`}];
+    {v:nf.format(L.under),u:"",l:`under a Duta${P?`: ${sg(L.under-P.under)} (${spc(L.under,P.under)}) on the week before`:""}`},
+    {v:String(act.length),u:`/${D.length}`,l:`Dutas registered a farmer last week (${act.map(x=>x.k).join(", ")||"none"})`}];
   X.findings=[
     top&&[`${top.k} drove the drop`,`${top.k} fell from ${nf.format(top.p)} to ${nf.format(top.l)} (${sg(top.d)}), ${pct(-top.d,Math.max(1,-d))}% of the ${nf.format(Math.abs(d))} fewer farmers.${topC&&topC.d<0?` The “${topC.k}” campaign alone went ${nf.format(topC.p)} → ${nf.format(topC.l)}.`:""}`],
-    [`Under Duta is test accounts, not Dutas`,`${L.test} of ${L.under} under-Duta farmers last week${P?` and ${P.test} of ${P.under} the week before`:""} sit under test Duta accounts. Only ${realAll} farmer${realAll===1?"":"s"} in ${Q.weeks.length} weeks came through a real Duta.`],
+    P&&[`Dutas halved, from a small base`,`${nf.format(P.under)} → ${nf.format(L.under)} farmers (${(L.under/L.total*100).toFixed(1)}% of all). ${act.length} of ${D.length} Dutas registered a farmer last week; ${lead?`${lead.k} leads with ${lead.tot} in ${Q.weeks.length} weeks`:""}. ${intD.length} of the ${D.length} are internal team, external Dutas brought ${extAll}.`],
     ups.length&&[`Paid channels held up`,`${ups.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}; “${gainC.k}” added ${sg(gainC.d)} farmers.`],
     P&&[`The week before was a peak`,`${nf.format(P.total)} farmers with ${Math.max(...P.days)} on one day; last week is ${Q.avg?`${spc(L.total,Q.avg)} on the ${Q.avgN}-week average of ${nf.format(Math.round(Q.avg))}`:""}, still ${spc(L.total,Q.weeks[0].total)} on the week of ${Q.weeks[0].short}.`]].filter(Boolean).slice(0,4);
-  X.bottom={p:`Non-Duta channels bring ${pct(L.non,L.total)}% of farmers; the Duta channel has not yet brought real farmers. Win back ${top?top.k.toLowerCase():"organic"} registrations and start real Dutas.`,
-    s:`Farmers counted by registration week (minggu_register).${Q.dropped?` The week of ${fds(new Date(Q.dropped.w))} is in progress and left out.`:""} Under Duta = akuisisi_type “Under Duta”; test = is_test_duta 1 or “Test” in the Duta name.`};
+  X.bottom={p:`Non-Duta channels bring ${pct(L.non,L.total)}% of farmers. Win back ${top?top.k.toLowerCase():"organic"} registrations, and get every Duta registering farmers each week.`,
+    s:`Farmers counted by registration week (minggu_register).${Q.dropped?` The week of ${fds(new Date(Q.dropped.w))} is in progress and left out.`:""} Duta = akuisisi_type “Under Duta”, internal-team and external Dutas alike.`};
+  const idle=D.filter(x=>!x.l);
   X.actions=[
-    {t:"Take test Duta accounts out of the acquisition count",d:`${Q.weeks.reduce((s,x)=>s+x.test,0)} farmers in ${Q.weeks.length} weeks sit under test Duta accounts. Exclude is_test_duta = 1 from the report, or move these farmers to their real channel, so Under Duta shows real Dutas only.`,o:"",w:""},
-    {t:"Set a weekly target for real Duta acquisition",d:`${realAll} real-Duta farmer${realAll===1?"":"s"} in ${Q.weeks.length} weeks. Agree how many active Dutas register farmers each week, and track it in this deck.`,o:"",w:""},
     top&&{t:`Find out why ${top.k} fell ${sg(top.d)}`,d:`${top.k} went ${nf.format(top.p)} → ${nf.format(top.l)}${topC&&topC.d<0?`, mostly “${topC.k}” (${nf.format(topC.p)} → ${nf.format(topC.l)})`:""}. Check what drove the ${P?P.short:""} peak (a broadcast, a post, an app release) and repeat it.`,o:"",w:""},
+    {t:"Set a weekly farmer target per Duta",d:`Dutas brought ${nf.format(L.under)} farmers last week${P?` (${nf.format(P.under)} the week before)`:""}. ${idle.length?`${idle.map(x=>x.k).join(", ")} registered none last week.`:""} Agree a weekly number per Duta and track it in this deck.`,o:"",w:""},
+    {t:"Grow the external Duta network",d:`${intD.length} of the ${D.length} Dutas with farmers are internal team; external Dutas brought ${extAll} farmer${extAll===1?"":"s"} in ${Q.weeks.length} weeks${extD.length?` (${extD.map(x=>x.k).join(", ")})`:""}. Recruit and activate external Dutas in the main areas.`,o:"",w:""},
     gainC&&gainC.d>0&&{t:`Keep funding “${gainC.k}”`,d:`It added ${sg(gainC.d)} farmers (${nf.format(gainC.p)} → ${nf.format(gainC.l)}). Compare its cost per farmer with the other campaigns before shifting budget.`,o:"",w:""},
     {t:"Make the phone number required at registration",d:`${pct(L.noPhone,L.total)}% of last week's farmers (${nf.format(L.noPhone)}) have no phone number, so they cannot be followed up by sales or a Duta.`,o:"",w:""}].filter(Boolean);
   return X;
