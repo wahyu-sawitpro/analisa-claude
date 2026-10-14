@@ -1,4 +1,8 @@
-# SawitPRO Sales & Leads Deck (Smallholder + Plantation)
+# SawitPRO Deck (Smallholder + Plantation)
+
+One deck page for every analysis request: sales reviews, lead acquisition (CRM), stock forecasting and more. The
+slides follow the files you upload: sales exports give the sales review, CRM exports the acquisition slides, and a
+sales history with a price list adds the stock forecast.
 
 An English deck in the SawitPRO template that turns weekly CRM and sales exports into a short, insight-led review.
 It is an HTML page: upload any number of files, check the detected data type of each one, then click **Analyze**.

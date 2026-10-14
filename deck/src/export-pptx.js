@@ -159,7 +159,7 @@ function buildPptx(T,DX){
 }
 
 function deckName(){ const d=state.X?.dates||[]; const t=d.length?`${d[0].getFullYear()}-${String(d[0].getMonth()+1).padStart(2,"0")}-${String(d[0].getDate()).padStart(2,"0")}`:"data";
-  return `SawitPRO ${state.X?.multi?"Smallholder and Plantation":(state.T?.[0]?.name||"Sales")} Review ${t}`; }
+  return `SawitPRO ${state.X?.multi?"Smallholder and Plantation":(state.T?.[0]?.name||"Sales")} ${state.X?.forecast?"Review and Stock Plan":"Review"} ${t}`; }
 async function makeBlob(){ await loadPptx(); return buildPptx(state.T,state.X).write({outputType:"blob"}); }
 async function busy(btn,label,fn){ const html=btn.innerHTML; btn.disabled=true; const t=btn.querySelector(".t"); if(t) t.textContent=label; else btn.textContent=label;
   try{ await fn(); } finally{ btn.disabled=false; btn.innerHTML=html; } }

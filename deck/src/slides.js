@@ -614,6 +614,10 @@ function deckNarrative(T){
     fa.push({t:`Secure ${mt0(m0.mt)} MT for ${m0.label}`,d:`${tops} are the largest lines. Check stock on hand and supplier lead time against the plan by area (${m0.rows.map(r=>`${r.area} ${mt0(r.mt)} MT`).join(", ")}).`,o:"",w:"",team:X.multi?t.name:null});
     fa.push({t:`Plan ${mt0(F.ordersNeeded)} fertilizer orders a month`,d:`${rp(F.target)} a month at the ${F.recentLabel} average order of ${rp(F.aov)} needs ${mt0(F.ordersNeeded)} orders; the team closed ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}. Split the gap by PIC and area.`,o:"",w:"",team:X.multi?t.name:null}); });
   if(fa.length) X.actions=[...fa,...(X.actions||[])].slice(0,6);
+  // the cover says the deck carries a stock plan
+  const fc0=T.find(t=>t.A.forecast)?.A.forecast;
+  if(fc0){ const m=fc0.months; X.forecast=true; X.eyebrow="Sales Review & Stock Plan";
+    X.title=`${X.title} · Plan ${m[0].label.split(" ")[0]}–${m[m.length-1].label.split(" ")[0]}`; }
   X.actions=draftActs(X.actions||[]); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X;
 }
 function deckNarrative0(T){

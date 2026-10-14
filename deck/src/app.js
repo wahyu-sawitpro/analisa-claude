@@ -73,7 +73,7 @@ function renderSources(){
     <button class="link" type="button" id="addMore">+ Add files</button>${state.sample?"":`<button class="link" type="button" id="clearAll">Use sample data</button>`}
     ${state.sources.some(d=>d.on&&roleOf(d)==="price")?`<label class="tgt" for="fcTarget">Monthly target (Rp)<input id="fcTarget" type="text" inputmode="numeric" value="${nf.format(FC_TARGET)}" aria-describedby="tgtHint"></label><span class="tgthint" id="tgtHint">sizes the stock plan</span>`:""}
     <span class="spacer"></span>
-    ${state.dirty?`<button class="analyze" type="button" id="analyzeBtn" ${on?"":"disabled"}>Analyze ${on} file${on===1?"":"s"} →</button>`:`${state.T?.some(t=>t.A.has.sales)&&!state.T.some(t=>t.A.wow||t.A.mode==="trend")?`<span class="wowhint">Add the week-before sales export to compare weeks</span>`:""}<span class="uptodate">✓ Deck is up to date</span>`}`;
+    ${state.dirty?`<button class="analyze" type="button" id="analyzeBtn" ${on?"":"disabled"}>Analyze ${on} file${on===1?"":"s"} →</button>`:`${state.T?.some(t=>t.A.has.sales)&&!state.T.some(t=>t.A.wow||t.A.mode==="trend")?`<span class="wowhint">Add the week-before sales export to compare weeks</span>`:""}${state.sources.some(d=>d.on&&roleOf(d)==="sales")&&!state.sources.some(d=>d.on&&roleOf(d)==="price")?`<span class="wowhint">Add a price list to get the stock forecast</span>`:""}<span class="uptodate">✓ Deck is up to date</span>`}`;
   document.getElementById("staleNote").hidden=!state.dirty;
   deckEl.classList.toggle("stale",state.dirty);
 }
