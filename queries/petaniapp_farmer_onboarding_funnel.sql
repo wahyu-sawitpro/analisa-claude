@@ -5,9 +5,13 @@
 --   2. Input Kebun    -> dari step 1, yang punya kebun aktif (luas > 0)
 --   3. Input Geotag   -> dari step 2, yang kebunnya punya geotag valid
 --   4. KYC Verified   -> dari step 3, yang dokumen KYC-nya VERIFIED
+--   5. Keranjang      -> dari step 4, yang buka halaman Keranjang di
+--                        sawitproretail di periode {{time_range}}
+--   6. Checkout       -> dari step 5, yang buka halaman "Pesanan #..."
+--                        (order terbentuk) di periode {{time_range}}
 -- Setiap step adalah subset step sebelumnya (kumulatif), jadi angkanya
 -- selalu turun. Status kebun / geotag / KYC = kondisi saat ini (snapshot),
--- yang dibatasi {{time_range}} hanya event buka home.
+-- yang dibatasi {{time_range}} hanya event (buka home, keranjang, checkout).
 -- {{time_range}} = field filter Metabase ke sawitpro_datamart.dim_date.date_series.
 -- Output per baris step (siap dipakai visualisasi Funnel di Metabase).
 -- TANPA pembungkus `SELECT ... FROM (...) AS source` (gagal di ClickHouse 24.4).
@@ -36,7 +40,7 @@ WITH
     ),
 
     data_user AS (
-        SELECT id
+        SELECT id, name, phone_no
         FROM sawitpro_datamart.datamart_user
         WHERE status = 'REGISTERED'
           AND user_role ILIKE '%farmer%'
@@ -54,12 +58,46 @@ WITH
           AND {{time_range}}
     ),
 
+    -- user yang buka halaman keranjang di periode terpilih
+    -- contoh page_title: 'Keranjang Belanja – Toko Sawit untuk Petani'
+    keranjang_user AS (
+        SELECT DISTINCT
+            fe.user_id,
+            1 AS is_keranjang
+        FROM default.flatten_eventapp_raw fe
+        INNER JOIN sawitpro_datamart.dim_date dd ON dd.date_series = toDate(fe.event_time)
+        WHERE fe.app_type = 'sawitproretail'
+          AND fe.user_id IS NOT NULL
+          AND fe.user_id <> 'Guest'
+          AND fe.page_title ILIKE '%keranjang%'
+          AND {{time_range}}
+    ),
+
+    -- user yang sampai halaman detail pesanan (checkout) di periode terpilih
+    -- contoh page_title: 'Pesanan #B2C26328 – Toko Sawit untuk Petani'
+    checkout_user AS (
+        SELECT DISTINCT
+            fe.user_id,
+            1 AS is_checkout
+        FROM default.flatten_eventapp_raw fe
+        INNER JOIN sawitpro_datamart.dim_date dd ON dd.date_series = toDate(fe.event_time)
+        WHERE fe.app_type = 'sawitproretail'
+          AND fe.user_id IS NOT NULL
+          AND fe.user_id <> 'Guest'
+          AND fe.page_title ILIKE '%pesanan #%'
+          AND {{time_range}}
+    ),
+
     funnel_agg AS (
         SELECT
             uniqExact(du.id) AS step1_buka_home,
             uniqExactIf(du.id, df.total_area_hectare > 0) AS step2_input_kebun,
             uniqExactIf(du.id, df.total_area_hectare > 0 AND df.has_geotag = 1) AS step3_input_geotag,
-            uniqExactIf(du.id, df.total_area_hectare > 0 AND df.has_geotag = 1 AND uk.is_kyc_verified = 1) AS step4_kyc_verified
+            uniqExactIf(du.id, df.total_area_hectare > 0 AND df.has_geotag = 1 AND uk.is_kyc_verified = 1) AS step4_kyc_verified,
+            uniqExactIf(du.id, df.total_area_hectare > 0 AND df.has_geotag = 1 AND uk.is_kyc_verified = 1
+                               AND ku.is_keranjang = 1) AS step5_keranjang,
+            uniqExactIf(du.id, df.total_area_hectare > 0 AND df.has_geotag = 1 AND uk.is_kyc_verified = 1
+                               AND ku.is_keranjang = 1 AND cu.is_checkout = 1) AS step6_checkout
         FROM data_user du
         INNER JOIN home_user hu
             ON du.id = hu.user_id
@@ -67,6 +105,10 @@ WITH
             ON du.id = df.owner_id
         LEFT JOIN user_kyc uk
             ON du.id = uk.user_id
+        LEFT JOIN keranjang_user ku
+            ON du.id = ku.user_id
+        LEFT JOIN checkout_user cu
+            ON du.id = cu.user_id
     )
 
 SELECT
@@ -80,6 +122,8 @@ ARRAY JOIN [
     (1, '1. Buka Home',    step1_buka_home,    step1_buka_home),
     (2, '2. Input Kebun',  step2_input_kebun,  step1_buka_home),
     (3, '3. Input Geotag', step3_input_geotag, step2_input_kebun),
-    (4, '4. KYC Verified', step4_kyc_verified, step3_input_geotag)
+    (4, '4. KYC Verified', step4_kyc_verified, step3_input_geotag),
+    (5, '5. Keranjang',    step5_keranjang,    step4_kyc_verified),
+    (6, '6. Checkout',     step6_checkout,     step5_keranjang)
 ] AS s
 ORDER BY step_order
