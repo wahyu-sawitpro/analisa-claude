@@ -49,15 +49,18 @@ async function readFile(file){
   if(wb.SheetNames.length===1) keep.forEach(d=>d.sheet=null);
   return keep;
 }
-const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v6"):localStorage.setItem("sp-deck-data-v6",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
-async function loadFiles(list){
-  const files=[...list]; if(!files.length) return;
+const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v7"):localStorage.setItem("sp-deck-data-v7",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
+// Upload files / drag and drop: the new files replace what the deck showed. "+ Add files": they join the current files.
+let addMode=false;
+async function loadFiles(list,add=addMode){
+  addMode=false; const files=[...list]; if(!files.length) return;
   note(""); const failed=[], added=[];
   for(const f of files){ try{ added.push(...await readFile(f)); }catch(e){ failed.push(`“${f.name}”: ${e.message}`); } }
   if(added.length){
-    if(state.sample){ state.sources=[]; state.sample=false; }
+    if(state.sample||!add){ state.sources=[]; state.sample=false; }
     for(const d of added){ const i=state.sources.findIndex(x=>x.name===d.name&&x.sheet===d.sheet); if(i>=0) state.sources[i]=d; else state.sources.push(d); }
-    markDirty();
+    analyzeNow();  // the deck is rebuilt from the uploaded files straight away
+    note(`Deck built from ${state.sources.filter(x=>x.on).map(srcLabel).join(", ")}. Change a data type or the target above, then click Analyze to rebuild.`);
   }
   if(failed.length) note(`Couldn't read ${failed.join("; ")}.`,true);
 }
@@ -85,11 +88,11 @@ src.addEventListener("change",e=>{ const t=e.target;
   if(t.id==="fcTarget"){ const v=toNum(t.value); if(v>0){ FC_TARGET=v; markDirty(); } else { t.value=nf.format(FC_TARGET); note("Enter the monthly target as a number of rupiah, e.g. 4,000,000,000.",true); } } });
 src.addEventListener("click",e=>{ const t=e.target;
   const rm=t.closest("[data-rm]"); if(rm){ state.sources.splice(+rm.dataset.rm,1); if(!state.sources.length){ state.sources=SAMPLE_SRCS.map(s=>({...s})); state.sample=true; analyzeNow(); } else markDirty(); return; }
-  if(t.id==="addMore") document.getElementById("fileIn").click();
+  if(t.id==="addMore"){ addMode=true; document.getElementById("fileIn").click(); }
   if(t.id==="clearAll"){ state.sources=SAMPLE_SRCS.map(s=>({...s})); state.sample=true; analyzeNow(); }
   if(t.id==="analyzeBtn") analyzeNow(); });
 document.getElementById("staleGo").onclick=()=>analyzeNow();
-document.getElementById("uploadBtn").onclick=()=>document.getElementById("fileIn").click();
+document.getElementById("uploadBtn").onclick=()=>{ addMode=false; document.getElementById("fileIn").click(); };
 document.getElementById("fileIn").onchange=e=>{ loadFiles(e.target.files); e.target.value=""; };
 let dragN=0; const hint=document.getElementById("dropHint");
 addEventListener("dragenter",e=>{if([...e.dataTransfer.types].includes("Files")){dragN++;hint.hidden=false}});

@@ -10,9 +10,9 @@ Parsing and analysis happen in the browser; data is not sent anywhere.
 
 | Control | What it does |
 |---|---|
-| Upload files | Adds one or many CSV, TSV, XLSX, XLS, ODS or JSON files (or drag and drop). Nothing changes until you click Analyze |
+| Upload files | Replaces the deck's data with one or many CSV, TSV, XLSX, XLS, ODS or JSON files (or drag and drop) and rebuilds the deck from them straight away. **+ Add files** in the data sources bar adds files to the current set instead |
 | Data sources bar | Each file or lead-like sheet, with its row count, an include toggle, a data-type selector (CRM / Sales, auto-detected) and remove |
-| Analyze | Builds the deck from the included sources |
+| Analyze | Rebuilds the deck after you change a data type, team, include toggle or the monthly target |
 | Present | Full-screen slide mode (arrow keys, Esc) |
 | Download PPTX | Editable 16:9 PowerPoint of the current deck. Bar charts are drawn from shapes and text boxes (no embedded chart workbooks), so they look the same in PowerPoint and Google Slides |
 | Open in Google Slides | Uploads the PPTX to the viewer's Google Drive via the Google Drive connector (converted to Slides), with a manual-import fallback |
