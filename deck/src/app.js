@@ -24,7 +24,7 @@ new ResizeObserver(fit).observe(deckEl);
 function note(msg,err,html){ const n=document.getElementById("notice"); if(!msg){n.hidden=true;return} if(html) n.innerHTML=msg; else n.textContent=msg; n.className="notice"+(err?" err":""); n.hidden=false; }
 
 /* ================= File loading ================= */
-const ROLE_SHORT={crm:"CRM",sales:"Sales"};
+const ROLE_SHORT={crm:"CRM",sales:"Sales",price:"Price list"};
 const SAMPLE_SRCS=(SAMPLE?.sources||[]).map(s=>({...s,on:true,role:"auto",team:"auto"}));
 function sheetToDs(wb,name,sheet){
   return aoaToSource(XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,raw:true,defval:null,blankrows:false}),name,sheet);
@@ -66,11 +66,12 @@ function renderSources(){
   const chips=state.sources.map((d,i)=>{ const auto=detectRole(d.headers);
     return `<span class="src-chip${d.on?"":" off"}">
       <label><input type="checkbox" data-i="${i}" ${d.on?"checked":""} aria-label="Include ${esc(srcLabel(d))}"> ${esc(srcLabel(d))} <em>${nf.format(d.rows.length)}</em></label>
-      <select data-role="${i}" aria-label="Data type of ${esc(srcLabel(d))}">${["auto","crm","sales"].map(r=>`<option value="${r}" ${(d.role||"auto")===r?"selected":""}>${r==="auto"?`${ROLE_SHORT[auto]} (auto)`:ROLE_SHORT[r]}</option>`).join("")}</select>
+      <select data-role="${i}" aria-label="Data type of ${esc(srcLabel(d))}">${["auto","crm","sales","price"].map(r=>`<option value="${r}" ${(d.role||"auto")===r?"selected":""}>${r==="auto"?`${ROLE_SHORT[auto]} (auto)`:ROLE_SHORT[r]}</option>`).join("")}</select>
       <select data-team="${i}" aria-label="Team of ${esc(srcLabel(d))}">${["auto","Smallholder","Plantation"].map(t=>`<option value="${t}" ${(d.team||"auto")===t?"selected":""}>${t==="auto"?`${detectTeam({...d,team:"auto"})||"Team"} (auto)`:t}</option>`).join("")}</select>
       ${state.sample?"":`<button type="button" data-rm="${i}" aria-label="Remove ${esc(srcLabel(d))}">×</button>`}</span>`; }).join("");
   box.innerHTML=`<span class="lbl">${state.sample?"Sample data":"Data sources"}</span>${chips}
     <button class="link" type="button" id="addMore">+ Add files</button>${state.sample?"":`<button class="link" type="button" id="clearAll">Use sample data</button>`}
+    ${state.sources.some(d=>d.on&&roleOf(d)==="price")?`<label class="tgt" for="fcTarget">Monthly target (Rp)<input id="fcTarget" type="text" inputmode="numeric" value="${nf.format(FC_TARGET)}" aria-describedby="tgtHint"></label><span class="tgthint" id="tgtHint">sizes the stock plan</span>`:""}
     <span class="spacer"></span>
     ${state.dirty?`<button class="analyze" type="button" id="analyzeBtn" ${on?"":"disabled"}>Analyze ${on} file${on===1?"":"s"} →</button>`:`${state.T?.some(t=>t.A.has.sales)&&!state.T.some(t=>t.A.wow||t.A.mode==="trend")?`<span class="wowhint">Add the week-before sales export to compare weeks</span>`:""}<span class="uptodate">✓ Deck is up to date</span>`}`;
   document.getElementById("staleNote").hidden=!state.dirty;
@@ -80,7 +81,8 @@ const src=document.getElementById("sources");
 src.addEventListener("change",e=>{ const t=e.target;
   if(t.dataset.i!==undefined){ state.sources[+t.dataset.i].on=t.checked; markDirty(); }
   if(t.dataset.role!==undefined){ state.sources[+t.dataset.role].role=t.value; markDirty(); }
-  if(t.dataset.team!==undefined){ state.sources[+t.dataset.team].team=t.value; markDirty(); } });
+  if(t.dataset.team!==undefined){ state.sources[+t.dataset.team].team=t.value; markDirty(); }
+  if(t.id==="fcTarget"){ const v=toNum(t.value); if(v>0){ FC_TARGET=v; markDirty(); } else { t.value=nf.format(FC_TARGET); note("Enter the monthly target as a number of rupiah, e.g. 4,000,000,000.",true); } } });
 src.addEventListener("click",e=>{ const t=e.target;
   const rm=t.closest("[data-rm]"); if(rm){ state.sources.splice(+rm.dataset.rm,1); if(!state.sources.length){ state.sources=SAMPLE_SRCS.map(s=>({...s})); state.sample=true; analyzeNow(); } else markDirty(); return; }
   if(t.id==="addMore") document.getElementById("fileIn").click();

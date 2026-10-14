@@ -69,6 +69,29 @@ PPTX (no native charts, so Google Slides keeps every label). Chart types: column
    - Recoverable demand: leads still in play
 3. Next steps and closing
 
+## Stock forecast (sales history + price list)
+Upload a sales history (e.g. `history sales Jan - Oct 2026 per 14 Oct.csv`) together with a price list (e.g.
+`Price per 14 Oct 2026.csv`, detected as **Price list**; a title row above the headers is skipped). A **Monthly target
+(Rp)** field appears in the data sources bar (Rp4B by default). The deck then adds three slides after the executive
+summary:
+- **Forecast · RpX a month**: GMV by month against the target, fertilizer tonnes by month with the plan, orders a
+  month the target needs, method, price moves and data notes.
+- **Forecast · stock plan by month and area**: Month | Area (province) | Stock required (MT, top 3 SKUs) | Target
+  sales (IDR) | Description, for the 3 months after the data ends.
+- **Forecast · stock plan by SKU**: MT per SKU and month, bags, average price per bag and main areas.
+
+Method: only items sold by the kg; the target is split by each area's share of fertilizer GMV (Riau, Sumatera Utara,
+Sumatera Selatan incl. Lampung, Jambi, Bengkulu), reduced by the non-fertilizer and shipping shares, and turned into kg
+at today's price for each SKU and price tier (product_cat Pupuk = Reguler, Pupuk Grosir = Grosir, Toling = Toko
+Keliling, Khusus Petani). The SKU mix comes from the same month last season when the history has it (Jan uses Jan–Feb),
+else the last 4 months. Lines with no province take the customer's province from other orders, else the PIC's.
+A long history is reviewed on its last 3 full months in the trend slides.
+
+Findings for Rp4B a month (history to 13 Oct 2026, prices of 14 Oct): Nov 600 MT, Dec 600 MT, Jan 469 MT
+(Riau 474 / 474 / 389, Sumatera Utara 112 / 112 / 63, Sumatera Selatan 15 / 15 / 17). Largest lines: KCL Canada Cap
+Mahkota 447 MT and RP Mahkota Egypt 364 MT over 3 months. The best month so far is 394 t (Sep), so the plan is about
+1.4–1.5× that; at the Jul–Oct average order (Rp27.8M) Rp4B needs about 138 fertilizer orders a month against 73 now.
+
 ## Comparing weeks
 Upload the week-before sales export (same columns as `sales from last week.csv`) next to last week's, or one export
 covering both weeks. Sales lines are grouped into Monday–Sunday weeks by order date: the latest week is analysed as
@@ -92,7 +115,7 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: the Smallholder Jul–Sep sales export and the CRM engagement export, with phone numbers and names replaced by anonymous tokens
+- `src/sample-data.json`: the Smallholder sales history Jan – 13 Oct 2026, the 14 Oct price list and the Jul–Sep CRM engagement export, with phone numbers, names and customer IDs replaced by anonymous tokens
 - `output/`: the Jul–Sep PPTX, `audit.csv` (each number re-derived from the CSVs) and `DECISIONS.md`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
