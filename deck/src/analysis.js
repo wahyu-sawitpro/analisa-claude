@@ -67,17 +67,24 @@ function detectWith(fields,headers){
   return map;
 }
 const detectCrm=h=>detectWith(CRM_FIELDS,h), detectSales=h=>detectWith(SALES_FIELDS,h);
+// A farmer acquisition export: one row per registered farmer, with the registration week and Duta / non-Duta type.
+const ACQ_FIELDS=[["week",[/minggu_?register|register_?week|week_?register|^minggu$|^week$/]],["type",[/akuisisi_?type|acquisition_?type/]],["joined",[/join_?date_?farmer|register_?date|join_?date|tanggal_?daftar/]],
+  ["source",[/^utm_?source$/]],["campaign",[/^utm_?source_?name$|utm_?campaign/]],["status",[/status_?under_?duta/]],["duta",[/^duta_?id$|^duta_?name$/]],["dutaName",[/^duta_?name$/]],
+  ["test",[/is_?test_?duta|is_?test/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
+const detectAcq=h=>detectWith(ACQ_FIELDS,h);
+const isAcqList=headers=>{ const m=detectAcq(headers); return !!(m.type||m.week&&m.joined&&(m.id||m.duta)); };
 // A price list: item names and a price column, no order or quantity columns.
 const isPriceList=headers=>{ const h=headers.map(norm);
   return h.some(x=>/nama barang|item|product|produk/.test(x))&&h.some(x=>/harga|price/.test(x))&&!h.some(x=>/^qty$|quantity|order|invoice|gmv/.test(x)); };
 function detectRole(headers){
+  if(isAcqList(headers)) return "acq";
   if(isPriceList(headers)) return "price";
   const s=detectSales(headers), c=detectCrm(headers);
   const salesScore=["orderNo","invoice","qty","gmv","item"].filter(k=>s[k]).length;
   const crmScore=["status","reason","channel","detail","id"].filter(k=>c[k]).length;
   return salesScore>=3&&salesScore>=crmScore?"sales":"crm";
 }
-const ROLE_LABEL={crm:"CRM engagements",sales:"Sales orders",price:"Price list"};
+const ROLE_LABEL={crm:"CRM engagements",sales:"Sales orders",price:"Price list",acq:"Farmer acquisition"};
 
 /* ================= Cleaning & translation ================= */
 const blank=v=>v===null||v===undefined||(typeof v==="string"&&v.trim()==="")||(typeof v==="number"&&isNaN(v));
@@ -576,6 +583,9 @@ function detectTeam(d){
 }
 // Split the selected sources into one analysis per team. Sales files with a team column are split row by row.
 function analyseTeams(sources){
+  // a farmer acquisition export makes this an acquisition deck: its own analysis, other files are left out
+  const acq=sources.filter(d=>(d.role&&d.role!=="auto"?d.role:detectRole(d.headers))==="acq");
+  if(acq.length){ const Q=acquisition(acq); return [{name:"Farmer acquisition",A:{acq:Q,crm:[],orders:[],won:[],has:{},dates:Q.dates,gmv:0},C:null,sources:acq,left:sources.length-acq.length}]; }
   const TR=trendMode(sources), parts=new Map(), add=(t,d)=>{ if(!parts.has(t)) parts.set(t,[]); parts.get(t).push(d); };
   const prices=[];
   for(const d of sources){
@@ -709,4 +719,38 @@ function forecastStock(lines,P,target){
   const otherGmv=sum(F.filter(l=>!l.fcArea),l=>l.gmv);
   return {target,months,areas,share,fertShare,shipShare,hist,best,bestKg,bestRecent,avg,avgN:fullRecent.length,ordersPerMonth,recentFullLabel:recentFull.length?`${recentFull[0].label}–${recentFull[recentFull.length-1].label}`:"",aov,ordersNeeded:aov?target*fertShare/aov:null,rOrders,
     recentLabel:`${MON[recent[0]%12]}–${MON[last%12]}`,lastDate,inf,priceMoves,unpriced,otherShare:fertGmv?otherGmv/fertGmv:0,priceLabel:P.label};
+}
+
+/* ================= Farmer acquisition (Duta vs non-Duta) ================= */
+const ACQ_SRC_ORDER=["Organic","GADN","Meta","Identified Campaigns","Duta"];
+const isUnder=v=>/under|^duta$/i.test(String(v||""))&&!/non/i.test(String(v||""));
+// Weekly registrations from the export: the last full week against the week before, split by Duta / non-Duta, channel and campaign.
+// A week that is still in progress (its data stops before the Sunday) is left out.
+function acquisition(sources){
+  const R=[];
+  for(const d of sources){ const m=detectAcq(d.headers);
+    for(const r of d.rows){ const wk=toDate(r[m.week]), jd=toDate(r[m.joined]); if(!wk&&!jd) continue;
+      const w=wk||new Date(jd.getFullYear(),jd.getMonth(),jd.getDate()-((jd.getDay()+6)%7));
+      const under=m.type?isUnder(r[m.type]):!blank(r[m.duta]);
+      const test=under&&(String(r[m.test]??"").trim()==="1"||/^true$/i.test(String(r[m.test]??""))||/test/i.test(String(r[m.dutaName]??"")));
+      R.push({w:+w,jd,under,test,real:under&&!test,src:clean(r[m.source])||(under?"Duta":"Unknown"),camp:clean(r[m.campaign])||"(no campaign)",
+        status:clean(r[m.status]),duta:clean(r[m.duta]),phone:!blank(r[m.phone])}); } }
+  const all=[...new Set(R.map(r=>r.w))].sort((a,b)=>a-b), lastW=all[all.length-1], lastJ=Math.max(...R.filter(r=>r.w===lastW&&r.jd).map(r=>+r.jd));
+  const dropped=all.length>2&&lastJ<lastW+6*864e5?{w:lastW,n:R.filter(r=>r.w===lastW).length,to:new Date(lastJ)}:null;
+  const weeks=dropped?all.slice(0,-1):all;
+  const wl=w=>{ const a=new Date(w), b=new Date(w+6*864e5); return a.getMonth()===b.getMonth()?`${a.getDate()}–${b.getDate()} ${MON[b.getMonth()]}`:`${fds(a)} – ${fds(b)}`; };
+  const stat=w=>{ const x=R.filter(r=>r.w===w), u=x.filter(r=>r.under);
+    return {w,label:wl(w),short:fds(new Date(w)),total:x.length,under:u.length,non:x.length-u.length,test:u.filter(r=>r.test).length,real:u.filter(r=>r.real).length,
+      sale:u.filter(r=>/sale/i.test(r.status||"")).length,leads:u.filter(r=>/lead/i.test(r.status||"")).length,dutas:new Set(u.map(r=>r.duta).filter(Boolean)).size,
+      realDutas:new Set(u.filter(r=>r.real).map(r=>r.duta).filter(Boolean)).size,noPhone:x.filter(r=>!r.phone).length,
+      src:new Map(countBy(x,r=>r.src)),nonSrc:new Map(countBy(x.filter(r=>!r.under),r=>r.src)),camp:new Map(countBy(x.filter(r=>!r.under),r=>r.camp)),
+      days:[0,1,2,3,4,5,6].map(i=>x.filter(r=>r.jd&&(Math.round((+r.jd-w)/864e5)%7+7)%7===i).length)}; };  // the next Monday morning (before the week cut) counts as Monday
+  const W=weeks.map(stat), L=W[W.length-1], P=W.length>1?W[W.length-2]:null;
+  const srcs=[...new Set(R.map(r=>r.src))].sort((a,b)=>(ACQ_SRC_ORDER.indexOf(a)+1||9)-(ACQ_SRC_ORDER.indexOf(b)+1||9));
+  const dSrc=P?srcs.map(k=>({k,p:P.src.get(k)||0,l:L.src.get(k)||0})).map(o=>({...o,d:o.l-o.p})):[];
+  const camps=P?[...new Set([...L.camp.keys(),...P.camp.keys()])].map(k=>({k,p:P.camp.get(k)||0,l:L.camp.get(k)||0})).map(o=>({...o,d:o.l-o.p})).sort((a,b)=>a.d-b.d):[];
+  const base=W.slice(Math.max(0,W.length-5),-1), avg=base.length?base.reduce((s,x)=>s+x.total,0)/base.length:null;
+  const peak=W.reduce((m,x)=>x.total>m.total?x:m,W[0]);
+  return {weeks:W,L,P,srcs,dSrc,camps,avg,avgN:base.length,peak,dropped,rows:R.length,realAll:R.filter(r=>r.real).length,underAll:R.filter(r=>r.under).length,
+    realWeeks:W.filter(x=>x.real).length,lastDate:dropped?dropped.to:new Date(lastJ),dates:R.map(r=>r.jd).filter(Boolean),files:sources.map(srcLabel)};
 }

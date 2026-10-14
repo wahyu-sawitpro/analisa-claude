@@ -72,7 +72,7 @@ function lineChart(o,W,H){
     if(o.area) P.push(cA([[pts[0][0],base],...pts,[pts[pts.length-1][0],base]],se.color));
     for(let i=1;i<pts.length;i++) P.push(cL(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1],se.color,2.5));
     pts.forEach(([x,y],i)=>{ P.push(cD(x,y,n>14?3.5:4.5,se.color,`${String(o.cats[i]).replace("\n"," ")}${S.length>1?` · ${se.name}`:""}: ${fmt(se.values[i]||0)}`));
-      if(o.show==="all"||(o.show||[n-1]).includes(i)) P.push(cT(x-45,y-24,90,16,(o.vfmt||fmt)(se.values[i]||0,i),{size:11.5,bold:true,align:"center"})); }); });
+      const sh=se.show||o.show; if(sh==="all"||(sh||[n-1]).includes(i)) P.push(cT(x-45,y-24,90,16,(o.vfmt||fmt)(se.values[i]||0,i),{size:11.5,bold:true,align:"center"})); }); });
   o.cats.forEach((c,i)=>{ if(!c||(o.xEvery&&i%o.xEvery&&i!==n-1)) return; P.push(cT(xs(i)-40,base+5,80,lblH-4,c,{size:10.5,color:CMUTE,align:"center",valign:"top"})); });
   return P;
 }

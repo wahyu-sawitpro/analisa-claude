@@ -2,7 +2,8 @@
 
 One deck page for every analysis request: sales reviews, lead acquisition (CRM), stock forecasting and more. The
 slides follow the files you upload: sales exports give the sales review, CRM exports the acquisition slides, and a
-sales history with a price list adds the stock forecast.
+sales history with a price list adds the stock forecast. A farmer acquisition export (e.g. `farmer akusisi.csv`) makes it a
+farmer acquisition review (Duta vs non-Duta).
 
 An English deck in the SawitPRO template that turns weekly CRM and sales exports into a short, insight-led review.
 It is an HTML page: upload any number of files, check the detected data type of each one, then click **Analyze**.
@@ -73,6 +74,20 @@ PPTX (no native charts, so Google Slides keeps every label). Chart types: column
    - Recoverable demand: leads still in play
 3. Next steps and closing
 
+## Farmer acquisition (Duta vs non-Duta)
+A file with `akuisisi_type` / `minggu_register` / `join_date_farmer` columns is read as **Acquisition** and sets the whole
+deck (other files are left out). Last week = the latest full registration week; a week still in progress (its data stops
+before the Sunday, e.g. the week of 12 Oct with data to 14 Oct) is left out and the slide says so. Slides:
+- **Duta vs non-Duta:** last week vs the week before (count, change, change %, share), under-Duta split into test Duta
+  accounts (`is_test_duta` = 1 or "Test" in the Duta name) and real Dutas, Sale / Leads status, under-Duta farmers by week.
+- **What moved the total:** waterfall by channel (`utm_source`) and the largest campaign moves (`utm_source_name`, non-Duta).
+- **Weekly trend:** farmers per week by channel, and farmers per day last week vs the week before.
+- **Channels in detail:** channel table with the 4-week average, campaign table, farmers without a phone number.
+
+Findings for the week of 5–11 Oct 2026 (sample): 376 farmers, −103 (−22%) on 28 Sep – 4 Oct; non-Duta 372 (−99), under
+Duta 4 (−4), all 4 under test Duta accounts, so no farmer came through a real Duta (1 in 7 weeks). Organic −95 explains 92%
+of the drop ("organic" campaign 111 → 47); GADN +10 and App-Register-Campaign-DG +36 grew. 28% of farmers have no phone.
+
 ## Stock forecast (sales history + price list)
 Upload a sales history (e.g. `history sales Jan - Oct 2026 per 14 Oct.csv`) together with a price list (e.g.
 `Price per 14 Oct 2026.csv`, detected as **Price list**; a title row above the headers is skipped). A **Monthly target
@@ -119,7 +134,8 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: the Smallholder sales history Jan – 13 Oct 2026 and the 14 Oct price list (the forecast sample), with phone numbers, names and customer IDs replaced by anonymous tokens
+- `src/sample-data.json`: `farmer akusisi.csv` (registrations 24 Aug – 14 Oct 2026, the acquisition sample), with farmer and Duta names and phone numbers replaced by anonymous tokens
+- `output/Farmer Acquisition 5-11 Oct 2026.pptx`: the acquisition deck from the sample
 - `output/`: the Jul–Sep PPTX, `audit.csv` (each number re-derived from the CSVs) and `DECISIONS.md`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
