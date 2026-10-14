@@ -106,7 +106,7 @@ function buildPptx(T,DX){
       txt(sl,[t.A.has.sales&&`${rp(t.A.gmv)} from ${t.A.orders.length} orders`,t.A.crm.length&&`${t.A.crm.length} CRM engagements`].filter(Boolean).join(" · "),{x:X(131),y:X(460),w:X(900),h:0.4,fontSize:16,bold:true,color:"E4ECDD"});
       txt(sl,String(i+1).padStart(2,"0"),{x:X(900),y:X(500),w:X(300),h:X(170),fontSize:130,bold:true,color:"FFFFFF",transparency:85,align:"right"}); }
     teamBlock(t.A,t.N,DX.multi?`${t.name} · `:"");
-    if(t.C&&t.NC) teamBlock(t.C,t.NC,`${DX.multi?`${t.name} · `:""}CRM ${crmSpan(t.C)} · `);
+    if(t.C&&t.NC&&!t.A.forecast) teamBlock(t.C,t.NC,`${DX.multi?`${t.name} · `:""}CRM ${crmSpan(t.C)} · `);
   });
 
   // Draw chart primitives (see viz.js) as plain shapes and text boxes.
@@ -139,7 +139,7 @@ function buildPptx(T,DX){
   function teamBlock(A,N,pre){ teamSpecs(A,N,pre).forEach(panelSlide); }
 
   // Next steps
-  { const sl=content("Next steps",`${DX.actions.length} draft actions ${DX.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`);
+  { const sl=content("Next steps",`${DX.actions.length} draft actions ${DX.forecast?"to deliver the stock plan":DX.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`);
     const nc=DX.actions.length>4?3:2, cw=nc===3?(1080-2*14)/3:532, gap=nc===3?14:16;
     DX.actions.forEach((a,i)=>{ const x=80+(i%nc)*(cw+gap), y=180+Math.floor(i/nc)*205; box(sl,x,y,cw,190);
       txt(sl,[{text:`${i+1}  `,options:{color:"D9A21B",bold:true,fontSize:12}},{text:a.t,options:{color:"274E13",bold:true,fontSize:nc===3?12:13}}],{x:X(x+18),y:X(y+14),w:X(cw-36),h:X(40),fit:"shrink"});

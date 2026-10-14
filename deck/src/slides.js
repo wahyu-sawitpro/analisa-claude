@@ -412,7 +412,7 @@ function forecastSpecs(F,pre){
 }
 function teamSpecs(A,N,pre){
   const S=[], O=A.orders, pl=(n,w)=>`${n} ${w}${n===1?"":"s"}`, rpM=v=>rp(v);
-  if(A.forecast) S.push(...forecastSpecs(A.forecast,pre));
+  if(A.forecast) return forecastSpecs(A.forecast,pre);  // a price list makes this a forecast deck: forecast slides only
   const NI={name:"Not interested",color:OUTC.lost}, WM={name:"Considering / prospect",color:OUTC.warm}, NS={name:"No status",color:OUTC.none};
 
   // Success story
@@ -616,7 +616,7 @@ let FOOT_BASIS="SAWITPRO PROPRIETARY";
 function basisOf(T,X){
   const tr=T.find(t=>t.A.trend)?.A.trend, sales=T.some(t=>t.A.has.sales), fc=T.find(t=>t.A.forecast)?.A.forecast, last=fc?fc.lastDate:X.dates[X.dates.length-1];
   const asOf=last?`data to ${fds(last)} ${last.getFullYear()}`:"";
-  return [sales&&"GMV incl. shipping, before discount",tr?`${tr.Z.label} vs ${tr.F.label}`:T.some(t=>t.A.wow)?"last week vs the week before":null,asOf].filter(Boolean).join(" · ")||"SAWITPRO PROPRIETARY";
+  return [sales&&"GMV incl. shipping, before discount",fc?`target ${rp(fc.target)} a month at ${fc.priceLabel.replace(/^price (per )?/i,"prices of ").replace(/\.csv$/i,"")}`:tr?`${tr.Z.label} vs ${tr.F.label}`:T.some(t=>t.A.wow)?"last week vs the week before":null,asOf].filter(Boolean).join(" · ")||"SAWITPRO PROPRIETARY";
 }
 function deckNarrative(T){
   const X=deckNarrative0(T), fa=[];
@@ -625,12 +625,17 @@ function deckNarrative(T){
     const tops=[...top].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,v])=>`${skuShort(n)} ${mt0(v)} MT`).join(", ");
     fa.push({t:`Secure ${mt0(m0.mt)} MT for ${m0.label}`,d:`${tops} are the largest lines. Check stock on hand and supplier lead time against the plan by area (${m0.rows.map(r=>`${r.area} ${mt0(r.mt)} MT`).join(", ")}).`,o:"",w:"",team:X.multi?t.name:null});
     fa.push({t:`Plan ${mt0(F.ordersNeeded)} fertilizer orders a month`,d:`${rp(F.target)} a month at the ${F.recentLabel} average order of ${rp(F.aov)} needs ${mt0(F.ordersNeeded)} orders; the team closed ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}. Split the gap by PIC and area.`,o:"",w:"",team:X.multi?t.name:null}); });
-  if(fa.length) X.actions=[...fa,...(X.actions||[])].slice(0,6);
+  T.filter(t=>t.A.forecast).forEach(t=>{ const F=t.A.forecast, mJ=F.months[F.months.length-1], m0=F.months[0];
+    const kcl=[...new Map(mJ.rows.flatMap(r=>r.skus).map(x=>[x.name,0])).keys()].map(n=>[n,mJ.rows.reduce((s,r)=>s+(r.skus.find(x=>x.name===n)?.mt||0),0)]).sort((a,b)=>b[1]-a[1])[0];
+    if(kcl) fa.push({t:`Book ${mt0(kcl[1])} MT of ${skuShort(kcl[0])} for ${mJ.label.split(" ")[0]}`,d:`${mJ.label.split(" ")[0]} shifts to last season's mix (${mJ.winLabel}); ${skuShort(kcl[0])} is the largest line at ${mt0(kcl[1])} MT, against ${mt0(m0.rows.reduce((s,r)=>s+(r.skus.find(x=>x.name===kcl[0])?.mt||0),0))} MT in ${m0.label.split(" ")[0]}. Confirm supplier allocation before December.`,o:"",w:"",team:X.multi?t.name:null});
+    if(F.unpriced.length) fa.push({t:`Add ${F.unpriced.length} SKUs to the price list`,d:`${F.unpriced.slice(0,4).map(skuShort).join(", ")}${F.unpriced.length>4?" and others":""} sell but are not on the 14 Oct price list, so the plan uses their last selling price.`,o:"",w:"",team:X.multi?t.name:null});
+    if(F.inf.n) fa.push({t:`Fill the province on ${F.inf.n} order lines`,d:`${rp(F.inf.gmv)} of sales had no province (mostly Jan–Feb); the plan took it from the customer's other orders. Fix it at the source so the area split stays right.`,o:"",w:"",team:X.multi?t.name:null}); });
+  if(fa.length) X.actions=fa.slice(0,6);
   // the cover says the deck carries a stock plan
   const fc0=T.find(t=>t.A.forecast)?.A.forecast;
   if(fc0){ const F=fc0, m=F.months, tg=F.target, avgMt=m.reduce((s,x)=>s+x.mt,0)/m.length, name=T.find(t=>t.A.forecast).name;
     const skT=new Map(); m.forEach(x=>x.rows.forEach(r=>r.skus.forEach(k=>skT.set(k.name,(skT.get(k.name)||0)+k.mt)))); const top=[...skT].sort((a,b)=>b[1]-a[1]);
-    X.forecast=true; X.eyebrow="Stock Forecast"; X.title=`${name} · ${m[0].label} – ${m[m.length-1].label}`;
+    X.forecast=true; X.gaps=[]; X.eyebrow="Stock Forecast"; X.title=`${name} · ${m[0].label} – ${m[m.length-1].label}`;
     X.period=`Sales history ${fds(F.hist[0]&&new Date(Math.floor(F.hist[0].m/12),F.hist[0].m%12,1))} – ${fds(F.lastDate)} ${F.lastDate.getFullYear()}`; X.meta=`target ${rp(tg)} a month`;
     X.headline=`${rp(tg)} a month needs ${m.map(x=>`${mt0(x.mt)} MT in ${x.label.split(" ")[0]}`).join(", ")}: about ${(avgMt*1000/F.bestKg.kg).toFixed(1)}× our best month`;
     X.kpis=[{v:mt0(m[0].mt),u:" MT",l:`stock for ${m[0].label} (${m.slice(1).map(x=>`${x.label.split(" ")[0]} ${mt0(x.mt)} MT`).join(", ")})`,hot:true},
@@ -751,9 +756,9 @@ function buildDeck(T,X){
   T.forEach((t,i)=>{
     if(X.multi) S.push(dividerSlide(i+1,`Team ${i+1}`,t.name,[t.A.has.sales&&`${rp(t.A.gmv)} from ${t.A.orders.length} orders`,t.A.crm.length&&`${t.A.crm.length} CRM engagements`].filter(Boolean).join(" · ")));
     teamSlides(t.A,t.N,X.multi?`${t.name} · `:"",S,next);
-    if(t.C&&t.NC) teamSlides(t.C,t.NC,`${X.multi?`${t.name} · `:""}CRM ${crmSpan(t.C)} · `,S,next);
+    if(t.C&&t.NC&&!t.A.forecast) teamSlides(t.C,t.NC,`${X.multi?`${t.name} · `:""}CRM ${crmSpan(t.C)} · `,S,next);
   });
-  S.push(contentSlide(next(),"Next steps",`${X.actions.length} draft actions ${X.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`,`
+  S.push(contentSlide(next(),"Next steps",`${X.actions.length} draft actions ${X.forecast?"to deliver the stock plan":X.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`,`
     <div class="act${X.actions.length>4?" act3":""}">${X.actions.map((a,i)=>`<div class="card"><h3><span>${i+1}</span>${esc(a.t)}</h3><p>${esc(a.d)}</p><div class="meta">${a.team?`<span class="team">${esc(a.team)}</span>`:""}<span>Owner: ${esc(a.o)}</span><span class="when">${esc(a.w)}</span></div></div>`).join("")}</div>
     ${X.gaps.length?`<div class="gaps"><b>Also clean up in the CRM:</b> ${esc(X.gaps.join("; "))}.</div>`:""}`));
   S.push(`<div class="slide closing"><img class="bg" src="${IMG.closing}" alt=""><div class="shade"></div><img class="wm" src="${IMG.wm}" alt="SawitPRO.id"><img class="lg" src="${IMG.logo}" alt="">

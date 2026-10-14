@@ -76,8 +76,8 @@ PPTX (no native charts, so Google Slides keeps every label). Chart types: column
 ## Stock forecast (sales history + price list)
 Upload a sales history (e.g. `history sales Jan - Oct 2026 per 14 Oct.csv`) together with a price list (e.g.
 `Price per 14 Oct 2026.csv`, detected as **Price list**; a title row above the headers is skipped). A **Monthly target
-(Rp)** field appears in the data sources bar (Rp4B by default). The deck then adds three slides after the executive
-summary:
+(Rp)** field appears in the data sources bar (Rp4B by default). With a price list the deck is a forecast deck: cover,
+forecast executive summary, the slides below, forecast next steps and closing (no sales review or CRM slides):
 - **Forecast · RpX a month**: GMV by month against the target, fertilizer tonnes by month with the plan, orders a
   month the target needs, method, price moves and data notes.
 - **Forecast · stock plan by month and area**: Month | Area (province) | Stock required (MT, top 3 SKUs) | Target
@@ -119,7 +119,7 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: the Smallholder sales history Jan – 13 Oct 2026, the 14 Oct price list and the Jul–Sep CRM engagement export, with phone numbers, names and customer IDs replaced by anonymous tokens
+- `src/sample-data.json`: the Smallholder sales history Jan – 13 Oct 2026 and the 14 Oct price list (the forecast sample), with phone numbers, names and customer IDs replaced by anonymous tokens
 - `output/`: the Jul–Sep PPTX, `audit.csv` (each number re-derived from the CSVs) and `DECISIONS.md`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
