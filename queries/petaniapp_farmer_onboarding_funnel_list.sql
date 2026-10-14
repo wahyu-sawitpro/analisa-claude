@@ -9,6 +9,10 @@
 -- order_no = nomor setelah '#' di page_title halaman pesanan
 --   ('Pesanan #B2C26328 – Toko Sawit untuk Petani' -> 'B2C26328');
 --   kalau lebih dari 1 order di periode, digabung dengan koma.
+-- total_order / total_sales = jumlah order & sum(potential_gmvs) dari
+--   Customer 360 (question #2992), join by order_no = customer_ref tanpa '#'.
+--   Hanya order valid (bukan Marketplace / cancel / draft, kategori
+--   'Khusus Petani', sejak 2026-01-01) yang dihitung.
 -- {{time_range}} = field filter Metabase ke sawitpro_datamart.dim_date.date_series.
 -- TANPA pembungkus `SELECT ... FROM (...) AS source` (gagal di ClickHouse 24.4).
 -- =====================================================================
@@ -69,17 +73,13 @@ WITH
           AND {{time_range}}
     ),
 
-    -- user yang sampai halaman detail pesanan (checkout) di periode terpilih,
-    -- beserta nomor order dari page_title (1 baris per user)
-    -- contoh page_title: 'Pesanan #B2C26328 – Toko Sawit untuk Petani'
-    checkout_user AS (
-        SELECT
+    -- order yang dibuka user di halaman detail pesanan (checkout) di periode
+    -- terpilih, 1 baris per (user, order)
+    -- contoh page_title: 'Pesanan #B2C26328 – Toko Sawit untuk Petani' -> 'B2C26328'
+    checkout_order AS (
+        SELECT DISTINCT
             fe.user_id,
-            1 AS is_checkout,
-            arrayStringConcat(
-                groupUniqArray(regexpExtract(fe.page_title, '#([A-Za-z0-9]+)', 1)),
-                ', '
-            ) AS order_no
+            regexpExtract(fe.page_title, '#([A-Za-z0-9]+)', 1) AS order_no
         FROM default.flatten_eventapp_raw fe
         INNER JOIN sawitpro_datamart.dim_date dd ON dd.date_series = toDate(fe.event_time)
         WHERE fe.app_type = 'sawitproretail'
@@ -87,7 +87,37 @@ WITH
           AND fe.user_id <> 'Guest'
           AND fe.page_title ILIKE '%pesanan #%'
           AND {{time_range}}
-        GROUP BY fe.user_id
+    ),
+
+    -- sales per order dari Customer 360 (customer_ref '#B2C25172' -> 'B2C25172'),
+    -- 1 baris per order
+    sales_order AS (
+        SELECT
+            upper(replaceAll(trimBoth(c360.customer_ref), '#', '')) AS order_no,
+            sum(ifNull(c360.potential_gmvs, 0)) AS sales
+        FROM {{#2992-customer-360}} AS c360
+        WHERE c360.dates >= '2026-01-01'
+          AND c360.Sales_App != 'Marketplace'
+          AND ifNull(c360.order_line_state, '') != 'cancel'
+          AND c360.product_category = 'Khusus Petani'
+          AND c360.sale_order_status NOT IN ('CANCELLED', 'CANCELED', 'DRAFT')
+          AND ifNull(c360.customer_ref, '') != ''
+        GROUP BY order_no
+    ),
+
+    -- 1 baris per user yang checkout: daftar order + total order & sales
+    -- (total_order / total_sales hanya dari order yang ada di sales_order)
+    checkout_user AS (
+        SELECT
+            co.user_id,
+            1 AS is_checkout,
+            arrayStringConcat(arrayFilter(x -> x != '', groupUniqArray(co.order_no)), ', ') AS order_no,
+            uniqExactIf(co.order_no, so.order_no != '') AS total_order,
+            sum(so.sales) AS total_sales
+        FROM checkout_order co
+        LEFT JOIN sales_order so
+            ON upper(co.order_no) = so.order_no
+        GROUP BY co.user_id
     )
 
 SELECT
@@ -101,6 +131,8 @@ SELECT
     if(ku.is_keranjang = 1, 'Yes', 'No') AS keranjang,
     if(cu.is_checkout = 1, 'Yes', 'No') AS checkout,
     cu.order_no AS order_no,
+    cu.total_order AS total_order,
+    cu.total_sales AS total_sales,
     multiIf(
         df.total_area_hectare > 0 AND df.has_geotag = 1 AND uk.is_kyc_verified = 1
             AND ku.is_keranjang = 1 AND cu.is_checkout = 1, '6. Checkout',
