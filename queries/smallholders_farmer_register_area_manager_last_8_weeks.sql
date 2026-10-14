@@ -41,6 +41,20 @@ WITH
         LIMIT 1 BY leads_user_id
     ),
 
+    -- UTM dari event app. Tabel event = banyak baris per user, jadi
+    -- diringkas 1 baris per user (ambil nilai yang tidak kosong) supaya
+    -- farmer tidak dobel.
+    event_utm AS (
+        SELECT
+            user_id,
+            anyIf(utm_source_name,           ifNull(utm_source_name, '') != '')           AS utm_source_name,
+            anyIf(stslc_utm_campaign,        ifNull(stslc_utm_campaign, '') != '')        AS stslc_utm_campaign,
+            anyIf(stslc_utm_source_platform, ifNull(stslc_utm_source_platform, '') != '') AS stslc_utm_source_platform
+        FROM flatten_eventapp_raw
+        WHERE user_id IN (SELECT id FROM farmers)
+        GROUP BY user_id
+    ),
+
     unique_kyc AS (
         SELECT user_id, updated_by,
                toDateTime(toInt64(created_at_utc0) / 1000) + INTERVAL 7 HOUR AS join_date_duta
@@ -58,6 +72,9 @@ WITH
             f.created_at_utc7            AS join_date_farmer,
             f.referral_utm               AS referral_utm,
             f.utm_source                 AS utm_source,
+            ev.utm_source_name           AS utm_source_name,
+            ev.stslc_utm_campaign        AS stslc_utm_campaign,
+            ev.stslc_utm_source_platform AS stslc_utm_source_platform,
             toMonday(f.created_at_utc7)  AS join_week_farmer,
             ifNull(al.status, '')        AS status_under_duta,
             status_under_duta IN ('SALE', 'LEADS') AS under_duta,
@@ -76,6 +93,7 @@ WITH
                 OR ifNull(u_duta.name, '') ILIKE '%test%' AS is_test_duta
         FROM farmers AS f
         LEFT JOIN latest_leads AS al     ON al.leads_user_id = f.id
+        LEFT JOIN event_utm    AS ev     ON ev.user_id       = f.id
         LEFT JOIN default.user AS u_duta ON u_duta.id        = al.ambassador_user_id
         LEFT JOIN unique_kyc   AS ak     ON ak.user_id       = al.ambassador_user_id
         LEFT JOIN default.user AS u_am   ON u_am.id          = ak.updated_by
@@ -90,6 +108,9 @@ SELECT DISTINCT
     join_date_farmer,
     referral_utm,
     utm_source,
+    nullIf(utm_source_name, '')           AS utm_source_name,
+    nullIf(stslc_utm_campaign, '')        AS stslc_utm_campaign,
+    nullIf(stslc_utm_source_platform, '') AS stslc_utm_source_platform,
     nullIf(status_under_duta, '')   AS status_under_duta,
     if(under_duta, duta_id, NULL)   AS duta_id,
     if(under_duta, duta_name, NULL) AS duta_name,
