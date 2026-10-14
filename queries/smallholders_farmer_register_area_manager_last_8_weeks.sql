@@ -1,46 +1,50 @@
 -- =====================================================================
--- Farmer REGISTERED 8 minggu terakhir + Area Manager (AM)-nya
--- Tujuan: memisahkan farmer register yang ada AM vs yang tidak ada AM.
+-- DETAIL: Petani (role FARMER) yang REGISTERED 8 minggu terakhir,
+-- beserta duta yang mengakuisisi & Area Manager (AM) duta tersebut.
+-- Ringkasan jumlahnya: smallholders_farmer_register_area_manager_summary_last_8_weeks.sql
 --
--- Rentang: Senin 8 minggu lalu s/d sekarang (Asia/Jakarta), termasuk
--- minggu berjalan. Kalau hanya mau minggu yang sudah selesai, ganti
--- `period_end` dengan toMonday(toDate(now('Asia/Jakarta'))).
+-- Rentang: Senin 7 minggu lalu s/d hari ini (8 minggu kalender,
+-- termasuk minggu berjalan, Asia/Jakarta). Kalau hanya mau minggu
+-- yang sudah selesai, geser keduanya 1 minggu ke belakang.
 --
--- Alur AM:
---   farmer -> ambassador_leads (SALE/LEADS) -> duta
---          -> ambassador_kyc VERIFIED duta -> updated_by = AM
---   Kalau farmer tidak punya duta tapi dirinya sendiri duta (self KYC),
---   AM diambil dari KYC farmer itu sendiri.
+-- Alur:
+--   petani register (base, SEMUA petani tetap muncul)
+--     -> ambassador_leads SALE/LEADS  = diakuisisi duta
+--     -> ambassador_kyc VERIFIED duta -> updated_by = AM
+--
+-- Kategori `acquisition_status`:
+--   'Ada Duta & AM'      : diakuisisi duta, duta punya AM
+--   'Ada Duta, Tanpa AM' : diakuisisi duta, AM duta tidak ketemu
+--   'Tanpa Duta'         : register sendiri (tidak ada leads)
 --
 -- Catatan:
+--   * Semua join LEFT JOIN supaya petani tanpa duta tetap terhitung.
 --   * Cek "ada / tidak ada join" pakai ifNull(toString(..), '') != ''
---     supaya benar baik join_use_nulls = 0 (default value '') maupun 1
---     (NULL). Versi lama pakai `self_kyc.user_id IS NOT NULL` yang selalu
---     TRUE kalau join_use_nulls = 0.
---   * CTE farm_data / catat_panen / catat_rawat dihapus karena tidak
---     dipakai di output.
+--     supaya benar baik join_use_nulls = 0 (default '') maupun 1 (NULL).
+--   * `is_test_account` = AM Fauzy (akun test) atau nama petani/duta
+--     mengandung 'test'. Tidak dibuang di sini, difilter di summary.
 -- =====================================================================
 WITH
     toMonday(toDate(now('Asia/Jakarta'))) - INTERVAL 7 WEEK AS period_start,
     toDate(now('Asia/Jakarta')) + 1                         AS period_end,
 
-    -- Farmer REGISTERED dalam periode (filter tanggal ditaruh di sini
-    -- supaya join di bawah hanya memproses farmer 8 minggu terakhir)
-    target_farmers AS (
+    -- Petani: user REGISTERED dengan role FARMER, register dalam periode
+    farmers AS (
         SELECT
             id,
             name,
             phone_no,
-            status,
             utm_source,
-            created_at_utc7 AS created_date
+            created_at_utc7
         FROM sawitpro_datamart.datamart_user
         WHERE status = 'REGISTERED'
+          AND user_role ILIKE '%FARMER%'
           AND toDate(created_at_utc7) >= period_start
           AND toDate(created_at_utc7) <  period_end
+        LIMIT 1 BY id
     ),
 
-    -- 1 baris terbaru per lead (status SALE / LEADS)
+    -- Leads terbaru per petani (SALE / LEADS) = petani diakuisisi duta
     unique_leads AS (
         SELECT
             ambassador_user_id,
@@ -48,12 +52,12 @@ WITH
             status
         FROM ambassador_leads
         WHERE status IN ('SALE', 'LEADS')
-          AND leads_user_id IN (SELECT id FROM target_farmers)
+          AND leads_user_id IN (SELECT id FROM farmers)
         ORDER BY leads_user_id, updated_at_utc0 DESC
         LIMIT 1 BY leads_user_id
     ),
 
-    -- KYC VERIFIED pertama per user (dipakai untuk duta & self-duta)
+    -- KYC VERIFIED pertama per duta (updated_by = AM yang verifikasi)
     unique_kyc AS (
         SELECT
             user_id,
@@ -61,63 +65,43 @@ WITH
             toDateTime(toInt64(created_at_utc0) / 1000, 'Asia/Jakarta') AS join_date_duta
         FROM ambassador_kyc
         WHERE status = 'VERIFIED'
+          AND user_id IN (SELECT ambassador_user_id FROM unique_leads)
         ORDER BY user_id, created_at_utc0 ASC
         LIMIT 1 BY user_id
     )
 
 SELECT DISTINCT
-    -- Duta: dari leads, fallback ke farmer sendiri kalau dia self-duta
-    ifNull(toString(u_duta.id), '')     != '' AS has_duta,
-    ifNull(toString(self_kyc.user_id), '') != '' AS is_self_duta,
+    f.id                       AS farmer_id,
+    f.name                     AS farmer_name,
+    f.phone_no                 AS farmer_phone,
+    f.utm_source               AS utm_source,
+    f.created_at_utc7          AS join_date_farmer,
+    toMonday(f.created_at_utc7) AS join_week_farmer,
 
-    multiIf(has_duta, u_duta.id,       is_self_duta, u_farmer.id,       NULL) AS duta_id,
-    multiIf(has_duta, u_duta.name,     is_self_duta, u_farmer.name,     NULL) AS duta_name,
-    multiIf(has_duta, u_duta.phone_no, is_self_duta, u_farmer.phone_no, NULL) AS duta_phone,
-    multiIf(has_duta, ak.join_date_duta, is_self_duta, self_kyc.join_date_duta, NULL) AS join_date_duta,
-
-    -- AM: dari KYC duta, fallback ke KYC self-duta
-    nullIf(trim(ifNull(if(has_duta, u_am.name, self_am.name), '')), '') AS am_name,
+    ifNull(toString(al.leads_user_id), '') != '' AS has_duta,
+    nullIf(trim(ifNull(u_am.name, '')), '')      AS area_manager,
+    area_manager IS NOT NULL                     AS has_am,
 
     multiIf(
-        ifNull(u_am.name, '') = 'Fauzy Nurazhari Pane'
-            OR ifNull(self_am.name, '') = 'Fauzy Nurazhari Pane', 'Fauzy Nur Azhari Pane Test',
-        ifNull(duta_name, u_farmer.name) ILIKE '%test%',            ifNull(duta_name, u_farmer.name),
-        am_name
-    ) AS area_manager,
+        has_duta AND has_am, 'Ada Duta & AM',
+        has_duta,            'Ada Duta, Tanpa AM',
+                             'Tanpa Duta'
+    ) AS acquisition_status,
 
-    if(area_manager IS NULL, 'Tanpa Area Manager', 'Ada Area Manager') AS am_status,
+    if(has_duta, al.status, NULL)         AS status_under_duta,
+    if(has_duta, u_duta.id, NULL)         AS duta_id,
+    if(has_duta, u_duta.name, NULL)       AS duta_name,
+    if(has_duta, u_duta.phone_no, NULL)   AS duta_phone,
+    if(has_am,   ak.join_date_duta, NULL) AS join_date_duta,
 
-    u_farmer.id          AS farmer_id,
-    u_farmer.name        AS farmer_name,
-    u_farmer.phone_no    AS farmer_phone,
-    u_farmer.status      AS farmer_status,
-    u_farmer.utm_source  AS utm_source,
-    u_farmer.created_date AS join_date_farmer,
-    toMonday(u_farmer.created_date) AS join_week_farmer,
-    al.status            AS status_under_duta
+    ifNull(u_am.name, '') = 'Fauzy Nurazhari Pane'
+        OR f.name ILIKE '%test%'
+        OR ifNull(duta_name, '') ILIKE '%test%' AS is_test_account
 
-FROM target_farmers AS u_farmer
--- INNER JOIN: farmer wajib punya leads SALE / LEADS
-INNER JOIN unique_leads   AS al       ON al.leads_user_id   = u_farmer.id
-LEFT JOIN  default.user   AS u_duta   ON u_duta.id          = al.ambassador_user_id
-LEFT JOIN  unique_kyc     AS ak       ON ak.user_id         = al.ambassador_user_id
-LEFT JOIN  default.user   AS u_am     ON u_am.id            = ak.updated_by
-LEFT JOIN  unique_kyc     AS self_kyc ON self_kyc.user_id   = u_farmer.id
-LEFT JOIN  default.user   AS self_am  ON self_am.id         = self_kyc.updated_by
+FROM farmers AS f
+LEFT JOIN unique_leads AS al     ON al.leads_user_id = f.id
+LEFT JOIN default.user AS u_duta ON u_duta.id        = al.ambassador_user_id
+LEFT JOIN unique_kyc   AS ak     ON ak.user_id       = al.ambassador_user_id
+LEFT JOIN default.user AS u_am   ON u_am.id          = ak.updated_by
 
-ORDER BY join_date_farmer DESC;
-
-
--- ---------------------------------------------------------------------
--- (Opsional) Ringkasan per minggu: jumlah farmer ada AM vs tanpa AM.
--- Bungkus query di atas (tanpa ORDER BY & titik koma) sebagai `detail`:
---
--- SELECT
---     join_week_farmer,
---     countDistinctIf(farmer_id, am_status = 'Ada Area Manager')   AS farmer_ada_am,
---     countDistinctIf(farmer_id, am_status = 'Tanpa Area Manager') AS farmer_tanpa_am,
---     countDistinct(farmer_id)                                     AS total_farmer
--- FROM ( ...query detail di atas... ) AS detail
--- GROUP BY join_week_farmer
--- ORDER BY join_week_farmer DESC
--- ---------------------------------------------------------------------
+ORDER BY join_date_farmer DESC
