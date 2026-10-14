@@ -379,7 +379,19 @@ function forecastSpecs(F,pre){
       F.priceMoves.length&&`<b>Prices today vs what we sold at (${F.recentLabel}):</b> ${esc(F.priceMoves.slice(0,4).map(x=>`${skuShort(x.name)} ${rp(x.was)} → ${rp(x.now)} a bag (${x.now>=x.was?"+":"−"}${Math.abs(Math.round((x.now/x.was-1)*100))}%)`).join("; "))}.`,
       (F.inf.n||F.unpriced.length)&&`<b>Data:</b> ${F.inf.n?`${F.inf.n} lines (${rp(F.inf.gmv)}) had no province and took the customer's province from other orders${F.inf.byPic?` (${F.inf.byPic} from the PIC's main area)`:""}. `:""}${F.unpriced.length?`${F.unpriced.length} SKUs are not on the price list and use their last selling price (${esc(F.unpriced.slice(0,3).map(skuShort).join(", "))}${F.unpriced.length>3?"…":""}).`:""}`
     ].filter(Boolean)});
-  // 2. Stock plan by month and area (the table management asked for)
+  // 2. Where the stock goes: tonnes by area per month, and the largest SKUs over the 3 months
+  const ARC=[CAT[0],CAT[1],CAT[2]], skT=new Map(); M.forEach(m=>m.rows.forEach(r=>r.skus.forEach(x=>skT.set(x.name,(skT.get(x.name)||0)+x.mt))));
+  const topSk=[...skT].sort((a,b)=>b[1]-a[1]).slice(0,8), totMt=M.reduce((s,m)=>s+m.mt,0), r0=M[0].rows[0], rJ=M[M.length-1].rows[0];
+  S.push({kicker:pre+"Forecast · where the stock goes",title:`${F.areas[0]} needs ${pct(M[0].rows[0].mt,M[0].mt)}% of the stock; ${skuShort(topSk[0][0])} and ${skuShort(topSk[1][0])} are ${pct(topSk[0][1]+topSk[1][1],totMt)}% of the tonnes`,
+    rows:[{cards:[
+      {w:1,title:"Stock required by area (MT)",sub:"Tonnes per month to reach the target",chart:{type:"column",stacked:true,cats:M.map(m=>m.label),
+        series:F.areas.map((a,i)=>({name:a,color:ARC[i],values:M.map(m=>m.rows.find(r=>r.area===a)?.mt||0)})),fmt:v=>mt0(v),lblH:28}},
+      {w:1.1,title:"Largest SKUs, Nov–Jan (MT)",sub:"Tonnes over the 3 months; bags in grey",chart:{type:"hbar",items:topSk.map(([n,v])=>({k:skuShort(n),v,r:`${nf.format(Math.round(v*1000/(packKg(n)||50)))} bags`})),fmt:v=>mt1(v)}}]}],
+    notes:[
+      `<b>${M[0].label.split(" ")[0]} and ${M[1].label.split(" ")[0]} lean on rock phosphate and KCL</b> (the ${F.recentLabel} mix), so they need more tonnes at a lower ${rp(r0.vpk)}/kg in ${F.areas[0]}.`,
+      `<b>${M[M.length-1].label.split(" ")[0]} follows last season</b> (${M[M.length-1].winLabel}): more KCL and NPK at ${rp(rJ.vpk)}/kg, so the same rupiah needs fewer tonnes (${mt0(M[M.length-1].mt)} MT).`,
+      `<b>Sumatera Selatan is small and thin:</b> ${M[0].rows.find(r=>r.area==="Sumatera Selatan")?`${mt1(M[0].rows.find(r=>r.area==="Sumatera Selatan").mt)} MT a month from ${M[0].rows.find(r=>r.area==="Sumatera Selatan").orders} orders of history`:"no history"}, so its mix can swing with one or two customers.`].filter(Boolean)});
+  // 3. Stock plan by month and area (the table management asked for)
   const rows=[]; M.forEach(m=>m.rows.forEach((r,i)=>{ const top=r.skus.slice(0,3).map(x=>`${skuShort(x.name)} ${mt1(x.mt)}`).join(" · "), rest=r.skus.length-3;
     rows.push([i?"":{v:m.label,bold:true},`${r.area}${r.note?"*":""}`,{v:`${mt1(r.mt)} MT: ${top}`},
       `${rp(r.target)}\n(fertilizer ${rp(r.fertGmv)})`,
@@ -616,8 +628,22 @@ function deckNarrative(T){
   if(fa.length) X.actions=[...fa,...(X.actions||[])].slice(0,6);
   // the cover says the deck carries a stock plan
   const fc0=T.find(t=>t.A.forecast)?.A.forecast;
-  if(fc0){ const m=fc0.months; X.forecast=true; X.eyebrow="Sales Review & Stock Plan";
-    X.title=`${X.title} · Plan ${m[0].label.split(" ")[0]}–${m[m.length-1].label.split(" ")[0]}`; }
+  if(fc0){ const F=fc0, m=F.months, tg=F.target, avgMt=m.reduce((s,x)=>s+x.mt,0)/m.length, name=T.find(t=>t.A.forecast).name;
+    const skT=new Map(); m.forEach(x=>x.rows.forEach(r=>r.skus.forEach(k=>skT.set(k.name,(skT.get(k.name)||0)+k.mt)))); const top=[...skT].sort((a,b)=>b[1]-a[1]);
+    X.forecast=true; X.eyebrow="Stock Forecast"; X.title=`${name} · ${m[0].label} – ${m[m.length-1].label}`;
+    X.period=`Sales history ${fds(F.hist[0]&&new Date(Math.floor(F.hist[0].m/12),F.hist[0].m%12,1))} – ${fds(F.lastDate)} ${F.lastDate.getFullYear()}`; X.meta=`target ${rp(tg)} a month`;
+    X.headline=`${rp(tg)} a month needs ${m.map(x=>`${mt0(x.mt)} MT in ${x.label.split(" ")[0]}`).join(", ")}: about ${(avgMt*1000/F.bestKg.kg).toFixed(1)}× our best month`;
+    X.kpis=[{v:mt0(m[0].mt),u:" MT",l:`stock for ${m[0].label} (${m.slice(1).map(x=>`${x.label.split(" ")[0]} ${mt0(x.mt)} MT`).join(", ")})`,hot:true},
+      {v:rpParts(tg)[0],u:rpParts(tg)[1],l:`target a month: ${(tg/F.best.gmv).toFixed(1)}× the best month (${rp(F.best.gmv)}, ${F.best.label}), ${(tg/F.avg).toFixed(1)}× the ${F.avgN}-month average`},
+      {v:mt0(F.ordersNeeded),u:"",l:`fertilizer orders a month needed, vs ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}`},
+      {v:String(pct(F.share[F.areas[0]],1)),u:"%",l:`of the target and stock in ${F.areas[0]}; ${F.areas.slice(1).map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")}`}];
+    X.findings=[
+      [`Rp4B is a step up, not a stretch of today`.replace("Rp4B",rp(tg)),`The best month so far was ${rp(F.best.gmv)} (${F.best.label}); the last ${F.avgN} full months averaged ${rp(F.avg)}. The plan needs ${mt0(avgMt)} MT a month against a record of ${mt0(F.bestKg.kg/1000)} t (${F.bestKg.label}).`],
+      [`Two SKUs carry the plan`,`${top.slice(0,3).map(([n,v])=>`${skuShort(n)} ${mt0(v)} MT`).join(", ")} over the 3 months (${pct(top.slice(0,3).reduce((s,x)=>s+x[1],0),top.reduce((s,x)=>s+x[1],0))}% of the tonnes). A stock-out of either stops the plan.`],
+      [`January is a different mix`,`Last season's Jan–Feb sold more KCL and NPK, so January needs ${mt0(m[m.length-1].mt)} MT for the same ${rp(tg)}, against ${mt0(m[0].mt)} MT in ${m[0].label.split(" ")[0]}.`],
+      [`The gap is orders, not price`,`At the ${F.recentLabel} average order of ${rp(F.aov)}, ${rp(tg)} needs ${mt0(F.ordersNeeded)} orders a month; the team closed ${Math.round(F.ordersPerMonth)}. Today's prices are within ${Math.max(...F.priceMoves.map(x=>Math.abs(Math.round((x.now/x.was-1)*100))),0)}% of what the top SKUs sold for.`]];
+    X.bottom={p:`Stock ${top.slice(0,2).map(([n])=>skuShort(n)).join(" and ")} first, and plan ${mt0(F.ordersNeeded)} orders a month by PIC and area.`,
+      s:`Stock required is the tonnage to sell at 14 Oct prices; stock on hand and supplier lead times are not in the data.`}; }
   X.actions=draftActs(X.actions||[]); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X;
 }
 function deckNarrative0(T){
