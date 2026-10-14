@@ -21,7 +21,7 @@ WITH
     -- Akuisisi farmer: definisi sama dengan query target akuisisi
     -- (datamart_user REGISTERED + is_active + role FARMER)
     farmers AS (
-        SELECT id, name, phone_no, created_at_utc7
+        SELECT id, name, phone_no, created_at_utc7, referral_utm, utm_source
         FROM sawitpro_datamart.datamart_user
         WHERE status = 'REGISTERED'
           AND is_active = TRUE
@@ -56,6 +56,8 @@ WITH
             f.name                       AS farmer_name,
             f.phone_no                   AS farmer_phone,
             f.created_at_utc7            AS join_date_farmer,
+            f.referral_utm               AS referral_utm,
+            f.utm_source                 AS utm_source,
             toMonday(f.created_at_utc7)  AS join_week_farmer,
             ifNull(al.status, '')        AS status_under_duta,
             status_under_duta IN ('SALE', 'LEADS') AS under_duta,
@@ -86,6 +88,8 @@ SELECT DISTINCT
     farmer_name,
     farmer_phone,
     join_date_farmer,
+    referral_utm,
+    utm_source,
     nullIf(status_under_duta, '')   AS status_under_duta,
     if(under_duta, duta_id, NULL)   AS duta_id,
     if(under_duta, duta_name, NULL) AS duta_name,
