@@ -1,0 +1,24 @@
+item,slide,value,source,status
+GMV Jul,3,Rp2.41B,sales.gmv sum by month,OK
+GMV Aug,2,Rp1.64B,sales.gmv sum by month,OK
+GMV Sep,3,Rp2.25B,sales.gmv sum by month,OK
+Total GMV Jul–Sep,2,6.31B,sales.gmv sum,OK
+Orders total,1,237 orders,distinct main_order_no,OK
+Customers total,1,133 customers,distinct normalised phone,OK
+Sep orders,3,100 orders in Sep,"distinct order, Sep",OK
+Sep customers,3,71 customers,"distinct phone, Sep",OK
+Jul→Sep change %,2,7%,(Sep/Jul−1),OK
+Jul customers not in Sep,5,49 of 67 Jul customers,phone sets,OK
+Both Jul & Sep,5,18 cust,phone sets,OK
+Jul customers ordered again,2,(24 of 67),phone sets,OK
+Lapsed customers,8,62 customers stopped buying,phone sets,OK
+Lapsed GMV,8,(Rp3.1B),gmv of lapsed,OK
+Orders ≥Rp100M Jul,6,from 6 to 1,order gmv ≥100M,OK
+Sep GMV not completed,17,Rp569M,"so_status≠COMPLETED, Sep",OK
+Sep orders not completed,17,18 Sep orders,"so_status≠COMPLETED, Sep",OK
+Riau share,10,Riau is 81%,province,OK
+CRM engagements,15,Engagements logged: 849,engagement rows Jul–Sep,OK
+Reached,15,Reached the lead: 767,"Called, or Onsite with no result",OK
+Showed interest,15,Showed interest: 590,warm + won statuses,OK
+CRM wins,15,Only 2 of,Already order,OK
+CONTROL (deliberately wrong: Sep GMV Rp2.35B),2,Rp2.35B,control,MISMATCH
