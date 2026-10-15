@@ -4,7 +4,7 @@
 -- Versi rapi/optimasi dari query basket asli (finale + `basket` CTE).
 -- Output: 1 baris per minggu (8 baris), kolom sama dengan query asli:
 --   sale_order_week  : Senin awal minggu (toMonday tanggal order)
---   total_sales      : sum(basket_gmv)
+--   total_sales      : sum(basket_gmv), basket_gmv = sum(potential_gmvs)
 --   total_invoice    : jumlah basket (invoice_no + tanggal)
 --   basket_size      : median(basket_gmv)  -- tahan outlier
 --   mean_basket_size : avg(basket_gmv)     -- pembanding
@@ -14,9 +14,8 @@
 --   product_category NOT IN (Racun, Token, Kaos, Pulsa..., Dokter Sawit,
 --   Benih, Minyak Hemat).
 -- Catatan definisi (dipertahankan dari query asli):
---   * gmv hanya terisi untuk sale_order_status COMPLETED/32. Basket yang
---     belum COMPLETED tetap ikut total_invoice, tapi basket_gmv-nya NULL
---     sehingga tidak ikut sum/median/avg.
+--   * basket_gmv = sum(potential_gmvs) (bukan `gmv` yang hanya terisi untuk
+--     COMPLETED), jadi semua order yang lolos filter ikut sum/median/avg.
 --   * Query ini TIDAK difilter per tim (semua pic_teams), sama seperti
 --     aslinya. Lark semua tim tetap dibaca hanya karena join dop_fallback
 --     (ALL join) bisa menggandakan baris -> mempengaruhi sum(gmv).
@@ -181,7 +180,7 @@ WITH
         d.invoice_no AS invoice_no,
         d.store_name AS store_name,
         CAST(toDate(toTimeZone(d.sale_order_created_time, 'Asia/Jakarta')) AS Nullable(Date)) AS basket_date,
-        CAST(multiIf(toString(d.sale_order_status) IN ('COMPLETED', '32'), d.potential_gmv, NULL) AS Nullable(Float64)) AS row_gmv
+        CAST(d.potential_gmv AS Nullable(Float64)) AS row_gmv
       FROM sawitpro_datamart.fct_new_sale_order_shopify AS d
       WHERE
         basket_date >= week_start
@@ -262,7 +261,7 @@ WITH
       SELECT
         e.invoice_no AS invoice_no,
         CAST(toTimeZone(e.sale_order_created_time, 'Asia/Jakarta') AS Nullable(Date)) AS basket_date,
-        CAST(multiIf(toString(e.sale_order_status) IN ('COMPLETED', '32'), e.potential_gmv, NULL) AS Nullable(Float64)) AS row_gmv,
+        CAST(e.potential_gmv AS Nullable(Float64)) AS row_gmv,
         if(fb.n > 0, fb.n, 1) AS row_weight
       FROM
         sawitpro_datamart.datamart_ecommerce AS e
