@@ -2,7 +2,8 @@
 -- Basket size order PETANI (pupuk per-kg), 8 minggu terakhir yang sudah
 -- selesai (Senin 8 minggu lalu s/d sebelum Senin minggu ini, Asia/Jakarta).
 -- Versi rapi/optimasi dari query basket asli (finale + `basket` CTE).
--- Output (1 baris), sama dengan query asli:
+-- Output: 1 baris per minggu (8 baris), kolom sama dengan query asli:
+--   sale_order_week  : Senin awal minggu (toMonday tanggal order)
 --   total_sales      : sum(basket_gmv)
 --   total_invoice    : jumlah basket (invoice_no + tanggal)
 --   basket_size      : median(basket_gmv)  -- tahan outlier
@@ -308,9 +309,14 @@ WITH
         basket_date
     )
 SELECT
+  toMonday(basket_date) AS sale_order_week,                                -- Senin awal minggu
   CAST(round(sum(basket_gmv)) AS Nullable(Int64)) AS total_sales,
   count() AS total_invoice,
   CAST(round(median(basket_gmv)) AS Nullable(Int64)) AS basket_size,       -- median, tahan outlier
   CAST(round(avg(basket_gmv)) AS Nullable(Int64)) AS mean_basket_size      -- pembanding
 FROM
   basket
+GROUP BY
+  sale_order_week
+ORDER BY
+  sale_order_week
