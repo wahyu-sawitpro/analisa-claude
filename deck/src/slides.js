@@ -425,7 +425,7 @@ function acqNarrative(T){
   const Q=T[0].A.acq, L=Q.L, P=Q.P, d=P?L.total-P.total:0, top=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0], ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), extAll=Q.weeks.reduce((s,x)=>s+x.real,0);
   const D=Q.dutas, act=D.filter(x=>x.l), intD=D.filter(x=>x.internal), extD=D.filter(x=>!x.internal), lead=[...D].sort((a,b)=>b.tot-a.tot)[0];
   const topC=Q.camps[0], gainC=Q.camps[Q.camps.length-1], X={multi:false,acq:true,gaps:[],dates:Q.dates};
-  X.eyebrow="Farmer Acquisition"; X.title="Duta vs Non-Duta Last Week"; X.period=`Week of ${L.label} ${new Date(L.w).getFullYear()}`; X.meta=P?`vs ${P.label}`:`${nf.format(L.total)} farmers`;
+  X.eyebrow="Farmer Acquisition"; X.title=`Duta vs Non-Duta, ${L.label}`; X.period=`Week of ${L.label} ${new Date(L.w).getFullYear()}`; X.meta=P?`vs ${P.label}`:`${nf.format(L.total)} farmers`;
   X.headline=P?`${nf.format(L.total)} farmers joined last week, ${sg(d)} (${spc(L.total,P.total)}): ${nf.format(L.under)} through Dutas (${sg(L.under-P.under)}) and ${nf.format(L.non)} without (${sg(L.non-P.non)})`:`${nf.format(L.total)} farmers joined in the week of ${L.label}`;
   X.kpis=[{v:nf.format(L.total),u:"",l:`farmers registered ${L.label}${P?`, ${sg(d)} (${spc(L.total,P.total)}) on ${P.label}`:""}`,hot:true},
     {v:nf.format(L.non),u:"",l:`non-Duta${P?`: ${sg(L.non-P.non)} (${spc(L.non,P.non)}) on the week before`:""}`},

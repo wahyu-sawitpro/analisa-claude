@@ -1,5 +1,6 @@
 # SawitPRO Deck (Smallholder + Plantation)
 
+The page title, the cover and the PPTX file name follow what was analysed (e.g. "SawitPRO Deck · Farmer Acquisition").
 One deck page for every analysis request: sales reviews, lead acquisition (CRM), stock forecasting and more. The
 slides follow the files you upload: sales exports give the sales review, CRM exports the acquisition slides, and a
 sales history with a price list adds the stock forecast. A farmer acquisition export (e.g. `farmer akusisi.csv`) makes it a
