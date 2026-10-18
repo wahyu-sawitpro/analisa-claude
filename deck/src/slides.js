@@ -356,6 +356,57 @@ const OUT_COLOR={"Ordered":"#274E13","Considering / prospect":"#D9A21B","Not int
 const skuShort=n=>String(n).replace(/\s*\d+(?:[.,]\d+)?\s*kg\b/gi,"").replace(/^MOP\//i,"").replace(/\s+-\s+/g," ").replace(/\s+/g," ").trim();
 const mt1=v=>(Math.round(v*10)/10).toLocaleString("en-US",{minimumFractionDigits:1,maximumFractionDigits:1});
 const mt0=v=>Math.round(v).toLocaleString("en-US");
+// DO pipeline: where the FFB supplier leads stand, who and where they are, and the lead list with what is missing.
+const DO_C={HOT:"#B85A28",WARM:"#D9A21B",COLD:"#5B7F95"};
+const cap=t=>String(t).replace(/^./,c=>c.toUpperCase()), tN=v=>v==null?"–":nf.format(Math.round(v)), plS=(n,w)=>`${nf.format(n)} ${w}${n===1?"":"s"}`;
+function doSpecs(Q,pre){
+  const S=[], R=Q.rows, items=(c,col)=>c.map(([k,v])=>({k,v,color:col?col(k):CAT[0]}));
+  const sc=k=>DO_C[k]||"#9AA592", ffbBy=(f)=>[...sumBy(R,f,r=>r.ffb||0)];
+  const old=[...R].filter(r=>r.age!=null).sort((a,b)=>b.age-a.age)[0];
+  S.push({kicker:pre+"DO pipeline · where the leads stand",
+    title:`${plS(Q.n,"DO lead")}: ${Q.status.map(([k,v])=>`${v} ${k}`).join(", ")}; ${Q.progress.map(([k,v])=>`${v} at ${k.toLowerCase()}`).join(", ")}`,
+    rows:[{cards:[
+      {w:1,title:"Leads by status",sub:"Potential FFB (t) at the right",chart:{type:"hbar",items:Q.status.map(([k,v])=>({k,v,color:sc(k),r:`${tN(R.filter(r=>r.status===k).reduce((s,r)=>s+(r.ffb||0),0))} t`}))}},
+      {w:1,title:"Leads by progress stage",sub:"Area (ha) at the right",chart:{type:"hbar",items:Q.progress.map(([k,v])=>({k,v,color:CAT[0],r:`${tN(R.filter(r=>r.progress===k).reduce((s,r)=>s+(r.area||0),0))} ha`}))}}]}],
+    notes:[`<b>Size:</b> ${tN(Q.area)} ha and ${tN(Q.ffb)} t of potential FFB across ${plS(Q.n,"lead")}${Q.n>1?`; the largest is ${[...R].sort((a,b)=>(b.ffb||0)-(a.ffb||0))[0].id} with ${tN([...R].sort((a,b)=>(b.ffb||0)-(a.ffb||0))[0].ffb)} t`:""}.`,
+      old&&`<b>Age:</b> the oldest open lead (${old.id}) was created ${fds(old.created)}, ${old.age} days ago, and is still ${old.status} at ${old.progress.toLowerCase()}.`].filter(Boolean)});
+  const card=(title,c,sub)=>({w:1,title,sub,chart:{type:"hbar",items:c.slice(0,5).map(([k,v])=>({k,v,color:CAT[0]})),rowH:40}});
+  S.push({kicker:pre+"DO pipeline · who and where",title:`${Q.pic.map(([k,v])=>`${k} ${v}`).slice(0,3).join(", ")}${Q.regency.length?`; ${Q.regency.slice(0,2).map(([k,v])=>`${k} ${v}`).join(", ")}`:""}${Q.mill.length?`; nearest mill ${Q.mill[0][0]}`:""}`,
+    rows:[{cards:[card("By PIC",Q.pic,"Leads per PIC"),card("By regency",Q.regency,Q.prov.map(([k])=>k).slice(0,2).join(", ")),card("By nearest mill",Q.mill,"Mill closest to the DO")]},
+      {cards:[card("By lead source",Q.source,"How the lead was found"),card("By customer type",Q.custType,"Type of DO"),
+        {w:1,title:"Potential FFB by PIC",sub:"Tonnes",chart:{type:"hbar",items:ffbBy(r=>r.pic).slice(0,5).map(([k,v])=>({k,v,color:CAT[2]})),fmt:v=>`${tN(v)} t`,rowH:40}}]}]});
+  const ord={HOT:0,WARM:1,COLD:2}, L=[...R].sort((a,b)=>(ord[a.status]??3)-(ord[b.status]??3)||(b.ffb||0)-(a.ffb||0)).slice(0,12);
+  S.push({kicker:pre+"DO pipeline · lead list",title:`${R.filter(r=>r.missing.length).length} of ${plS(Q.n,"lead")} ${R.filter(r=>r.missing.length).length===1?"misses":"miss"} key information: ${[...new Map(R.flatMap(r=>r.missing).map(x=>[x,1])).keys()].slice(0,3).join(", ")||"none"}`,
+    rows:[{cards:[{foot:`Hottest first, then by potential FFB. No owner names or phone numbers are shown. Age = days since the lead was created, to ${fds(Q.today)}.`,
+      table:{colW:[9,12,10,13,11,7,7,7,8,8,6,18],head:["Lead","PIC","Regency","Customer type","Progress","Status","Area (ha)","FFB (t)","Nearest mill","Created","Age","Missing"],align:["l","l","l","l","l","l","r","r","l","l","r","l"],
+        rows:L.map(r=>[{v:r.id,bold:true},r.pic||"–",r.regency||"–",r.custType||"–",r.progress,{v:r.status,fill:sc(r.status),color:"#FFFFFF"},tN(r.area),tN(r.ffb),r.mill||"–",r.created?fds(r.created):"–",r.age??"–",r.missing.join(", ")||"–"])}}]}]});
+  return S;
+}
+function doNarrative(T){
+  const Q=T[0].A.dop, R=Q.rows, X={multi:false,dop:true,gaps:[],dates:Q.dates}, hot=R.filter(r=>r.status==="HOT").length, cold=R.filter(r=>r.status==="COLD").length;
+  const miss=countBy(R.flatMap(r=>r.missing.map(m=>({m}))),x=>x.m), early=R.filter(r=>/first|outreach|contact/i.test(r.progress)).length, old=[...R].filter(r=>r.age!=null).sort((a,b)=>b.age-a.age)[0];
+  const partial=Q.maxId&&Q.maxId>Q.n*1.5;
+  X.eyebrow="DO Pipeline"; X.title=`Smallholder DO Leads, ${Q.dates.length?`${fds(Q.dates[0])}${Q.dates.length>1&&+Q.dates[0]!==+Q.dates[Q.dates.length-1]?` – ${fds(Q.dates[Q.dates.length-1])}`:""}`:"status"}`;
+  X.period=`Status to ${fds(Q.today)} ${Q.today.getFullYear()}`; X.meta=plS(Q.n,"DO lead");
+  X.headline=`${plS(Q.n,"DO lead")} with ${tN(Q.area)} ha and ${tN(Q.ffb)} t of potential FFB; ${cold===Q.n?`${Q.n===1?"it is":"all are"} still COLD`:`${hot} HOT, ${cold} COLD`}${early?` and ${early===Q.n?(Q.n===1?"at":"all at"):`${early} at`} first outreach`:""}`;
+  X.kpis=[{v:nf.format(Q.n),u:"",l:`DO lead${Q.n===1?"":"s"} in this export${partial?` (IDs run to ${Q.maxId})`:""}`,hot:true},
+    {v:tN(Q.ffb),u:" t",l:"potential FFB across the leads"},{v:tN(Q.area),u:" ha",l:"area across the leads"},
+    {v:String(hot),u:`/${Q.n}`,l:`HOT leads; ${cold} COLD${old?`, oldest ${old.age} days`:""}`}];
+  X.findings=[
+    partial&&[`This export looks partial`,`It has ${plS(Q.n,"lead")} but the lead IDs run to ${Q.maxId}, so about ${Q.maxId-Q.n} leads are missing. Re-export the full DO pipeline before reading trends from it.`],
+    [`No lead has moved past first contact`.replace("No lead has",early===Q.n?"No lead has":`${Q.n-early} of ${Q.n} leads have`).replace("moved past first contact",early===Q.n?"moved past first contact":"moved past first contact"),`${Q.progress.map(([k,v])=>`${v} at ${k}`).join(", ")}; status ${Q.status.map(([k,v])=>`${k} ${v}`).join(", ")}${old?`. ${old.id} is ${old.age} days old`:""}.`],
+    miss.length&&[`Key fields are empty`,`${cap(miss.slice(0,4).map(([k,v])=>`${k} (${v} of ${Q.n})`).join(", "))}. Without the distance to the mill and the current buyer the offer can't be priced.`],
+    [`Where the volume is`,`${Q.regency.slice(0,2).map(([k,v])=>`${k} ${v}`).join(", ")||"No regency"}${Q.mill.length?`, nearest mill ${Q.mill.slice(0,2).map(([k])=>k).join(", ")}`:""}; ${Q.custType.slice(0,2).map(([k,v])=>`${k} ${v}`).join(", ")}, found through ${Q.source.slice(0,2).map(([k])=>k.toLowerCase()).join(" and ")}.`]].filter(Boolean).slice(0,4);
+  X.bottom={p:partial?`Get the full DO pipeline export, then move the COLD leads past first outreach with the missing facts filled in.`:`Move the COLD leads past first outreach, and fill in the mill distance and current buyer so each offer can be priced.`,
+    s:`Status as exported from the CRM; potential FFB and area are as entered by the PIC. Owner names and phone numbers are not shown.`};
+  const byPic=countBy(R.filter(r=>r.status!=="HOT"),r=>r.pic);
+  X.actions=[
+    partial&&{t:`Re-export the full DO pipeline`,d:`This file has ${plS(Q.n,"lead")} but IDs run to ${Q.maxId}. Export every DO lead (all PICs, all statuses) so the deck shows the whole pipeline.`,o:"",w:""},
+    old&&{t:`Second visit for ${old.id}`,d:`${old.pic||"The PIC"}: ${old.age} days at ${old.progress.toLowerCase()}, ${tN(old.area)} ha and ${tN(old.ffb)} t potential FFB${old.mill?` near ${old.mill}`:""}. Agree the next step and a closing date.`,o:"",w:""},
+    miss.length&&{t:`Fill in ${miss.slice(0,2).map(([k])=>k).join(" and ")}`,d:`${cap(miss.map(([k,v])=>`${k} empty on ${v} of ${Q.n}`).join("; "))}. Make them required before a lead moves past first outreach.`,o:"",w:""},
+    byPic.length&&{t:`Weekly DO pipeline review by PIC`,d:`Leads not yet HOT: ${byPic.map(([k,v])=>`${k} ${v}`).join(", ")}. Review progress, status and closing dates each week in this deck.`,o:"",w:""}].filter(Boolean);
+  return X;
+}
 // Farmer acquisition: Duta vs non-Duta last week, what moved the total, the weekly trend, and the channel / campaign detail.
 const sg=v=>v>0?`+${nf.format(v)}`:v<0?`−${nf.format(-v)}`:"0", spc=(l,p)=>p?`${l>=p?"+":"−"}${Math.abs(Math.round((l/p-1)*100))}%`:"–";
 const SRC_C={Organic:CAT[0],GADN:CAT[2],Meta:CAT[4],"Identified Campaigns":CAT[1],Duta:CAT[3]};
@@ -503,6 +554,7 @@ function forecastSpecs(F,pre){
 }
 function teamSpecs(A,N,pre){
   if(A.acq) return acqSpecs(A.acq,pre);
+  if(A.dop) return doSpecs(A.dop,pre);
   const S=[], O=A.orders, pl=(n,w)=>`${n} ${w}${n===1?"":"s"}`, rpM=v=>rp(v);
   if(A.forecast) return forecastSpecs(A.forecast,pre);  // a price list makes this a forecast deck: forecast slides only
   const NI={name:"Not interested",color:OUTC.lost}, WM={name:"Considering / prospect",color:OUTC.warm}, NS={name:"No status",color:OUTC.none};
@@ -706,12 +758,14 @@ function teamSlides(A,N,pre,S,next){ teamSpecs(A,N,pre).forEach(sp=>S.push(panel
 // Footer line on every content slide: what GMV means, what is compared and the as-of date.
 let FOOT_BASIS="SAWITPRO PROPRIETARY";
 function basisOf(T,X){
+  if(T[0].A.dop){ const Q=T[0].A.dop; return `DO leads from the CRM · status to ${fds(Q.today)} ${Q.today.getFullYear()}`; }
   if(T[0].A.acq){ const Q=T[0].A.acq; return `Farmers by registration week${Q.P?` · last week vs the week before`:""} · data to ${fds(Q.lastDate)} ${Q.lastDate.getFullYear()}`; }
   const tr=T.find(t=>t.A.trend)?.A.trend, sales=T.some(t=>t.A.has.sales), fc=T.find(t=>t.A.forecast)?.A.forecast, last=fc?fc.lastDate:X.dates[X.dates.length-1];
   const asOf=last?`data to ${fds(last)} ${last.getFullYear()}`:"";
   return [sales&&"GMV incl. shipping, before discount",fc?`target ${rp(fc.target)} a month at ${fc.priceLabel.replace(/^price (per )?/i,"prices of ").replace(/\.csv$/i,"")}`:tr?`${tr.Z.label} vs ${tr.F.label}`:T.some(t=>t.A.wow)?"last week vs the week before":null,asOf].filter(Boolean).join(" · ")||"SAWITPRO PROPRIETARY";
 }
 function deckNarrative(T){
+  if(T[0].A.dop){ const X=doNarrative(T); X.actions=draftActs(X.actions); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X; }
   if(T[0].A.acq){ const X=acqNarrative(T); X.actions=draftActs(X.actions); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X; }
   const X=deckNarrative0(T), fa=[];
   T.filter(t=>t.A.forecast).forEach(t=>{ const F=t.A.forecast, m0=F.months[0], top=new Map();
@@ -852,7 +906,7 @@ function buildDeck(T,X){
     teamSlides(t.A,t.N,X.multi?`${t.name} · `:"",S,next);
     if(t.C&&t.NC&&!t.A.forecast) teamSlides(t.C,t.NC,`${X.multi?`${t.name} · `:""}CRM ${crmSpan(t.C)} · `,S,next);
   });
-  S.push(contentSlide(next(),"Next steps",`${X.actions.length} draft actions ${X.acq?"to grow farmer acquisition":X.forecast?"to deliver the stock plan":X.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`,`
+  S.push(contentSlide(next(),"Next steps",`${X.actions.length} draft actions ${X.dop?"to move the DO pipeline":X.acq?"to grow farmer acquisition":X.forecast?"to deliver the stock plan":X.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`,`
     <div class="act${X.actions.length>4?" act3":""}">${X.actions.map((a,i)=>`<div class="card"><h3><span>${i+1}</span>${esc(a.t)}</h3><p>${esc(a.d)}</p><div class="meta">${a.team?`<span class="team">${esc(a.team)}</span>`:""}<span>Owner: ${esc(a.o)}</span><span class="when">${esc(a.w)}</span></div></div>`).join("")}</div>
     ${X.gaps.length?`<div class="gaps"><b>Also clean up in the CRM:</b> ${esc(X.gaps.join("; "))}.</div>`:""}`));
   S.push(`<div class="slide closing"><img class="bg" src="${IMG.closing}" alt=""><div class="shade"></div><img class="wm" src="${IMG.wm}" alt="SawitPRO.id"><img class="lg" src="${IMG.logo}" alt="">

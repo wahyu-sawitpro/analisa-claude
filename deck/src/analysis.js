@@ -73,18 +73,25 @@ const ACQ_FIELDS=[["week",[/minggu_?register|register_?week|week_?register|^ming
   ["test",[/is_?test_?duta|is_?test/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
 const detectAcq=h=>detectWith(ACQ_FIELDS,h);
 const isAcqList=headers=>{ const m=detectAcq(headers); return !!(m.type||m.week&&m.joined&&(m.id||m.duta)); };
+// A DO (FFB supplier) pipeline export from the CRM: one row per DO lead, with area, potential FFB and the nearest mill.
+const DO_FIELDS=[["id",[/^text$|^do_?id$|^id$/]],["pic",[/^pic$/]],["progress",[/^progress$/]],["location",[/^location$|lokasi/]],["doName",[/^do name$/]],
+  ["source",[/leads? source/]],["area",[/luas|area \(ha\)/]],["created",[/created date|tanggal dibuat/]],["ffb",[/ffb/]],["dist",[/jarak/]],["mill",[/mills? terdekat|nearest mill/]],
+  ["supply",[/supply ke|supplies to/]],["custType",[/customer type/]],["closing",[/closing date/]],["status",[/^status$/]],["detail",[/^detail$/]]];
+const detectDo=h=>{ const m={}, used=new Set(); for(const [k,res] of DO_FIELDS){ const x=h.find(c=>!used.has(c)&&res.some(re=>re.test(norm(c)))); if(x){m[k]=x;used.add(x);} } return m; };
+const isDoList=headers=>{ const m=detectDo(headers); return !!(m.doName||m.ffb&&m.mill); };
 // A price list: item names and a price column, no order or quantity columns.
 const isPriceList=headers=>{ const h=headers.map(norm);
   return h.some(x=>/nama barang|item|product|produk/.test(x))&&h.some(x=>/harga|price/.test(x))&&!h.some(x=>/^qty$|quantity|order|invoice|gmv/.test(x)); };
 function detectRole(headers){
   if(isAcqList(headers)) return "acq";
+  if(isDoList(headers)) return "do";
   if(isPriceList(headers)) return "price";
   const s=detectSales(headers), c=detectCrm(headers);
   const salesScore=["orderNo","invoice","qty","gmv","item"].filter(k=>s[k]).length;
   const crmScore=["status","reason","channel","detail","id"].filter(k=>c[k]).length;
   return salesScore>=3&&salesScore>=crmScore?"sales":"crm";
 }
-const ROLE_LABEL={crm:"CRM engagements",sales:"Sales orders",price:"Price list",acq:"Farmer acquisition"};
+const ROLE_LABEL={crm:"CRM engagements",sales:"Sales orders",price:"Price list",acq:"Farmer acquisition",do:"DO pipeline"};
 
 /* ================= Cleaning & translation ================= */
 const blank=v=>v===null||v===undefined||(typeof v==="string"&&v.trim()==="")||(typeof v==="number"&&isNaN(v));
@@ -585,6 +592,8 @@ function detectTeam(d){
 function analyseTeams(sources){
   // a farmer acquisition export makes this an acquisition deck: its own analysis, other files are left out
   const acq=sources.filter(d=>(d.role&&d.role!=="auto"?d.role:detectRole(d.headers))==="acq");
+  const dop=sources.filter(d=>(d.role&&d.role!=="auto"?d.role:detectRole(d.headers))==="do");
+  if(dop.length&&!acq.length){ const Q=doPipeline(dop); return [{name:"DO pipeline",A:{dop:Q,crm:[],orders:[],won:[],has:{},dates:Q.dates,gmv:0},C:null,sources:dop,left:sources.length-dop.length}]; }
   if(acq.length){ const Q=acquisition(acq); return [{name:"Farmer acquisition",A:{acq:Q,crm:[],orders:[],won:[],has:{},dates:Q.dates,gmv:0},C:null,sources:acq,left:sources.length-acq.length}]; }
   const TR=trendMode(sources), parts=new Map(), add=(t,d)=>{ if(!parts.has(t)) parts.set(t,[]); parts.get(t).push(d); };
   const prices=[];
@@ -761,4 +770,23 @@ function acquisition(sources){
     .sort((a,b)=>b.l-a.l||b.tot-a.tot||a.k.localeCompare(b.k));
   return {weeks:W,L,P,dutas,srcs,dSrc,camps,avg,avgN:base.length,peak,dropped,rows:R.length,realAll:R.filter(r=>r.real).length,underAll:R.filter(r=>r.under).length,
     realWeeks:W.filter(x=>x.real).length,lastDate:dropped?dropped.to:new Date(lastJ),dates:R.map(r=>r.jd).filter(Boolean),files:sources.map(srcLabel)};
+}
+
+/* ================= DO pipeline (FFB supplier leads) ================= */
+const DO_STATUS=["HOT","WARM","COLD"], DO_ASK=[["dist","distance to the nearest mill"],["supply","who they supply today"],["detail","engagement detail"],["closing","closing date"],["mill","nearest mill"],["area","area (ha)"],["ffb","potential FFB"]];
+function doPipeline(sources){
+  const R=[]; let asOf=null;
+  for(const d of sources){ const m=detectDo(d.headers);
+    for(const r of d.rows){ if(blank(r[m.id])&&blank(r[m.doName])) continue;
+      const loc=clean(r[m.location])||"", parts=loc.split(/\s+-\s+/), created=toDate(r[m.created]);
+      R.push({id:clean(r[m.id])||"–",pic:clean(r[m.pic]),progress:clean(r[m.progress])||"No progress",status:(clean(r[m.status])||"No status").toUpperCase(),
+        prov:parts[0]?parts[0].toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase()):null,regency:parts[1]?regionOf(parts[1]):null,source:clean(r[m.source]),
+        area:toNum(r[m.area]),ffb:toNum(r[m.ffb]),dist:toNum(r[m.dist]),mill:clean(r[m.mill]),supply:clean(r[m.supply]),custType:clean(r[m.custType]),
+        created,closing:toDate(r[m.closing]),detail:clean(r[m.detail]),missing:DO_ASK.filter(([k])=>m[k]&&blank(r[m[k]])).map(([,l])=>l)}); } }
+  const today=new Date(); today.setHours(0,0,0,0);
+  R.forEach(r=>{ r.age=r.created?Math.round((today-r.created)/864e5):null; });
+  const sum=k=>R.reduce((s,r)=>s+(r[k]||0),0), ids=R.map(r=>parseInt(String(r.id).replace(/\D/g,""),10)).filter(n=>!isNaN(n));
+  return {rows:R,n:R.length,area:sum("area"),ffb:sum("ffb"),status:countBy(R,r=>r.status),progress:countBy(R,r=>r.progress),pic:countBy(R,r=>r.pic),prov:countBy(R,r=>r.prov),
+    regency:countBy(R,r=>r.regency),source:countBy(R,r=>r.source),custType:countBy(R,r=>r.custType),mill:countBy(R,r=>r.mill),
+    maxId:ids.length?Math.max(...ids):null,today,dates:R.map(r=>r.created).filter(Boolean).sort((a,b)=>a-b),files:sources.map(srcLabel)};
 }

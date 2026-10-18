@@ -75,6 +75,17 @@ PPTX (no native charts, so Google Slides keeps every label). Chart types: column
    - Recoverable demand: leads still in play
 3. Next steps and closing
 
+## DO pipeline (CRM DO export)
+A CRM export of DO (FFB supplier) leads, with `DO Name`, `Potensial FFB (Ton)` and `Mills terdekat` columns, is read as
+**DO pipeline** and sets the deck. Slides: where the leads stand (status HOT / WARM / COLD with potential FFB, progress
+stage with area), who and where (PIC, regency, nearest mill, lead source, customer type, FFB by PIC), and the lead list
+with each lead's age and missing fields. Owner names, DO names and phone numbers are never shown. When the lead IDs run
+far past the number of rows (e.g. DOOP-022 in a 1-row file) the deck flags the export as partial.
+
+Findings for `CRM DO smallholder status.csv` (18 Oct 2026, the sample): 1 lead (DOOP-022, Sazali Wandana, Asahan,
+Gapoktan / Kelompok Tani via canvassing), 50 ha and 200 t potential FFB near PGS, COLD at first outreach for 13 days;
+distance to mill, current buyer, detail and closing date are empty.
+
 ## Farmer acquisition (Duta vs non-Duta)
 A file with `akuisisi_type` / `minggu_register` / `join_date_farmer` columns is read as **Acquisition** and sets the whole
 deck (other files are left out). Last week = the latest full registration week; a week still in progress (its data stops
@@ -137,7 +148,7 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: `farmer akusisi.csv` (registrations 24 Aug – 14 Oct 2026, the acquisition sample), with farmer names and all phone numbers replaced by anonymous tokens (Duta user names are kept: they appear on the Duta slide)
+- `src/sample-data.json`: `CRM DO smallholder status.csv` (lead, owner and DO names and phone numbers replaced by tokens). Earlier sample: `farmer akusisi.csv` (registrations 24 Aug – 14 Oct 2026, the acquisition sample), with farmer names and all phone numbers replaced by anonymous tokens (Duta user names are kept: they appear on the Duta slide)
 - `output/Farmer Acquisition 5-11 Oct 2026.pptx`: the acquisition deck from the sample
 - `output/`: the Jul–Sep PPTX, `audit.csv` (each number re-derived from the CSVs) and `DECISIONS.md`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`

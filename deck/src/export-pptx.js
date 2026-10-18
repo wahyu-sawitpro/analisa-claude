@@ -118,7 +118,7 @@ function buildPptx(T,DX){
     else if(p.t==="d") sl.addShape(pres.shapes.OVAL,{x:X(ox+p.cx-p.rad),y:X(oy+p.cy-p.rad),w:X(p.rad*2),h:X(p.rad*2),fill:{color:H(p.fill)},line:{color:"FFFFFF",width:1.5}});
     else if(p.t==="t") txt(sl,p.s,{x:X(ox+p.x),y:X(oy+p.y),w:X(Math.max(p.w,8)),h:X(Math.max(p.h,8)),fontSize:Math.round(p.size*.75*10)/10,bold:p.bold,color:H(p.color),align:p.align,valign:p.valign==="middle"?"middle":p.valign,lineSpacingMultiple:.95,chart:true});
   }); }
-  function cellOf(v){ const o=typeof v==="object"&&v?v:{v}; return {text:String(o.v),options:o.pill?{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}:o.bold?{bold:true,color:"274E13"}:{}}; }
+  function cellOf(v){ const o=typeof v==="object"&&v?v:{v}; return {text:String(o.v),options:o.fill?{bold:true,color:(o.color||"#2B2F28").replace("#",""),fill:{color:o.fill.replace("#","")}}:o.pill?{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}:o.bold?{bold:true,color:"274E13"}:{}}; }
   function panelSlide(spec){
     const sl=content(spec.kicker,spec.title), L=layoutPanels(spec), ox=80, oy=180;
     L.cells.forEach(c=>{
@@ -139,7 +139,7 @@ function buildPptx(T,DX){
   function teamBlock(A,N,pre){ teamSpecs(A,N,pre).forEach(panelSlide); }
 
   // Next steps
-  { const sl=content("Next steps",`${DX.actions.length} draft actions ${DX.acq?"to grow farmer acquisition":DX.forecast?"to deliver the stock plan":DX.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`);
+  { const sl=content("Next steps",`${DX.actions.length} draft actions ${DX.dop?"to move the DO pipeline":DX.acq?"to grow farmer acquisition":DX.forecast?"to deliver the stock plan":DX.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`);
     const nc=DX.actions.length>4?3:2, cw=nc===3?(1080-2*14)/3:532, gap=nc===3?14:16;
     DX.actions.forEach((a,i)=>{ const x=80+(i%nc)*(cw+gap), y=180+Math.floor(i/nc)*205; box(sl,x,y,cw,190);
       txt(sl,[{text:`${i+1}  `,options:{color:"D9A21B",bold:true,fontSize:12}},{text:a.t,options:{color:"274E13",bold:true,fontSize:nc===3?12:13}}],{x:X(x+18),y:X(y+14),w:X(cw-36),h:X(40),fit:"shrink"});
@@ -159,6 +159,7 @@ function buildPptx(T,DX){
 }
 
 function deckName(){ const d=state.X?.dates||[]; const t=d.length?`${d[0].getFullYear()}-${String(d[0].getMonth()+1).padStart(2,"0")}-${String(d[0].getDate()).padStart(2,"0")}`:"data";
+  if(state.X?.dop) return `SawitPRO DO Pipeline ${new Date().toISOString().slice(0,10)}`;
   if(state.X?.acq){ const w=new Date(state.T[0].A.acq.L.w); return `SawitPRO Farmer Acquisition week of ${w.getFullYear()}-${String(w.getMonth()+1).padStart(2,"0")}-${String(w.getDate()).padStart(2,"0")}`; }
   return `SawitPRO ${state.X?.multi?"Smallholder and Plantation":(state.T?.[0]?.name||"Sales")} ${state.X?.forecast?"Review and Stock Plan":"Review"} ${t}`; }
 async function makeBlob(){ await loadPptx(); return buildPptx(state.T,state.X).write({outputType:"blob"}); }
