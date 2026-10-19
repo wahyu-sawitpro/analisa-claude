@@ -80,14 +80,18 @@ const clean=v=>blank(v)?null:String(v).replace(/\s+/g," ").trim();
 const STATUS_ORDER=["Ordered","Prospect","Considering","Interested","Not interested"];
 const WON="Ordered", WARM=new Set(["Prospect","Considering","Interested"]);
 function canonStatus(v){ const s=norm(v); if(!s) return null;
+  if(/status\s*pesanan|order\s*status|lacak\s*pesanan/.test(s)) return "Order follow-up";
   if(/already\s*order|sudah\s*order|ordered|closing|deal|won|closed/.test(s)) return "Ordered";
   if(/cold|tidak|ga?k\s*minat|not\s*interest|tolak|reject|lost/.test(s)) return "Not interested";
-  if(/prospect|transaksi\s*dalam/.test(s)) return "Prospect";
+  if(/prospe[ck]|transaksi\s*dalam/.test(s)) return "Prospect";
   if(/timbang|pikir|consider|follow|nego|ragu/.test(s)) return "Considering";
   if(/tertarik|minat|interest|hot|warm/.test(s)) return "Interested";
   return clean(v).replace(/^./,c=>c.toUpperCase()); }
 const REASON_EN=[
   [/belum\s*(ada\s*)?ketertarikan|cek harga|nanya|no clear interest/,"Just asking (no clear interest)"],
+  [/belum\s*ada\s*kebutuhan|kebutuhan\s*dalam\s*waktu/,"No need in the near term"],
+  [/tempo|kredit|cicil|hutang|credit\s*terms/,"Wants credit terms"],
+  [/datang\s*lebih\s*lama|pengiriman\s*lama|slow\s*delivery|delivery\s*too\s*slow/,"Delivery too slow"],
   [/supplier|toko langganan|langganan/,"Already has a supplier / shop"],
   [/terikat|kud|agen|koperasi|bumdes/,"Tied to a KUD / agent"],
   [/tidak tersedia|out of stock|stok/,"Product out of stock"],
@@ -104,8 +108,8 @@ const trReason=v=>{ const s=norm(v); if(!s) return null; const m=REASON_EN.find(
 // Reason themes: what kind of fix each reason calls for.
 const THEMES=[
   ["Locked in elsewhere",/supplier|kud|agent/i,"#6E5A8A"],
-  ["Stock & delivery",/out of stock/i,"#A8653A"],
-  ["Price",/price/i,"#B5523B"],
+  ["Stock & delivery",/out of stock|delivery too slow/i,"#A8653A"],
+  ["Price",/price|credit terms/i,"#B5523B"],
   ["Not a fit",/land|small quantities|wrong number/i,"#8E9C84"],
   ["Timing",/near term/i,"#5B7F95"],
   ["Just asking",/just asking|no clear interest|^other$/i,"#C9B458"],
@@ -198,7 +202,7 @@ function span(ds){ ds=ds.filter(Boolean).sort((a,b)=>a-b); if(!ds.length) return
   return `${fd(a)} – ${fd(b)}`; }
 const STATUS_COLOR={"Ordered":"#274E13","Prospect":"#4A653B","Interested":"#4A653B","Considering":"#D9A21B","Not interested":"#8E9C84"};
 const EXTRA=["#5B7F95","#A8653A","#6E5A8A","#3F8C7A"];
-const LABEL={channel:"Engagement channel",source:"Lead source",leadType:"Lead type",pic:"PIC",custType:"Customer type",userType:"Buyer type",kabupaten:"Regency",location:"Location",purpose:"Objective",_src:"Data source"};
+const LABEL={wonKind:"What was logged",channel:"Engagement channel",source:"Lead source",leadType:"Lead type",pic:"PIC",custType:"Customer type",userType:"Buyer type",kabupaten:"Regency",location:"Location",purpose:"Objective",_src:"Data source"};
 function countBy(rows,f){const m=new Map();for(const r of rows){const k=f(r);if(k===null||k===undefined)continue;m.set(k,(m.get(k)||0)+1)}return [...m].sort((a,b)=>b[1]-a[1])}
 function sumBy(rows,f,v){const m=new Map();for(const r of rows){const k=f(r);if(k===null||k===undefined)continue;m.set(k,(m.get(k)||0)+v(r))}return [...m].sort((a,b)=>b[1]-a[1])}
 const srcLabel=d=>d.sheet&&!/^sheet\s*1$/i.test(d.sheet)?`${d.name} · ${d.sheet}`:d.name;
@@ -219,6 +223,14 @@ function canonCrm(r,map,src,defStatus){ const o={_raw:r,_src:src};
   if(o.status!==WON&&/(^|[^a-z])(closing|sudah order|already order|deal)\b/i.test(o.detail||"")&&!/(belum|tidak|gagal|batal|not)\s+(closing|order|deal)/i.test(o.detail||"")){ o.statusLogged=o.status; o.status=WON; }
   o.outcome=o.status===WON?"Won":WARM.has(o.status)?"Warm":o.status==="Not interested"?"Lost":null;
   o.theme=themeOf(o.reason);
+  // What kind of engagement this is: a lead being worked, a sale logged at checkout (mobile shop, walk-in),
+  // an after-sales call on an order already placed, or a customer asking where their order is
+  const dt=String(o.detail||"");
+  o.kind=o.status==="Order follow-up"?"service"
+    :o.outcome==="Won"&&/memastikan\s*pesanan|mengawal\s*pesanan|pesanan\s*sudah\s*diterima|menagih|pelunasan/i.test(dt)&&!/sudah\s*order|closing/i.test(dt)?"aftersales"
+    :o.outcome==="Won"&&/toko\s*keliling|tokling|^\s*(belanja|beli|pesan)\b/i.test(dt)?"pos":"lead";
+  if(o.kind==="service"){ o.svcRefs=[...new Set((dt.match(/#?B2[BC]\d{3,}/gi)||[]).map(x=>x.replace(/^#?/,"#").toUpperCase()))]; o.refs=[]; o.ref=null; o.refVal={};
+    o.sla=/\bsla\b|terlambat|telat|antrian|belum\s*(sampai|dikirim|tiba)/i.test(dt); }
   return o; }
 function canonSale(r,map,src){ const o={_raw:r,_src:src};
   for(const k in map){ const v=r[map[k]]; o[k]=["qty","gmv","salesAmount","nett","revenue","discount","shipping"].includes(k)?toNum(v):k==="date"?toDate(v):clean(v); }
@@ -274,7 +286,25 @@ function analyse(sources,opt={}){
   A.has={crm:C.length>0,sales:lines.length>0};
   A.crmMap=Object.assign({},...A.crmSources.map(s=>s.map));
   A.won=C.filter(r=>r.outcome==="Won"); A.warm=C.filter(r=>r.outcome==="Warm"); A.lost=C.filter(r=>r.outcome==="Lost"); A.nostatus=C.filter(r=>!r.outcome);
-  A.notWon=C.filter(r=>r.outcome!=="Won");
+  A.notWon=C.filter(r=>r.outcome!=="Won"&&r.kind!=="service");
+  C.forEach(r=>{ r.wonKind=r.outcome==="Won"?{lead:"Lead worked",pos:"Sale logged at checkout",aftersales:"After-sales call"}[r.kind]:null; }); A.nostatus=A.nostatus.filter(r=>r.kind!=="service");
+  A.service=C.filter(r=>r.kind==="service"); A.wonLead=A.won.filter(r=>r.kind==="lead"); A.wonPos=A.won.filter(r=>r.kind==="pos"); A.wonAfter=A.won.filter(r=>r.kind==="aftersales");
+  A.svcRefs=[...new Set(A.service.flatMap(r=>r.svcRefs))]; A.svcSla=A.service.filter(r=>r.sla).length;
+  // what each order follow-up was about
+  A.service.forEach(r=>{ const d=String(r.detail||""); r.issue=/sampah|rusak|kotor|bocor|kurang\s*\d|komplain|complain/i.test(d)?"Damaged or short delivery":/dokumen|surat\s*pernyataan/i.test(d)?"Documents":/antrian|queue/i.test(d)?"Long queue":r.sla?"Past the delivery SLA":/shareloc|kirim|pengiriman|truk/i.test(d)?"Waiting for delivery":"Order status";
+    r.first=/first\s*purch|pembelian\s*pertama|pertama\s*kali/i.test(d); });
+  // PICs whose engagements all carry the same status, reason and location (or the same count every day) with no notes:
+  // logged from a template, so they can't explain why leads say no
+  A.templated=countBy(C,r=>r.pic).filter(([,n])=>n>=15).map(([p,n])=>{ const rs=C.filter(r=>r.pic===p), top=k=>{ const c=countBy(rs,r=>r[k]??"(blank)")[0]; return c?{v:c[0],s:c[1]/n}:{v:null,s:0}; };
+      const days=countBy(rs.filter(r=>r.date),r=>+r.date).map(x=>x[1]);
+      return {p,n,loc:top("location"),rea:top("reasonRaw"),st:top("status"),src:top("source"),noNotes:rs.filter(r=>!r.detail).length/n,perDay:days.length>=3&&new Set(days).size===1?days[0]:null}; })
+    .filter(t=>t.noNotes>=.9&&t.rea.s>=.9&&t.st.s>=.9&&(t.loc.s>=.9||t.perDay));
+  A.tplRows=C.filter(r=>A.templated.some(t=>t.p===r.pic)&&r.kind==="lead"&&r.outcome!=="Won");
+  // prospects whose own estimated closing date has passed by the end of the period
+  { const end=A.weekStart?new Date(+A.weekStart+6*864e5):new Date(Math.max(0,...C.map(r=>+r.date||0),...lines.map(l=>+l.date||0)));
+    A.overdue=C.filter(r=>r.outcome==="Warm"&&r.closing&&+r.closing<+end).sort((a,b)=>(b.potential||0)-(a.potential||0)); A.periodEnd=end; }
+  // the same engagement typed in twice
+  { const seen=new Set(); A.dupRows=C.filter(r=>{ if(!r.detail) return false; const k=[r.pic,r.date&&+r.date,r.ph||r.nk,r.detail].join("|"); if(seen.has(k)) return true; seen.add(k); return false; }).length; }
   A.statusKeys=STATUS_ORDER.filter(s=>C.some(r=>r.status===s)).concat([...new Set(C.map(r=>r.status).filter(s=>s&&!STATUS_ORDER.includes(s)))]);
   A.color=k=>STATUS_COLOR[k]||EXTRA[A.statusKeys.filter(x=>!STATUS_COLOR[x]).indexOf(k)%EXTRA.length];
   A.dates=[...C.map(r=>r.date),...lines.map(r=>r.date)].filter(Boolean).sort((a,b)=>a-b);
@@ -360,13 +390,15 @@ function analyse(sources,opt={}){
   // ---- Funnel: logged -> reached -> showed interest -> ordered
   const reached=r=>!/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"");
   A.calls=C.filter(r=>r.callResp||/phone/i.test(r.channel||"")); A.callsMissed=A.calls.filter(r=>!reached(r)).length;
-  A.funnel=[["Engagements logged",C.length],["Reached the lead",C.filter(reached).length],["Showed interest",A.won.length+A.warm.length],["Ordered",A.won.length]];
+  // the funnel follows leads being worked: sales logged at checkout, after-sales calls and order follow-ups are not leads
+  const LF=C.filter(r=>r.kind==="lead");
+  A.funnel=[[LF.length===C.length?"Engagements logged":"Leads worked",LF.length],["Reached the lead",LF.filter(reached).length],["Showed interest",LF.filter(r=>reached(r)&&(r.outcome==="Won"||r.outcome==="Warm")).length],["Ordered",LF.filter(r=>reached(r)&&r.outcome==="Won").length]];
 
   // ---- PIC scorecard: CRM activity next to the orders each PIC closed
   // PIC names are written differently across exports ("Simon Sihar Simanjuntak" / "Simon Simanjuntak"): match on first + last name
   const pk=v=>{ const t=(clean(v)||"").toLowerCase().replace(/[^a-z ]/g,"").split(" ").filter(w=>w.length>1); return t.length?t[0]+" "+(t.length>1?t[t.length-1]:""):null; }, pm=new Map();
-  const pg=v=>{ const k=pk(v); if(!k) return null; if(!pm.has(k)) pm.set(k,{p:clean(v),eng:0,reached:0,won:0,warm:0,lost:0,orders:0,gmv:0,inCrm:0,ch:[]}); return pm.get(k); };
-  for(const r of C){ const g=pg(r.pic); if(!g) continue; g.eng++; if(reached(r)) g.reached++; if(r.outcome==="Won") g.won++; else if(r.outcome==="Warm") g.warm++; else if(r.outcome==="Lost") g.lost++; if(r.channel) g.ch.push(r.channel); }
+  const pg=v=>{ const k=pk(v); if(!k) return null; if(!pm.has(k)) pm.set(k,{p:clean(v),eng:0,leadEng:0,leadWon:0,reached:0,won:0,warm:0,lost:0,orders:0,gmv:0,inCrm:0,ch:[]}); return pm.get(k); };
+  for(const r of C){ const g=pg(r.pic); if(!g) continue; g.eng++; if(r.kind==="lead"){ g.leadEng++; if(r.outcome==="Won") g.leadWon++; } if(reached(r)) g.reached++; if(r.outcome==="Won") g.won++; else if(r.outcome==="Warm") g.warm++; else if(r.outcome==="Lost") g.lost++; if(r.channel) g.ch.push(r.channel); }
   for(const o of O){ const g=pg(o.pic); if(!g) continue; g.orders++; g.gmv+=o.gmv; if(o.crm) g.inCrm++; }
   A.picCard=[...pm.values()].map(g=>({...g,topCh:countBy(g.ch,x=>x)[0]?.[0]||null})).sort((a,b)=>b.gmv-a.gmv||b.eng-a.eng);
   A.notLogging=A.has.crm?A.picCard.filter(g=>g.orders&&!g.eng&&!g.inCrm):[];
@@ -451,9 +483,10 @@ function analyse(sources,opt={}){
 
   // ---- Which dimension separates winners (or warm leads) from the rest
   const DIMS=["source","channel","leadType","pic","custType","location"].filter(k=>C.some(r=>r[k]));
-  const pos=A.won.length?r=>r.outcome==="Won":r=>r.outcome==="Warm";
-  A.posLabel=A.won.length?"ordered":"still in play";
-  const scored=C.filter(r=>r.outcome);
+  // only leads being worked: sales logged at checkout and after-sales calls would make their channel look like it "converts"
+  const pos=A.wonLead.length?r=>r.outcome==="Won":r=>r.outcome==="Warm";
+  A.posLabel=A.wonLead.length?"ordered":"still in play";
+  const tpl=new Set(A.templated.map(t=>t.p)), scored=C.filter(r=>r.outcome&&r.kind==="lead"&&!tpl.has(r.pic));
   const gini=(w,n)=>{if(!n)return 0;const p=w/n;return 2*p*(1-p)};
   const P=scored.filter(pos).length, base=gini(P,scored.length);
   A.dims=DIMS.map(k=>{ const groups=countBy(scored,r=>r[k]??"(not filled)").map(([g,n])=>{const w=scored.filter(r=>(r[k]??"(not filled)")===g&&pos(r)).length;return {g,n,w,rate:w/n}});
@@ -463,9 +496,9 @@ function analyse(sources,opt={}){
   // A dimension only counts when at least two of its groups have 3+ engagements (no "1 of 1" findings).
   A.dims=A.dims.filter(d=>{ const g=d.groups.filter(x=>x.n>=3&&x.g!=="(not filled)"); return g.length>=2&&Math.max(...g.map(x=>x.rate))-Math.min(...g.map(x=>x.rate))>=.2; });
   const PREF=["source","channel","leadType","custType","location","pic"], top=A.dims[0]?.gain||0;
-  A.best=P&&P<scored.length&&top>0?A.dims.filter(d=>d.gain>=top*.9).sort((a,b)=>PREF.indexOf(a.k)-PREF.indexOf(b.k))[0]:null;
+  A.best=P&&P<scored.length&&scored.length>=12&&top>0?A.dims.filter(d=>d.gain>=top*.9).sort((a,b)=>PREF.indexOf(a.k)-PREF.indexOf(b.k))[0]:null;
   const dom=(rs,k)=>{const c=countBy(rs,r=>r[k]??"(not filled)");return c.length?{v:c[0][0],share:c[0][1]/rs.length}:{v:"–",share:0}};
-  A.cohorts=[["Ordered",A.won],["Considering / prospect",A.warm],["Not interested",A.lost]].filter(c=>c[1].length);
+  A.cohorts=[["Ordered",A.wonLead],["Considering / prospect",A.warm],["Not interested",A.lost]].filter(c=>c[1].length);
   A.profile=DIMS.map(k=>({k,vals:A.cohorts.map(([,rs])=>dom(rs,k))}));
   // dimensions where the winning cohort is concentrated on a value the losers rarely have
   const posRows=scored.filter(pos), negRows=scored.filter(r=>!pos(r));

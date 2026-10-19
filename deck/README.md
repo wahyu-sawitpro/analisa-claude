@@ -92,11 +92,42 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: the Smallholder Jul–Sep sales export and the CRM engagement export, with phone numbers and names replaced by anonymous tokens
+- `src/sample-data.json`: the six weekly exports for 12–18 Oct (sales and CRM, both teams), with phone numbers and names replaced by anonymous tokens
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
-## Findings for Jul–Sep 2026 (sample data: sales decline review)
-The sample is the two Smallholder exports in the repo: sales Jul–Sep (371 order lines, 237 orders) and the CRM
+## Reading the CRM honestly
+- **What a “win” is.** Rows marked as ordered are split into leads that were worked, sales logged at checkout (mobile
+  shop or walk-in: “toko keliling”, “beli pupuk …”) and after-sales calls on orders already placed. Only worked leads
+  count in the funnel, the PIC conversion note and “what separates winners”.
+- **Order follow-ups.** Engagements where the customer asks about an existing order (“Menanyakan Status Pesanan”) are
+  taken out of the rejection reasons and shown on a customer-service slide with the orders named, the issue read from
+  the notes (past SLA, queue, delivery, documents, damaged goods) and first purchases.
+- **Templated logging.** A PIC whose engagements all share one status, one reason and one location (or exactly the
+  same count every day) with no notes is flagged; those rows are left out of the driver analysis and the call-back
+  list, and the rejection slide says the real reasons are unknown.
+- **Overdue prospects.** Prospects whose estimated closing date has passed by the end of the week become an action.
+
+## Findings for the week of 12–18 Oct 2026 (sample data)
+The sample is the six exports in the repo for this week: Smallholder and Plantation sales (last two weeks), and the
+rejection-reason and success-story CRM exports for both teams.
+
+Smallholder
+- Rp376M from 25 orders, up 77% from Rp212M: more orders (11 → 25); KCL / MOP +Rp123M, NPK +Rp107M. The largest order
+  (Rp110M, a group purchase of NPK and urea in Bungo) is 29% of GMV; without each week's largest order GMV is still +49%.
+- 19 “wins” in the CRM, but 14 are mobile-shop sales logged at checkout and 3 are after-sales calls; only 2 came from
+  working a lead. Of 62 reached leads that showed interest, 2 ordered. TikTok: 38 leads, 0 orders, mostly price questions.
+- 10 engagements were customers chasing 8 orders; 6 mention the SLA or a queue (Topaz seeds 30–40 days).
+- Joko Prestiwo and Muhammad Abdul Wahab closed 4 orders (Rp59.8M) with no CRM entry; Rp67.7M is still unpaid.
+
+Plantation
+- Rp39.1M from 5 orders, up 50% from Rp26M on bigger orders (rock phosphate Rp17.2M).
+- 76 of 78 “not interested” entries are templated (Devi Mariana Naibaho, exactly 10 ads leads a day, and Naya
+  Huwaidah): one status, one reason, one location and no notes, so the ads and event results can't be judged.
+- The 2 real wins are leaf and soil tests from Khoirul Huda's field visits in Jambi; 2 prospects (drone mapping
+  Rp9.6M, leaf test Rp3.2M) are past their closing date. Eko Prastyo's 2 orders (Rp15.5M) have no CRM entry.
+
+## Findings for Jul–Sep 2026 (earlier sample: sales decline review)
+That sample was the two Smallholder exports in the repo: sales Jul–Sep (371 order lines, 237 orders) and the CRM
 engagement export (41 engagements, all dated 5–9 Oct).
 - GMV Rp2.41B → Rp1.64B → Rp2.25B (−7% Jul to Sep), August the low point (52 orders from 36 customers).
 - Three wholesale fertilizer accounts of one PIC (Rp1.06B in Jul, 44% of the month) stopped ordering after 25 Jul,
