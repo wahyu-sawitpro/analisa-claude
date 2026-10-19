@@ -162,6 +162,11 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - **Templated logging.** A PIC whose engagements all share one status, one reason and one location (or exactly the
   same count every day) with no notes is flagged; those rows are left out of the driver analysis and the call-back
   list, and the rejection slide says the real reasons are unknown.
+- **Potential loss.** Leads who didn't order are valued from what they said they needed: the potential GMV logged in
+  the CRM, a rupiah amount in the notes, sacks or tonnes in the notes, or the fertilizer need in kg, priced at this
+  week's selling price per product (50 kg sacks). Leads who ordered this week (by phone) are left out. The value is
+  grouped by reason, with stock-outs, slow delivery, price and payment terms marked as on our side, and shown on a
+  “Rejection reasons · potential loss” slide with the biggest leads at stake and any competitor price in the notes.
 - **Overdue prospects.** Prospects whose estimated closing date has passed by the end of the week become an action.
 
 ## Findings for the week of 12–18 Oct 2026 (sample data)
@@ -173,6 +178,10 @@ Smallholder
   (Rp110M, a group purchase of NPK and urea in Bungo) is 29% of GMV; without each week's largest order GMV is still +49%.
 - 19 “wins” in the CRM, but 14 are mobile-shop sales logged at checkout and 3 are after-sales calls; only 2 came from
   working a lead. Of 62 reached leads that showed interest, 2 ordered. TikTok: 38 leads, 0 orders, mostly price questions.
+- Potential loss: Rp277M of named demand from 8 leads didn't convert; Rp230M of it on our side. Payment terms Rp119M
+  (3 leads asked to pay in instalments, incl. 10 t of NPK Pak Tani) and stock-outs Rp111M (NPK Mahkota 13-6-27 10 t,
+  AC Powder AKP, KCL Sasco). Price is not the blocker: one lead paid Rp450k a sack of KCL Mahkota elsewhere vs our
+  Rp419k. 72 of 80 leads have no quantity logged, and 3 leads in the not-ordered export ordered anyway (Rp145M).
 - 10 engagements were customers chasing 8 orders; 6 mention the SLA or a queue (Topaz seeds 30–40 days).
 - Joko Prestiwo and Muhammad Abdul Wahab closed 4 orders (Rp59.8M) with no CRM entry; Rp67.7M is still unpaid.
 

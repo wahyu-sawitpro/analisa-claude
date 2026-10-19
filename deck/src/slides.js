@@ -43,6 +43,20 @@ function narrative(A){
   N.reasonTitle=tTop&&lost&&tTop.lost/lost>=.4?`${pct(tTop.lost,lost)}% of “not interested” leads are ${tTop.t==="Locked in elsewhere"?"locked into a supplier, KUD or agent":tTop.t.toLowerCase()}`
     :A.themes[0]?`${A.themes[0].t} is the most common reason (${A.themes[0].n} of ${nw})`:"Why leads say no";
 
+  // Potential loss from leads who didn't order
+  const PL=A.loss;
+  if(PL&&PL.total>0){ const sg=g=>PL.byGroup.find(x=>x.g===g), st=sg("Out of stock or slow delivery"), pr=sg("Price or payment terms"), top=PL.byGroup[0], nL=PL.leads.length;
+    N.lossTitle=PL.fix>=PL.total*.5?`${rp(PL.total)} of named demand didn't convert; ${rp(PL.fix)} of it is on our side (${andList([st&&"stock-outs",pr&&"payment terms"].filter(Boolean))})`
+      :`${rp(PL.total)} of named demand didn't convert, most of it ${({"Still deciding, no reason given":"from leads still deciding","No clear reason":"from leads with no clear reason","Not buying yet":"from leads not buying yet","Buys elsewhere (shop, KUD, agent)":"lost to other suppliers","Not a fit":"from leads that aren't a fit"})[top.g]||lc(top.g)} (${rp(top.v)})`;
+    const cp=PL.comp[0];
+    N.lossNotes=[
+      st&&`<b>Out of stock or slow delivery: ${rp(st.v)}.</b>${PL.stockProducts.length?` Leads asked for ${esc(andList(PL.stockProducts.slice(0,4)))}, which weren't available or took too long.`:""}`,
+      pr&&`<b>Price or payment terms: ${rp(pr.v)}</b>${PL.credit.length?`; ${PL.credit.length} lead${PL.credit.length>1?"s":""} asked to pay in instalments (tempo), which we don't offer`:""}.`,
+      cp&&cp.ours&&`<b>Price is not the blocker${cp.prod?` on ${esc(cp.prod)}`:""}:</b> a lead paid Rp${nf.format(Math.round(cp.their/1000))}k a sack elsewhere; ours sold at Rp${nf.format(Math.round(cp.ours/1000))}k this week.`,
+      PL.lateBuyers&&`<b>${PL.lateBuyers} lead${PL.lateBuyers>1?"s":""} in this export ordered anyway</b> (${rp(PL.lateBuyGmv)}) and ${PL.lateBuyers>1?"are":"is"} left out; the not-ordered list isn't cleaned after a sale.`,
+      `<b>${PL.unval} of ${nL} leads have no quantity or potential logged</b>${PL.zeroPotential?` (${PL.zeroPotential} carry a potential of Rp0)`:""}, so the real loss is higher. Log the fertilizer need (kg) on every lead.`
+    ].filter(Boolean).slice(0,4); }
+
   // Customers chasing orders
   if(A.service.length>=3){ const SV=A.service, iss=countBy(SV,r=>r.issue), first=SV.filter(r=>r.first).length, sp=countBy(SV,r=>r.pic)[0];
     N.svTitle=`${SV.length} “leads” were customers chasing ${A.svcRefs.length||"their"} order${A.svcRefs.length===1?"":"s"}${A.svcSla?`; ${A.svcSla} mention the SLA or a queue`:""}`;
@@ -305,7 +319,8 @@ function narrative(A){
   if(A.wonFromNotes.length) F.push(["Closed deals are not marked as orders",`${A.wonFromNotes.length} win${A.wonFromNotes.length>1?"s are":" is"} still “${A.wonFromNotes[0].statusLogged||"blank"}” in the CRM although the notes say closing.`]);
   if(A.wow){ const W=A.wow; F.unshift([W.flat?"GMV flat vs the week before":`GMV ${W.up?"up":"down"} ${W.pc!=null?W.pc+"%":""} vs the week before`,`${rp(W.p.gmv)} → ${rp(W.c.gmv)}, mostly from ${W.drv}${W.lead?`; ${W.lead.k} moved most`:""}.`]); }
   if(won&&(A.wonPos.length+A.wonAfter.length)/won>=.5) F.splice(1,0,["Most CRM “wins” are logged after the sale",`${N.kindNote.replace(/^./,c=>c.toUpperCase())} So the CRM can't yet show what turns a lead into an order.`]);
-  if(A.service.length>=3) F.splice(1,0,[`${A.service.length} customers chased late orders`,`They were logged as leads but asked where their order is${A.svcRefs.length?`: ${A.svcRefs.length} orders named${A.svcSla?`, ${A.svcSla} engagements mention the SLA or a queue`:""}`:""}. Late deliveries put the next order at risk.`]);
+  if(PL&&PL.total>=Math.max(1e7,(A.gmv||0)*.1)) F.splice(1,0,[`${rp(PL.total)} of named demand didn't convert`,`${PL.valued.length} leads said what they needed but didn't order${PL.fix?`; ${rp(PL.fix)} of it was blocked on our side (stock-outs, payment terms)`:""}. ${PL.unval} more leads have no quantity logged.`]);
+  if(A.service.length>=3) F.splice(A.service.length>=3&&PL&&PL.total>=Math.max(1e7,(A.gmv||0)*.1)?2:1,0,[`${A.service.length} customers chased late orders`,`They were logged as leads but asked where their order is${A.svcRefs.length?`: ${A.svcRefs.length} orders named${A.svcSla?`, ${A.svcSla} engagements mention the SLA or a queue`:""}`:""}. Late deliveries put the next order at risk.`]);
   if(A.templated.length){ const t=A.templated[0], f=[`${N.tplN} leads are logged from a template`,`${N.tplWho}: one status, one reason${t.loc.s>=.9?`, one location (${t.loc.v})`:""} and no notes${t.perDay?`; ${t.p.split(" ")[0]} logs exactly ${t.perDay} a day`:""}. The ${N.tplSrc} results can't be judged.`];
     if(N.tplDominant){ const i=F.findIndex(x=>/rejection theme|just asking|loyalty/i.test(x[0])); if(i>=0) F.splice(i,1); F.splice(1,0,f); } else F.push(f); }
   if(A.trend){ const T=A.trend; F.splice(A.wow?1:0,0,[T.flat?`GMV flat from ${T.F.label} to ${T.Z.label}`:`GMV ${T.up?"up":"down"} ${T.pc}% from ${T.F.label} to ${T.Z.label}`,
@@ -334,6 +349,11 @@ function narrative(A){
   if(A.has.sales&&A.topOrderShare>=.5&&A.orders.length>1) act.push({t:"Widen the base beyond one large order",d:`One order is ${pct(A.orders[0].gmv,A.gmv)}% of GMV. Line up repeat orders from the other ${A.orders.length-1} customers so next week doesn't depend on a single deal.`,o:"Team lead",w:"Next 2 weeks"});
   if(A.missingRefs.length) act.splice(1,0,{t:`Reconcile ${A.missingRefs.length} closing${A.missingRefs.length>1?"s":""} missing from sales`,d:`${A.missingRefs.map(x=>x.ref).join(", ")}${A.missingVal?` (${rp(A.missingVal)})`:""} are logged as closed in the CRM but not in the sales export. Confirm the invoice, team and order number for each.`,o:"Sales ops + PIC",w:"This week"});
   if(A.wonFromNotes.length) act.push({t:"Mark closed deals as orders in the CRM",d:`${A.wonFromNotes.length} closed deal${A.wonFromNotes.length>1?"s are":" is"} still logged as “${A.wonFromNotes[0].statusLogged||"blank"}”. Update the status and add the order number, so wins are counted automatically.`,o:"Sales ops",w:"This week"});
+  if(PL){ const st=PL.byGroup.find(x=>x.g==="Out of stock or slow delivery"), ri=act.findIndex(a=>/^Restock/.test(a.t));
+    if(st&&ri>=0){ act[ri].t=`Restock what leads asked for (${rp(st.v)} at stake)`; const it=act.splice(ri,1)[0]; act.splice(1,0,it); }
+    else if(st) act.splice(1,0,{t:`Restock what leads asked for (${rp(st.v)} at stake)`,d:`${st.n} lead${st.n>1?"s":""} couldn't buy${PL.stockProducts.length?` ${andList(PL.stockProducts.slice(0,3))}`:""}. Confirm stock and an arrival date, offer the nearest substitute, and call them back when it lands.`,o:"Supply & ops",w:"This week"});
+    const cv=PL.credit.reduce((s,x)=>s+x.v,0);
+    if(PL.credit.length) act.splice(2,0,{t:`Decide on payment terms for ${PL.credit.length} lead${PL.credit.length>1?"s":""}${cv?` (${rp(cv)})`:""}`,d:`${PL.credit.length>1?"They":"The lead"} asked to pay in instalments (tempo). Agree a small pilot with finance (e.g. 2–3 payments for known farmers or a Duta guarantee) or say no clearly so the PIC can close or drop them.`,o:"Sales lead + finance",w:"Next 2 weeks"}); }
   if(A.service.length>=3){ const sp=countBy(A.service,r=>r.pic)[0]?.[0]; act.splice(1,0,{t:`Clear the late-order backlog${A.svcRefs.length?` (${A.svcRefs.length} orders)`:""}`,d:`Customers asked about ${A.svcRefs.length?A.svcRefs.slice(0,4).join(", ")+(A.svcRefs.length>4?", …":""):"their orders"}. Get a delivery date from ops for each, tell the customer before they ask again, and log these as order follow-ups, not leads.`,o:`Ops${sp?` + ${sp}`:""}`,w:"This week"}); }
   if(A.overdue.length){ const ov=A.overdue, pv=ov.reduce((s,r)=>s+(r.potential||0),0); act.splice(2,0,{t:`Close ${ov.length} prospect${ov.length>1?"s":""} past ${ov.length>1?"their":"its"} closing date${pv?` (${rp(pv)})`:""}`,d:`${ov.map(r=>`${r.product||r.purpose||"prospect"}${r.potential?` ${rp(r.potential)}`:""}, due ${fds(r.closing)}`).slice(0,3).join("; ")}. Call this week to close or set a new date.`,o:andList([...new Set(ov.map(r=>r.pic).filter(Boolean))])||"PIC",w:"This week"}); }
   if(A.templated.length){ const t=A.templated[0]; const ai=act.findIndex(a=>/catch-all/.test(a.t)); if(ai>=0) act.splice(ai,1);
@@ -346,6 +366,10 @@ function narrative(A){
     if(ns&&!T.up) act.splice(1,0,{t:`Win back ${T.acc} that stopped ordering`,d:`${andList(T.stopped.map(c=>c.label))} bought ${rp(T.stopped.reduce((s,c)=>s+c.tot,0))} in ${T.preLabel} and nothing in ${Z.label}. Ask what changed (price, supplier, season) and agree the next order; don't let a few accounts carry the month.`,o:andList([...new Set(T.stopped.map(c=>c.pic).filter(Boolean))])||"Account PIC",w:"This week"});
     if(Z.openGmv>=Z.gmv*.1) act.push({t:`Close out ${rp(Z.openGmv)} of ${Z.label} orders`,d:`${Z.openN} ${Z.label} order${Z.openN===1?" is":"s are"} not completed${Z.partGmv?` and ${rp(Z.partGmv)} is only partially paid`:""}. Confirm delivery and payment dates so the month's GMV is realised.`,o:"Order PIC + finance",w:"This week"}); }
   if(N.tplDominant){ const i=act.findIndex(x=>x.t.startsWith("Log what")); if(i>0) act.unshift(act.splice(i,1)[0]); }
+  // the actions that recover named demand go right after the first one, biggest rupiah first
+  if(PL&&PL.fix>=Math.max(1e7,(A.gmv||0)*.1)){ const val=x=>{ const m=x.t.match(/Rp([\d.]+)([MB])/); return m?parseFloat(m[1])*(m[2]==="B"?1e3:1):0; };
+    const rec=act.filter(x=>/at stake|payment terms/.test(x.t)).sort((a,b)=>val(b)-val(a)); rec.forEach(x=>act.splice(act.indexOf(x),1)); act.splice(1,0,...rec);
+    N.bottom={p:`Fix what's on our side: ${rp(PL.fix)} of named demand stalled on stock and payment terms.`,s:N.bottom.s}; }
   N.actions=act.slice(0,6);
   if(N.tplDominant) N.bottom={p:`Make the ${N.tplSrc} logs usable before judging or funding them.`,s:`${N.tplN} of ${n} engagements carry one templated status and reason.${A.won.length?` The ${A.won.length} win${A.won.length>1?"s":""} came from ${andList([...new Set(A.won.map(r=>lc(r.channel||"other")))])}.`:""}`};
   if(!N.bottom.p) N.bottom.p=N.actions[0]?`${N.actions[0].t}.`:"Keep logging every engagement so wins and losses can be compared.";
@@ -746,6 +770,21 @@ function teamSpecs(A,N,pre){
     if(N.tplDominant){ const pics=countBy(A.reasonRows,r=>r.pic); cards.push({w:.9,title:"Who logged these",sub:"Engagements that did not order, by PIC; lead source in grey",
       chart:{type:"hbar",items:pics.slice(0,6).map(([p,n])=>({k:p,v:n,r:countBy(A.reasonRows.filter(r=>r.pic===p),r=>r.source)[0]?.[0]||"–"})),color:"#8E9C84"}}); }
     S.push({kicker:pre+N.rk,title:N.rrTitle,rows:[{cards}],notes:N.rrNotes});
+  }
+
+  const LOSS_SHORT={"Out of stock or slow delivery":"Stock / delivery","Price or payment terms":"Price / terms","Still deciding, no reason given":"Still deciding","No clear reason":"No clear reason","Not buying yet":"Not buying yet","Buys elsewhere (shop, KUD, agent)":"Buys elsewhere","Not a fit":"Not a fit"};
+  // Rejection reasons: potential loss
+  if(A.loss&&A.loss.total>0){
+    const PL=A.loss, cp=PL.comp[0], FX="#A23B72", MK="#8E9C84";
+    S.push({kicker:pre+"Rejection reasons · potential loss",title:N.lossTitle,rows:[{h:84,cards:[{kpiRow:[
+        {v:rpParts(PL.total)[0],u:rpParts(PL.total)[1],l:`named demand from ${PL.valued.length} lead${PL.valued.length>1?"s":""} who didn't order`,hot:true},
+        {v:rpParts(PL.fix)[0]||"0",u:rpParts(PL.fix)[1],l:"blocked on our side: stock-outs, delivery, price or payment terms"},
+        {v:String(PL.unval),u:`/${PL.leads.length}`,l:"leads with no quantity or potential logged"},
+        cp&&cp.ours?{v:`Rp${nf.format(Math.round(cp.their/1000))}k`,u:"",l:`${cp.prod||"a sack"} elsewhere vs Rp${nf.format(Math.round(cp.ours/1000))}k ours this week`}:PL.lateBuyers?{v:String(PL.lateBuyers),u:"",l:`leads in this export ordered anyway (${rp(PL.lateBuyGmv)})`}:{v:String(PL.zeroPotential),u:"",l:"leads logged with a potential of Rp0"}]}]},
+      {cards:[{w:.95,title:"Potential by reason",sub:"Rupiah named by leads who didn't order; leads in grey",chart:{type:"hbar",legend:[{name:"On our side",color:FX},{name:"Market or lead",color:MK}],items:PL.byGroup.map(g=>({k:g.g,v:g.v,r:`${g.n} lead${g.n>1?"s":""}`,color:g.fix?FX:MK})),fmt:v=>rp(v)}},
+        {w:1.55,title:"Biggest leads at stake",sub:"Valued at this week's price per 50 kg sack; leads who ordered this week left out. Look leads up by ID",
+          table:{colW:[13,16,14,17,9,15],head:["ID","PIC","Reason","Product","Value","Basis"],align:["l","l","l","l","r","l"],
+            rows:PL.valued.slice(0,3).map(x=>{ const sr=LOSS_SHORT[x.group]||x.group; return [x.r.id||"–",x.r.pic||"–",FIXABLE.has(x.group)?{v:sr,pill:true}:sr,prodShort(x.product)||"–",rp(x.v),x.basis]; })}}]}],notes:N.lossNotes});
   }
 
   // Customers chasing their orders (logged as leads)

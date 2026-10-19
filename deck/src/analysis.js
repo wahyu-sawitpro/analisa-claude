@@ -345,6 +345,7 @@ function analyse(sources,opt={}){
   const O=A.orders; A.gmv=O.reduce((s,o)=>s+o.gmv,0);
   A.customers=new Set(O.map(o=>o.ph||o.nk||o.no)).size;
   A.hasCustStatus=O.some(o=>o.hasStatus); A.newOrders=O.filter(o=>o.isNew); A.partial=O.filter(o=>o.partial);
+  A.loss=leadLoss(A,C,lines,O);
   A.byItem=sumBy(lines,l=>shortItem(l.item)||null,l=>l.gmv||0);
   // What sold: product family, product category, basket and price consistency
   const grp=(key)=>{ const m=new Map(); for(const l of lines){ const k=key(l); if(!k) continue; if(!m.has(k)) m.set(k,{k,gmv:0,qty:0,orders:new Set(),cust:new Set()});
@@ -610,6 +611,60 @@ function monthTrend(L){
     retained:{n:inF.filter(c=>c.by.slice(1).some(v=>v)).length,of:inF.length},fresh:{n:fresh.length,gmv:sum(fresh,L1)},
     pic:delta(Z.pic,F.pic),cat:delta(Z.cat,F.cat),family:delta(Z.family,F.family),region:delta(Z.region,F.region)};
 }
+
+// Potential loss: what the leads who didn't order said they needed, valued at this week's selling prices.
+// Order of evidence: the potential GMV the PIC logged, a rupiah total written in the notes, sacks or tonnes in the notes,
+// then the fertilizer need in kg. Leads who ordered this week (by phone) and engagements that aren't leads are left out.
+const LOSS_GROUP=t=>({"Stock & delivery":"Out of stock or slow delivery","Price":"Price or payment terms","Timing":"Not buying yet","Locked in elsewhere":"Buys elsewhere (shop, KUD, agent)","Not a fit":"Not a fit","Just asking":"No clear reason"}[t]||null);
+const FIXABLE=new Set(["Out of stock or slow delivery","Price or payment terms"]);
+function leadLoss(A,C,lines,O){
+  const med=a=>{ const v=a.filter(x=>x>0).sort((x,y)=>x-y); return v.length?v[Math.floor(v.length/2)]:null; };
+  const items=new Map(), fams=new Map(), sacks=[];
+  for(const l of lines){ if(!l.unit||!l.item) continue; const k=shortItem(l.item); (items.get(k)||items.set(k,[]).get(k)).push(l.unit); const f=l.family; if(f) (fams.get(f)||fams.set(f,[]).get(f)).push(l.unit); if(/50\s*kg/i.test(l.item)) sacks.push(l.unit); }
+  const itemP=[...items].map(([k,v])=>[k,med(v)]), famP=new Map([...fams].map(([k,v])=>[k,med(v)])), sackP=med(sacks);
+  const priceOf=txt=>{ const t=norm(txt); if(!t) return null; let best=null, bs=0;
+    for(const [k,v] of itemP){ const kt=norm(k).split(" ").filter(w=>w.length>2&&!/^\d+kg$/.test(w)); if(!kt.length) continue; const sc=kt.filter(w=>t.includes(w)).length/kt.length; if(sc>bs){ bs=sc; best=v; } }
+    if(bs>=.6) return best; const f=familyOf(txt); return f&&famP.get(f)||null; };
+  const num=v=>parseFloat(String(v).replace(/\./g,"").replace(",","."));
+  const ordered=new Set([...O.map(o=>o.ph).filter(Boolean),...C.filter(r=>r.outcome==="Won").map(r=>r.ph).filter(Boolean)]);
+  const valueOf=r=>{ const d=String(r.detail||""), prod=r.product||"";
+    if(r.potential>0) return {v:r.potential,basis:"CRM potential"};
+    const tot=[...d.matchAll(/=\s*(?:rp\.?\s*)?(\d{1,3}(?:[.,]\d{3}){1,3})/gi)].map(m=>num(m[1])).filter(x=>x>=1e5);
+    if(tot.length) return {v:tot.reduce((s,x)=>s+x,0),basis:"Amount in notes"};
+    let v=0, q=0;
+    for(const m of d.matchAll(/(\d+(?:[.,]\d+)?)\s*(sak|zak|karung|sack)s?\b/gi)){ const n=num(m[1]), ctx=d.slice(Math.max(0,m.index-45),m.index); const p=priceOf(ctx)||priceOf(prod)||sackP; if(p){ v+=n*p; q+=n; } }
+    for(const m of d.matchAll(/(\d+(?:[.,]\d+)?)\s*ton\b/gi)){ const n=num(m[1])*20, ctx=d.slice(Math.max(0,m.index-45),m.index); const p=priceOf(ctx)||priceOf(prod)||sackP; if(p){ v+=n*p; q+=n; } }
+    if(v) return {v,basis:`${nf.format(Math.round(q))} sacks in notes`};
+    if(r.needKg>0){ const p=priceOf(prod)||sackP; if(p) return {v:r.needKg/50*p,basis:`Need ${nf.format(r.needKg)} kg`}; }
+    return null; };
+  // one value per lead (the same lead may be logged twice); the latest row gives the reason and status
+  const leads=new Map();
+  for(const r of C){ if(r.kind!=="lead"||r.outcome==="Won") continue; if(r.ph&&ordered.has(r.ph)) continue;
+    const k=r.ph||r.nk||r.id||Math.random(), val=valueOf(r), cur=leads.get(k);
+    if(!cur) leads.set(k,{r,val}); else { if(val&&(!cur.val||val.v>cur.val.v)) cur.val=val; if((r.date||0)>=(cur.r.date||0)) cur.r=r; } }
+  const L=[...leads.values()].map(({r,val})=>({r,v:val?.v||0,basis:val?.basis||null,group:LOSS_GROUP(r.theme)||(r.outcome==="Warm"?"Still deciding, no reason given":"No clear reason"),product:r.product||productsIn([r]).join(", ")||null}));
+  const valued=L.filter(x=>x.v>0).sort((a,b)=>b.v-a.v), total=valued.reduce((s,x)=>s+x.v,0);
+  if(!L.length) return null;
+  const byGroup=[...new Set(valued.map(x=>x.group))].map(g=>{ const xs=valued.filter(x=>x.group===g); return {g,v:xs.reduce((s,x)=>s+x.v,0),n:xs.length,fix:FIXABLE.has(g)}; }).sort((a,b)=>b.v-a.v);
+  const fix=byGroup.filter(g=>g.fix).reduce((s,g)=>s+g.v,0), unval=L.filter(x=>!x.v);
+  // prices other suppliers charge, when the notes mention one
+  const comp=C.filter(r=>/(tempat|toko)\s*lain|di\s*luar|kompetitor|competitor/i.test(r.detail||"")).flatMap(r=>{ const d=r.detail, m=d.match(/(\d{2,3})\s*ribu|rp\.?\s*(\d{3}[.,]\d{3})/i); if(!m) return [];
+    const their=m[1]?num(m[1])*1000:num(m[2]), ctx=d.slice(Math.max(0,m.index-60),m.index+10), ours=priceOf(ctx)||priceOf(r.product||""); const prod=(ctx.match(PRODUCT_RE_A)||[])[0]||null;
+    return [{pic:r.pic,their,ours,prod}]; });
+  const medOrder=med(O.map(o=>o.gmv));
+  // leads in the not-ordered export who ordered this week anyway (matched by phone)
+  const lateBuyers=new Set(C.filter(r=>r.kind==="lead"&&r.outcome!=="Won"&&r.ph&&ordered.has(r.ph)).map(r=>r.ph));
+  const lateBuyGmv=O.filter(o=>o.ph&&lateBuyers.has(o.ph)).reduce((s,o)=>s+o.gmv,0);
+  const credit=L.filter(x=>/tempo|kredit|cicil|credit/i.test(x.r.reasonRaw||x.r.reason||""));
+  return {leads:L,valued,total,byGroup,fix,lateBuyers:lateBuyers.size,lateBuyGmv,credit,
+    stockProducts:[...new Set(L.filter(x=>x.group==="Out of stock or slow delivery").map(x=>prodShort(x.product)).filter(Boolean))],unval:unval.length,medOrder,indicative:medOrder?unval.length*medOrder:0,comp,
+    lateRefs:A.svcRefs?.length?O.filter(o=>A.svcRefs.includes(String(o.no).toUpperCase())).reduce((s,o)=>s+o.gmv,0):0,
+    zeroPotential:C.filter(r=>r.kind==="lead"&&r.potential===0).length};
+}
+// "MOP/KCL Sasco 50kg, Metsulindo …" -> "KCL Sasco"; "NPK Mahkota 13-6-27-4 0.65 B 50kg (Khusus Petani)" -> "NPK Mahkota 13-6-27"
+const prodShort=v=>{ let t=String(v||"").split(",")[0].replace(/\s*\(.*?\)/g,"").replace(/\s*-\s*(egypt|peru|topaz.*)$/i,"").replace(/\b\d+\s*(kg|liter|gr)\b/ig,"").replace(/^MOP\//i,"");
+  t=t.replace(/(\d+-\d+-\d+)(-\d+)?(\s+[\d.]+\s*B)?/,"$1").replace(/\s+/g," ").trim(); return t||null; };
+const PRODUCT_RE_A=/\b(KCL(?:\s+\w+)?|MOP(?:\s+\w+)?|NPK(?:\s+[\w.-]+)?|Urea|RP(?:\s+\w+)?|ZA|Dolomit|AKP)\b/i;
 
 /* ================= Teams ================= */
 // Each source belongs to a team: an explicit choice, else a team column (sales), else its headers, else its file name.
