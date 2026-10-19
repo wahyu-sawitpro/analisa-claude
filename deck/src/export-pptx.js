@@ -17,7 +17,11 @@ const strip=h=>String(h).replace(/<[^>]+>/g,"").replace(/&quot;/g,'"').replace(/
 
 function buildPptx(T,DX){
   const pres=new PptxGenJS(); pres.layout="LAYOUT_WIDE"; pres.title=DX.title; pres.company="SawitPRO";
-  const txt=(sl,t,o)=>sl.addText(t,{isTextBox:true,fontFace:FONT,margin:0,valign:"top",...o});
+  // Readable minimums: 9 pt for any text (tables, footers), 10 pt for body notes.
+  // Labels drawn inside charts (o.chart) keep 8 pt so they fit their bars and cells.
+  const txt=(sl,t,{chart,...o})=>{ const MIN=chart?8:9, up=f=>f==null?f:Math.max(MIN,f);
+    return sl.addText(Array.isArray(t)?t.map(r=>r.options?.fontSize?{...r,options:{...r.options,fontSize:up(r.options.fontSize)}}:r):t,
+      {isTextBox:true,fontFace:FONT,margin:0,valign:"top",...o,fontSize:up(o.fontSize)}); };
   const box=(sl,x,y,w,h,fill)=>sl.addShape(pres.shapes.ROUNDED_RECTANGLE,{x:X(x),y:X(y),w:X(w),h:X(h),rectRadius:0.12,fill:{color:fill||"FFFFFF"},line:{color:fill||"FFFFFF",width:0}});
   const base={catAxisLabelFontFace:FONT,valAxisLabelFontFace:FONT,dataLabelFontFace:FONT,legendFontFace:FONT,catAxisLabelColor:"535353",catAxisLabelFontSize:10,
     dataLabelFontSize:10,dataLabelColor:"2B2F28",valGridLine:{style:"none"},catGridLine:{style:"none"},catAxisLineShow:false,valAxisLineShow:false,valAxisHidden:true};
@@ -27,7 +31,7 @@ function buildPptx(T,DX){
     sl.addShape(pres.shapes.RECTANGLE,{x:X(38),y:X(655),w:X(1154),h:X(13),fill:{color:"F5D347"},line:{color:"F5D347",width:0}});
     sl.addImage({data:imgData(IMG.palm),x:X(1188),y:X(606),w:X(84),h:X(88)});
     sl.addImage({data:imgData(IMG.logo),x:X(1152),y:X(30),w:X(94),h:X(94)});
-    txt(sl,"SAWITPRO PROPRIETARY",{x:X(40),y:X(690),w:3,h:0.22,fontSize:8,color:"7A8373",charSpacing:1});
+    txt(sl,DX.basis||"SAWITPRO PROPRIETARY",{x:X(40),y:X(690),w:X(570),h:0.22,fontSize:9,color:"7A8373"});
     txt(sl,String(no),{x:X(620),y:X(690),w:0.4,h:0.22,fontSize:8,bold:true,color:"4A653B",align:"center"});
     txt(sl,"Do not use or distribute without permission from SawitPRO",{x:X(700),y:X(690),w:X(540),h:0.22,fontSize:8,color:"7A8373",align:"right"});
     txt(sl,kicker.toUpperCase(),{x:X(82),y:X(64),w:8,h:0.25,fontSize:10,bold:true,color:"D9A21B",charSpacing:2});
@@ -54,7 +58,7 @@ function buildPptx(T,DX){
       rect(sl,x,by,w,bh,"E9EDE5");
       let bx=x; (stacked?it.s.map((v,si)=>[v||0,colors[si]]):[[it.v,colors[0]]]).forEach(([v,c])=>{ if(!v) return; const bw=w*v/top;
         rect(sl,bx,by,bw-(stacked?1.5:0),bh,c);
-        if(stacked&&bw>=18&&bh>=10) txt(sl,String(v),{x:X(bx),y:X(by),w:X(bw),h:X(bh),fontSize:7.5,bold:true,color:"FFFFFF",align:"center",valign:"middle"});
+        if(stacked&&bw>=18&&bh>=10) txt(sl,String(v),{x:X(bx),y:X(by),w:X(bw),h:X(bh),fontSize:7.5,bold:true,color:"FFFFFF",align:"center",valign:"middle",chart:true});
         bx+=bw; }); }); };
   const table=(sl,head,rows,x,y,w,colW,o={})=>{ const hd=head.map(t=>({text:t,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:9.5}}));
     sl.addTable([hd,...rows.map(r=>r.map(c=>typeof c==="object"?c:{text:String(c)}))],{x:X(x),y:X(y),w:X(w),colW:colW&&colW.map(X),fontFace:FONT,fontSize:9,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.045,autoPage:false,...o}); };
@@ -102,7 +106,7 @@ function buildPptx(T,DX){
       txt(sl,[t.A.has.sales&&`${rp(t.A.gmv)} from ${t.A.orders.length} orders`,t.A.crm.length&&`${t.A.crm.length} CRM engagements`].filter(Boolean).join(" · "),{x:X(131),y:X(460),w:X(900),h:0.4,fontSize:16,bold:true,color:"E4ECDD"});
       txt(sl,String(i+1).padStart(2,"0"),{x:X(900),y:X(500),w:X(300),h:X(170),fontSize:130,bold:true,color:"FFFFFF",transparency:85,align:"right"}); }
     teamBlock(t.A,t.N,DX.multi?`${t.name} · `:"");
-    if(t.C&&t.NC) teamBlock(t.C,t.NC,`${DX.multi?`${t.name} · `:""}CRM ${crmSpan(t.C)} · `);
+    if(t.C&&t.NC&&!t.A.forecast) teamBlock(t.C,t.NC,`${DX.multi?`${t.name} · `:""}CRM ${crmSpan(t.C)} · `);
   });
 
   // Draw chart primitives (see viz.js) as plain shapes and text boxes.
@@ -112,9 +116,9 @@ function buildPptx(T,DX){
     else if(p.t==="l"){ const x=Math.min(p.x1,p.x2), y=Math.min(p.y1,p.y2), up=(p.x2-p.x1)*(p.y2-p.y1)<0;
       sl.addShape(pres.shapes.LINE,{x:X(ox+x),y:X(oy+y),w:X(Math.abs(p.x2-p.x1)),h:X(Math.abs(p.y2-p.y1)),flipV:up,line:{color:H(p.color),width:p.sw*.75,dashType:p.dash?"dash":"solid"}}); }
     else if(p.t==="d") sl.addShape(pres.shapes.OVAL,{x:X(ox+p.cx-p.rad),y:X(oy+p.cy-p.rad),w:X(p.rad*2),h:X(p.rad*2),fill:{color:H(p.fill)},line:{color:"FFFFFF",width:1.5}});
-    else if(p.t==="t") txt(sl,p.s,{x:X(ox+p.x),y:X(oy+p.y),w:X(Math.max(p.w,8)),h:X(Math.max(p.h,8)),fontSize:Math.round(p.size*.75*10)/10,bold:p.bold,color:H(p.color),align:p.align,valign:p.valign==="middle"?"middle":p.valign,lineSpacingMultiple:.95});
+    else if(p.t==="t") txt(sl,p.s,{x:X(ox+p.x),y:X(oy+p.y),w:X(Math.max(p.w,8)),h:X(Math.max(p.h,8)),fontSize:Math.round(p.size*.75*10)/10,bold:p.bold,color:H(p.color),align:p.align,valign:p.valign==="middle"?"middle":p.valign,lineSpacingMultiple:.95,chart:true});
   }); }
-  function cellOf(v){ const o=typeof v==="object"&&v?v:{v}; return {text:String(o.v),options:o.pill?{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}:o.bold?{bold:true,color:"274E13"}:{}}; }
+  function cellOf(v){ const o=typeof v==="object"&&v?v:{v}; return {text:String(o.v),options:o.fill?{bold:true,color:(o.color||"#2B2F28").replace("#",""),fill:{color:o.fill.replace("#","")}}:o.pill?{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}:o.bold?{bold:true,color:"274E13"}:{}}; }
   function panelSlide(spec){
     const sl=content(spec.kicker,spec.title), L=layoutPanels(spec), ox=80, oy=180;
     L.cells.forEach(c=>{
@@ -127,15 +131,15 @@ function buildPptx(T,DX){
         const hd=T.head.map((h,i)=>({text:h,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:9,align:al(i)}}));
         sl.addTable([hd,...T.rows.map(r=>r.map((v,i)=>{ const c2=cellOf(v); c2.options={...c2.options,align:al(i)}; return c2; }))],
           {x:X(ox+c.x+I.x-6),y:X(oy+c.y+I.y),w:X(I.w+12),colW:(()=>{ const w=colWeights(T), t=w.reduce((a,b)=>a+b,0); return w.map(x=>X((I.w+12)*x/t)); })(),fontFace:FONT,fontSize:9,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.04,autoPage:false}); }
-      if(c.foot) txt(sl,c.foot,{x:X(ox+c.x+20),y:X(oy+c.y+c.h-c.fh-6),w:X(c.w-40),h:X(c.fh),fontSize:9.2,color:"535353",valign:"bottom",fit:"shrink"});
+      if(c.foot) txt(sl,c.foot,{x:X(ox+c.x+20),y:X(oy+c.y+c.h-c.fh-6),w:X(c.w-40),h:X(c.fh),fontSize:10,color:"535353",valign:"bottom",fit:"shrink"});
     });
     if(L.notes){ box(sl,ox,oy+L.notes.y,1080,L.notes.h,"FBEFC4");
-      txt(sl,L.notes.list.map((t,i)=>({text:strip(t),options:{breakLine:i<L.notes.list.length-1,paraSpaceAfter:3}})),{x:X(ox+18),y:X(oy+L.notes.y+9),w:X(1044),h:X(L.notes.h-18),fontSize:9.3,color:"5A4600",valign:"middle",fit:"shrink"}); }
+      txt(sl,L.notes.list.map((t,i)=>({text:strip(t),options:{breakLine:i<L.notes.list.length-1,paraSpaceAfter:3}})),{x:X(ox+18),y:X(oy+L.notes.y+9),w:X(1044),h:X(L.notes.h-18),fontSize:10,color:"5A4600",valign:"middle",fit:"shrink"}); }
   }
   function teamBlock(A,N,pre){ teamSpecs(A,N,pre).forEach(panelSlide); }
 
   // Next steps
-  { const sl=content("Next steps",`${DX.actions.length} actions ${DX.trend?"to recover sales":"for the coming week"}`);
+  { const sl=content("Next steps",`${DX.actions.length} draft actions ${DX.dop?"to move the DO pipeline":DX.acq?"to grow farmer acquisition":DX.forecast?"to deliver the stock plan":DX.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`);
     const nc=DX.actions.length>4?3:2, cw=nc===3?(1080-2*14)/3:532, gap=nc===3?14:16;
     DX.actions.forEach((a,i)=>{ const x=80+(i%nc)*(cw+gap), y=180+Math.floor(i/nc)*205; box(sl,x,y,cw,190);
       txt(sl,[{text:`${i+1}  `,options:{color:"D9A21B",bold:true,fontSize:12}},{text:a.t,options:{color:"274E13",bold:true,fontSize:nc===3?12:13}}],{x:X(x+18),y:X(y+14),w:X(cw-36),h:X(40),fit:"shrink"});
@@ -155,7 +159,9 @@ function buildPptx(T,DX){
 }
 
 function deckName(){ const d=state.X?.dates||[]; const t=d.length?`${d[0].getFullYear()}-${String(d[0].getMonth()+1).padStart(2,"0")}-${String(d[0].getDate()).padStart(2,"0")}`:"data";
-  return `SawitPRO ${state.X?.multi?"Smallholder and Plantation":(state.T?.[0]?.name||"Sales")} Review ${t}`; }
+  if(state.X?.dop) return `SawitPRO DO Pipeline ${new Date().toISOString().slice(0,10)}`;
+  if(state.X?.acq){ const w=new Date(state.T[0].A.acq.L.w); return `SawitPRO Farmer Acquisition week of ${w.getFullYear()}-${String(w.getMonth()+1).padStart(2,"0")}-${String(w.getDate()).padStart(2,"0")}`; }
+  return `SawitPRO ${state.X?.multi?"Smallholder and Plantation":(state.T?.[0]?.name||"Sales")} ${state.X?.forecast?"Review and Stock Plan":"Review"} ${t}`; }
 async function makeBlob(){ await loadPptx(); return buildPptx(state.T,state.X).write({outputType:"blob"}); }
 async function busy(btn,label,fn){ const html=btn.innerHTML; btn.disabled=true; const t=btn.querySelector(".t"); if(t) t.textContent=label; else btn.textContent=label;
   try{ await fn(); } finally{ btn.disabled=false; btn.innerHTML=html; } }

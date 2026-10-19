@@ -1,4 +1,4 @@
-<title>SawitPRO Leads Deck</title>
+<title>SawitPRO Deck</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
@@ -67,7 +67,7 @@ main{padding-block:14px 60px;padding-inline:16px}
 .content .palm{position:absolute;left:1188px;top:606px;width:84px;height:88px}
 .content .logo{position:absolute;left:1152px;top:30px;width:94px;height:94px}
 .content .foot{position:absolute;top:690px;left:40px;right:40px;display:flex;justify-content:space-between;font-size:10px;color:var(--muted);letter-spacing:.06em}
-.content .foot .pg{font-weight:700;color:var(--green)}
+.content .foot>span{flex:1;min-width:0}.content .foot .pg{flex:0 0 40px;text-align:center;font-weight:700;color:var(--green)}.content .foot>span:last-child{text-align:right}
 .content .kicker{position:absolute;left:82px;top:64px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
 .content h2{position:absolute;left:80px;top:88px;width:1040px;margin:0;font-size:31px;line-height:1.15;font-weight:800;color:var(--green);text-wrap:balance;letter-spacing:-.01em}
 .content .body{position:absolute;left:80px;top:180px;width:1080px;height:462px}
@@ -161,6 +161,10 @@ main{padding-block:14px 60px;padding-inline:16px}
 .tip b{color:var(--yellow)}
 @media (max-width:640px){.bar .brand span{display:none}.btn .t{display:none}.btn{padding:8px 11px}}
 .sources .spacer{flex:1}
+.sources .tgt{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--green-dk);margin-left:6px}
+.sources .tgt input{width:150px;padding:5px 9px;border:1px solid var(--line);border-radius:8px;font:inherit;font-variant-numeric:tabular-nums;background:#fff;color:var(--ink)}
+.sources .tgthint{font-size:12px;color:var(--muted)}
+.tbl.pt td:not(.num){white-space:pre-line}
 .src-chip select{border:0;background:var(--tint);color:var(--green-dk);font:inherit;font-size:12px;font-weight:600;border-radius:999px;padding:3px 6px;margin-left:6px;max-width:170px}
 .analyze{appearance:none;border:0;background:var(--yellow);color:var(--green-dk);font:inherit;font-weight:800;font-size:14px;border-radius:999px;padding:10px 18px;cursor:pointer;box-shadow:0 2px 8px rgba(39,78,19,.25)}
 .analyze:hover{background:#FFE06A} .analyze[disabled]{opacity:.5;cursor:not-allowed}
@@ -199,10 +203,11 @@ svg.chart{display:block;overflow:visible;font-family:inherit}svg.chart rect[data
 .act .meta span.team{background:var(--green);color:#fff}
 .stats4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .tbl th .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;border:1.5px solid #fff}
+.brand em{font-style:normal;font-weight:600;opacity:.75}.brand em:not(:empty)::before{content:" · "}
 </style>
 
 <header class="bar">
-  <div class="brand"><img src="{{IMG:logo.png}}" alt=""><span>Sales &amp; Leads Deck</span></div>
+  <div class="brand"><img src="{{IMG:logo.png}}" alt=""><span>SawitPRO Deck<em id="deckTopic"></em></span></div>
   <div class="src"><span>Data source</span><b id="srcName">–</b></div>
   <div class="actions">
     <button class="btn primary" id="uploadBtn" type="button" title="CRM or sales exports: CSV, XLSX, XLS, ODS, TSV or JSON">
@@ -254,7 +259,8 @@ const SAMPLE=/*SAMPLE_DATA*/null;
 /*INCLUDE:export-pptx.js*/
 
 /* ================= Boot ================= */
-let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data-v6")||"null") }catch(e){}
+try{ localStorage.removeItem("sp-deck-data-v6"); }catch(e){}  // files saved by older versions of the page
+let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data-v7")||"null") }catch(e){}
 if(saved&&Array.isArray(saved.sources)&&saved.sources.some(d=>d.rows?.length)){
   state.sources=saved.sources; state.sample=false;
   if(saved.dirty){ state.dirty=true; renderSources(); deckEl.innerHTML=`<div class="card"><div class="empty">Your files are loaded. Click <b>&nbsp;Analyze&nbsp;</b> to build the deck.</div></div>`; }

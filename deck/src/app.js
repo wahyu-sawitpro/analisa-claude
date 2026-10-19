@@ -6,13 +6,15 @@ function analyzeNow(){
   const on=state.sources.filter(x=>x.on);
   state.dirty=false; renderSources(); note("");
   if(!on.length){ deckEl.innerHTML=`<div class="card"><div class="empty">All data sources are switched off. Turn one on above, then click Analyze.</div></div>`; SLIDES=[]; state.A=null; return; }
-  const T=analyseTeams(on).map(t=>({...t,N:narrative(t.A),NC:t.C?narrative(t.C):null})), X=deckNarrative(T);
+  const T=analyseTeams(on).map(t=>({...t,N:t.A.acq||t.A.dop?null:narrative(t.A),NC:t.C?narrative(t.C):null})), X=deckNarrative(T);
   state.T=T; state.X=X; state.A=T[0].A; state.N=T[0].N; renderSources();
+  // the page title follows what was analysed (acquisition, stock forecast, sales review, ...)
+  document.getElementById("deckTopic").textContent=X.eyebrow||""; document.title=`${X.eyebrow?`${X.eyebrow}: ${X.title} · `:""}SawitPRO Deck`;
   SLIDES=buildDeck(T,X);
   deckEl.innerHTML=SLIDES.map((s,i)=>`<section class="frame" aria-label="Slide ${i+1}">${s}</section>`).join("");
   const files=new Set(on.map(x=>x.name)).size;
   const crmN=T.reduce((s,t)=>s+t.A.crm.length+(t.C?t.C.crm.length:0),0), ordN=T.reduce((s,t)=>s+t.A.orders.length,0);
-  document.getElementById("srcName").textContent=`${files} file${files>1?"s":""} · ${T.length>1?`${T.map(t=>t.name).join(" + ")} · `:""}${[crmN&&`${nf.format(crmN)} CRM rows`,ordN&&`${nf.format(ordN)} orders`].filter(Boolean).join(" · ")}`;
+  document.getElementById("srcName").textContent=`${files} file${files>1?"s":""} · ${T.length>1?`${T.map(t=>t.name).join(" + ")} · `:""}${[crmN&&`${nf.format(crmN)} CRM rows`,ordN&&`${nf.format(ordN)} orders`,T[0].A.acq&&`${nf.format(T[0].A.acq.rows)} farmers`,T[0].A.dop&&`${nf.format(T[0].A.dop.n)} DO lead${T[0].A.dop.n===1?"":"s"}`].filter(Boolean).join(" · ")}`;
   const A=T[0].A;
   if(!state.sample){ const miss=[]; if(A.has.crm&&!A.crmMap.status) miss.push("a lead status column (e.g. “Respon Pengguna” or “Status”)"); if(A.has.crm&&!A.crmMap.reason) miss.push("a reason column (“Alasan …”)");
     if(miss.length) note(`Some slides are thin because the CRM data has no ${miss.join(" and no ")}.`); }
@@ -24,7 +26,7 @@ new ResizeObserver(fit).observe(deckEl);
 function note(msg,err,html){ const n=document.getElementById("notice"); if(!msg){n.hidden=true;return} if(html) n.innerHTML=msg; else n.textContent=msg; n.className="notice"+(err?" err":""); n.hidden=false; }
 
 /* ================= File loading ================= */
-const ROLE_SHORT={crm:"CRM",sales:"Sales"};
+const ROLE_SHORT={crm:"CRM",sales:"Sales",price:"Price list",acq:"Acquisition",do:"DO pipeline"};
 const SAMPLE_SRCS=(SAMPLE?.sources||[]).map(s=>({...s,on:true,role:"auto",team:"auto"}));
 function sheetToDs(wb,name,sheet){
   return aoaToSource(XLSX.utils.sheet_to_json(wb.Sheets[sheet],{header:1,raw:true,defval:null,blankrows:false}),name,sheet);
@@ -43,21 +45,25 @@ async function readFile(file){
   else wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true});
   const sheets=wb.SheetNames.map(sh=>sheetToDs(wb,file.name,sh)).filter(d=>d.rows.length);
   if(!sheets.length) throw new Error("no data rows found");
-  const useful=sheets.filter(d=>{ const c=detectCrm(d.headers), s=detectSales(d.headers);
+  const useful=sheets.filter(d=>{ const c=detectCrm(d.headers), s=detectSales(d.headers); if(isAcqList(d.headers)||isDoList(d.headers)) return true;
     return ["status","reason","pic","id","channel"].filter(k=>c[k]).length>=2||["orderNo","gmv","item","qty"].filter(k=>s[k]).length>=2; });
   const keep=useful.length?useful:[sheets.sort((a,b)=>b.rows.length-a.rows.length)[0]];
   if(wb.SheetNames.length===1) keep.forEach(d=>d.sheet=null);
   return keep;
 }
-const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v6"):localStorage.setItem("sp-deck-data-v6",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
-async function loadFiles(list){
-  const files=[...list]; if(!files.length) return;
+const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v7"):localStorage.setItem("sp-deck-data-v7",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
+// Upload files / drag and drop: the new files replace what the deck showed. "+ Add files": they join the current files.
+let addMode=false;
+async function loadFiles(list,add=addMode){
+  addMode=false; const files=[...list]; if(!files.length) return;
   note(""); const failed=[], added=[];
   for(const f of files){ try{ added.push(...await readFile(f)); }catch(e){ failed.push(`“${f.name}”: ${e.message}`); } }
   if(added.length){
-    if(state.sample){ state.sources=[]; state.sample=false; }
+    if(state.sample||!add){ state.sources=[]; state.sample=false; }
     for(const d of added){ const i=state.sources.findIndex(x=>x.name===d.name&&x.sheet===d.sheet); if(i>=0) state.sources[i]=d; else state.sources.push(d); }
-    markDirty();
+    analyzeNow();  // the deck is rebuilt from the uploaded files straight away
+    const left=state.T?.[0]?.left?` The ${state.T[0].A.dop?"DO pipeline":"acquisition"} file sets the deck, so the other ${state.T[0].left} file${state.T[0].left>1?"s are":" is"} left out.`:"";
+    note(`Deck built from ${state.sources.filter(x=>x.on).map(srcLabel).join(", ")}.${left} Change a data type${state.T?.[0]?.A.acq?"":" or the target above"}, then click Analyze to rebuild.`);
   }
   if(failed.length) note(`Couldn't read ${failed.join("; ")}.`,true);
 }
@@ -66,13 +72,14 @@ function renderSources(){
   const chips=state.sources.map((d,i)=>{ const auto=detectRole(d.headers);
     return `<span class="src-chip${d.on?"":" off"}">
       <label><input type="checkbox" data-i="${i}" ${d.on?"checked":""} aria-label="Include ${esc(srcLabel(d))}"> ${esc(srcLabel(d))} <em>${nf.format(d.rows.length)}</em></label>
-      <select data-role="${i}" aria-label="Data type of ${esc(srcLabel(d))}">${["auto","crm","sales"].map(r=>`<option value="${r}" ${(d.role||"auto")===r?"selected":""}>${r==="auto"?`${ROLE_SHORT[auto]} (auto)`:ROLE_SHORT[r]}</option>`).join("")}</select>
+      <select data-role="${i}" aria-label="Data type of ${esc(srcLabel(d))}">${["auto","crm","sales","price","acq","do"].map(r=>`<option value="${r}" ${(d.role||"auto")===r?"selected":""}>${r==="auto"?`${ROLE_SHORT[auto]} (auto)`:ROLE_SHORT[r]}</option>`).join("")}</select>
       <select data-team="${i}" aria-label="Team of ${esc(srcLabel(d))}">${["auto","Smallholder","Plantation"].map(t=>`<option value="${t}" ${(d.team||"auto")===t?"selected":""}>${t==="auto"?`${detectTeam({...d,team:"auto"})||"Team"} (auto)`:t}</option>`).join("")}</select>
       ${state.sample?"":`<button type="button" data-rm="${i}" aria-label="Remove ${esc(srcLabel(d))}">×</button>`}</span>`; }).join("");
   box.innerHTML=`<span class="lbl">${state.sample?"Sample data":"Data sources"}</span>${chips}
     <button class="link" type="button" id="addMore">+ Add files</button>${state.sample?"":`<button class="link" type="button" id="clearAll">Use sample data</button>`}
+    ${state.sources.some(d=>d.on&&roleOf(d)==="price")?`<label class="tgt" for="fcTarget">Monthly target (Rp)<input id="fcTarget" type="text" inputmode="numeric" value="${nf.format(FC_TARGET)}" aria-describedby="tgtHint"></label><span class="tgthint" id="tgtHint">sizes the stock plan</span>`:""}
     <span class="spacer"></span>
-    ${state.dirty?`<button class="analyze" type="button" id="analyzeBtn" ${on?"":"disabled"}>Analyze ${on} file${on===1?"":"s"} →</button>`:`${state.T?.some(t=>t.A.has.sales)&&!state.T.some(t=>t.A.wow||t.A.mode==="trend")?`<span class="wowhint">Add the week-before sales export to compare weeks</span>`:""}<span class="uptodate">✓ Deck is up to date</span>`}`;
+    ${state.dirty?`<button class="analyze" type="button" id="analyzeBtn" ${on?"":"disabled"}>Analyze ${on} file${on===1?"":"s"} →</button>`:`${state.T?.some(t=>t.A.has.sales)&&!state.T.some(t=>t.A.wow||t.A.mode==="trend")?`<span class="wowhint">Add the week-before sales export to compare weeks</span>`:""}${state.sources.some(d=>d.on&&roleOf(d)==="sales")&&!state.sources.some(d=>d.on&&roleOf(d)==="price")?`<span class="wowhint">Add a price list to get the stock forecast</span>`:""}<span class="uptodate">✓ Deck is up to date</span>`}`;
   document.getElementById("staleNote").hidden=!state.dirty;
   deckEl.classList.toggle("stale",state.dirty);
 }
@@ -80,14 +87,15 @@ const src=document.getElementById("sources");
 src.addEventListener("change",e=>{ const t=e.target;
   if(t.dataset.i!==undefined){ state.sources[+t.dataset.i].on=t.checked; markDirty(); }
   if(t.dataset.role!==undefined){ state.sources[+t.dataset.role].role=t.value; markDirty(); }
-  if(t.dataset.team!==undefined){ state.sources[+t.dataset.team].team=t.value; markDirty(); } });
+  if(t.dataset.team!==undefined){ state.sources[+t.dataset.team].team=t.value; markDirty(); }
+  if(t.id==="fcTarget"){ const v=toNum(t.value); if(v>0){ FC_TARGET=v; markDirty(); } else { t.value=nf.format(FC_TARGET); note("Enter the monthly target as a number of rupiah, e.g. 4,000,000,000.",true); } } });
 src.addEventListener("click",e=>{ const t=e.target;
   const rm=t.closest("[data-rm]"); if(rm){ state.sources.splice(+rm.dataset.rm,1); if(!state.sources.length){ state.sources=SAMPLE_SRCS.map(s=>({...s})); state.sample=true; analyzeNow(); } else markDirty(); return; }
-  if(t.id==="addMore") document.getElementById("fileIn").click();
+  if(t.id==="addMore"){ addMode=true; document.getElementById("fileIn").click(); }
   if(t.id==="clearAll"){ state.sources=SAMPLE_SRCS.map(s=>({...s})); state.sample=true; analyzeNow(); }
   if(t.id==="analyzeBtn") analyzeNow(); });
 document.getElementById("staleGo").onclick=()=>analyzeNow();
-document.getElementById("uploadBtn").onclick=()=>document.getElementById("fileIn").click();
+document.getElementById("uploadBtn").onclick=()=>{ addMode=false; document.getElementById("fileIn").click(); };
 document.getElementById("fileIn").onchange=e=>{ loadFiles(e.target.files); e.target.value=""; };
 let dragN=0; const hint=document.getElementById("dropHint");
 addEventListener("dragenter",e=>{if([...e.dataTransfer.types].includes("Files")){dragN++;hint.hidden=false}});

@@ -1,7 +1,9 @@
 # SawitPRO sales analysis
 
 The main deliverable is the deck in `deck/` (see `deck/README.md`): a single HTML page with upload, Analyze,
-Download PPTX and Google Slides export, published as a claude.ai artifact.
+Download PPTX and Google Slides export, published as the claude.ai artifact "SawitPRO Deck"
+(https://claude.ai/artifact/H73dmaq1yoCnzL2p2JMg5p). New analysis requests (sales, acquisition, forecasting, ...) are
+added to this deck, not built as separate decks.
 
 ## Standing requests from the user
 - **Always go deeper.** Don't stop at totals and the first explanation. For any change, break it down (volume vs

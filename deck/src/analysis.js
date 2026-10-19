@@ -39,6 +39,7 @@ const SALES_FIELDS=[
   ["date",[/order_?date|tanggal\s*order|sale.*date|^date$|^tanggal$/]],
   ["pic",[/pic_?name|sales\s*name|^pic$|salesperson/]],
   ["team",[/pic_?team|team/]],
+  ["custId",[/customer_?id/]],
   ["phone",[/customer_?phone|phone|no\.?\s*hp/]],
   ["name",[/customer_?name|nama\s*customer/]],
   ["qty",[/^qty$|quantity|jumlah/]],
@@ -66,13 +67,31 @@ function detectWith(fields,headers){
   return map;
 }
 const detectCrm=h=>detectWith(CRM_FIELDS,h), detectSales=h=>detectWith(SALES_FIELDS,h);
+// A farmer acquisition export: one row per registered farmer, with the registration week and Duta / non-Duta type.
+const ACQ_FIELDS=[["week",[/minggu_?register|register_?week|week_?register|^minggu$|^week$/]],["type",[/akuisisi_?type|acquisition_?type/]],["joined",[/join_?date_?farmer|register_?date|join_?date|tanggal_?daftar/]],
+  ["source",[/^utm_?source$/]],["campaign",[/^utm_?source_?name$|utm_?campaign/]],["status",[/status_?under_?duta/]],["duta",[/^duta_?id$|^duta_?name$/]],["dutaName",[/^duta_?name$/]],
+  ["test",[/is_?test_?duta|is_?test/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
+const detectAcq=h=>detectWith(ACQ_FIELDS,h);
+const isAcqList=headers=>{ const m=detectAcq(headers); return !!(m.type||m.week&&m.joined&&(m.id||m.duta)); };
+// A DO (FFB supplier) pipeline export from the CRM: one row per DO lead, with area, potential FFB and the nearest mill.
+const DO_FIELDS=[["id",[/^text$|^do_?id$|^id$/]],["pic",[/^pic$/]],["progress",[/^progress$/]],["location",[/^location$|lokasi/]],["doName",[/^do name$/]],
+  ["source",[/leads? source/]],["area",[/luas|area \(ha\)/]],["created",[/created date|tanggal dibuat/]],["ffb",[/ffb/]],["dist",[/jarak/]],["mill",[/mills? terdekat|nearest mill/]],
+  ["supply",[/supply ke|supplies to/]],["custType",[/customer type/]],["closing",[/closing date/]],["status",[/^status$/]],["detail",[/^detail$/]]];
+const detectDo=h=>{ const m={}, used=new Set(); for(const [k,res] of DO_FIELDS){ const x=h.find(c=>!used.has(c)&&res.some(re=>re.test(norm(c)))); if(x){m[k]=x;used.add(x);} } return m; };
+const isDoList=headers=>{ const m=detectDo(headers); return !!(m.doName||m.ffb&&m.mill); };
+// A price list: item names and a price column, no order or quantity columns.
+const isPriceList=headers=>{ const h=headers.map(norm);
+  return h.some(x=>/nama barang|item|product|produk/.test(x))&&h.some(x=>/harga|price/.test(x))&&!h.some(x=>/^qty$|quantity|order|invoice|gmv/.test(x)); };
 function detectRole(headers){
+  if(isAcqList(headers)) return "acq";
+  if(isDoList(headers)) return "do";
+  if(isPriceList(headers)) return "price";
   const s=detectSales(headers), c=detectCrm(headers);
   const salesScore=["orderNo","invoice","qty","gmv","item"].filter(k=>s[k]).length;
   const crmScore=["status","reason","channel","detail","id"].filter(k=>c[k]).length;
   return salesScore>=3&&salesScore>=crmScore?"sales":"crm";
 }
-const ROLE_LABEL={crm:"CRM engagements",sales:"Sales orders"};
+const ROLE_LABEL={crm:"CRM engagements",sales:"Sales orders",price:"Price list",acq:"Farmer acquisition",do:"DO pipeline"};
 
 /* ================= Cleaning & translation ================= */
 const blank=v=>v===null||v===undefined||(typeof v==="string"&&v.trim()==="")||(typeof v==="number"&&isNaN(v));
@@ -180,6 +199,9 @@ function inferHeaders(rows){
 // Array-of-arrays (one sheet) -> data source.
 function aoaToSource(aoa,name,sheet){
   let hi=aoa.findIndex(r=>r.filter(v=>!blank(v)).length>=2); if(hi<0) hi=0;
+  // a title row above the real headers (e.g. "Ongkir" over a price list): use the row that names the item and price columns
+  const ph=aoa.slice(0,6).findIndex(r=>r.some(v=>/nama barang|item name|product name/i.test(String(v??"")))&&r.some(v=>/harga|price/i.test(String(v??""))));
+  if(ph>hi) hi=ph;
   const headerless=looksData(aoa[hi]||[]);
   const headers=headerless?inferHeaders(aoa.slice(hi)):(aoa[hi]||[]).map((h,i)=>blank(h)?`Column ${i+1}`:String(h).replace(/^﻿/,"").trim());
   const body=aoa.slice(headerless?hi:hi+1);
@@ -255,6 +277,8 @@ function analyse(sources,opt={}){
         // a row with only an order number (and amount) continues the closing above it: same customer, another order
         if(prev&&o.ref&&!o.date&&!o.name&&!o.phone){ prev.refs.push(o.ref); prev.refVal[o.ref]=o.potential||0; if(o.potential) prev.potential=(prev.potential||0)+o.potential; continue; }
         crm.push(o); prev=o; } } }
+  // Trend review: CRM rows outside the sales months are left out (counted in A.crmOutside)
+  if(opt.window){ const [a,b]=opt.window, n0=crm.length; for(let i=crm.length-1;i>=0;i--){ const d=crm[i].date; if(d&&(d<a||d>b)) crm.splice(i,1); } A.crmOutside=n0-crm.length; }
   // Sales: the same order line in two uploaded files counts once
   { const seen=new Map(); for(let i=lines.length-1;i>=0;i--){ const l=lines[i], k=[l.orderNo||l.invoice,l.item,l.qty,l.gmv].join("|");
       if(l.orderNo||l.invoice){ if(seen.has(k)&&seen.get(k)!==l._src){ lines.splice(i,1); continue; } seen.set(k,l._src); } } }
@@ -388,8 +412,13 @@ function analyse(sources,opt={}){
   A.wonCustomers=new Set(A.won.map(r=>r.ph||r.nk||r.id)).size;
 
   // ---- Funnel: logged -> reached -> showed interest -> ordered
-  const reached=r=>!/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"");
-  A.calls=C.filter(r=>r.callResp||/phone/i.test(r.channel||"")); A.callsMissed=A.calls.filter(r=>!reached(r)).length;
+  // When the export logs call results, a lead counts as reached only with a logged result or a face-to-face visit;
+  // a phone or WhatsApp engagement with no result is "not recorded", not reached.
+  const unable=r=>/unable|tidak bisa|not reach|no answer/i.test(r.callResp||""), hasResp=C.some(r=>r.callResp);
+  const inPerson=r=>/onsite|visit|kunjung|event/i.test(r.channel||"");
+  const reached=r=>r.callResp||!hasResp?!unable(r):inPerson(r);
+  A.noResult=hasResp?C.filter(r=>!r.callResp&&!inPerson(r)).length:0;
+  A.calls=C.filter(r=>r.callResp||/phone/i.test(r.channel||"")); A.callsMissed=A.calls.filter(unable).length;
   // the funnel follows leads being worked: sales logged at checkout, after-sales calls and order follow-ups are not leads
   const LF=C.filter(r=>r.kind==="lead");
   A.funnel=[[LF.length===C.length?"Engagements logged":"Leads worked",LF.length],["Reached the lead",LF.filter(reached).length],["Showed interest",LF.filter(r=>reached(r)&&(r.outcome==="Won"||r.outcome==="Warm")).length],["Ordered",LF.filter(r=>reached(r)&&r.outcome==="Won").length]];
@@ -477,6 +506,10 @@ function analyse(sources,opt={}){
     return {k,groups,purity:groups.length>=2&&distinct>=2?purity*(cov/RR.length):0}; }).filter(x=>x.purity>0)
     .sort((a,b)=>Math.abs(b.purity-a.purity)>.05?b.purity-a.purity:RD.indexOf(a.k)-RD.indexOf(b.k));
   A.reasonDims=A.reasonSplit.slice(0,2).map(x=>x.k);
+  // PICs whose entries are all the same status and reason (likely a form default, not what the lead said)
+  A.uniform=countBy(C.filter(r=>r.pic),r=>r.pic).filter(([,n])=>n>=30).map(([p,n])=>{
+    const top=countBy(C.filter(r=>r.pic===p),r=>`${r.status||""}|${r.reasonRaw||""}`)[0]; return {p,n,same:top[1],status:top[0].split("|")[0],reason:top[0].split("|")[1]}; })
+    .filter(x=>x.same/x.n>=.95);
   A.askUnreach=RR.filter(r=>r.theme==="Just asking"&&/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"")).length;
   A.askTotal=RR.filter(r=>r.theme==="Just asking").length;
   A.locHot=countBy(RR,r=>r.location).filter(([,n])=>n>=4).map(([g,n])=>{const t=countBy(RR.filter(r=>r.location===g),r=>r.theme)[0];return {g,n,theme:t[0],tn:t[1]}}).filter(x=>x.tn/x.n>=.75)[0]||null;
@@ -528,6 +561,8 @@ function monthTrend(L){
   const ts=dated.map(l=>+l.date), lo=Math.min(...ts), hi=Math.max(...ts), mk=d=>d.getFullYear()*12+d.getMonth(), DAY3=3*864e5;
   const months=[]; for(let m=mk(new Date(lo));m<=mk(new Date(hi));m++){ const a=new Date(Math.floor(m/12),m%12,1), b=new Date(Math.floor(m/12),m%12+1,0); if(lo<=+a+DAY3&&hi>=+b-DAY3) months.push(m); }
   if(months.length<2) return null;
+  // a long export (e.g. Jan–Sep) is reviewed on its last 3 full months; the forecast slides show the whole history
+  if(months.length>3) months.splice(0,months.length-3);
   const M=months.map(m=>{ const ls=dated.filter(l=>mk(l.date)===m), om=new Map();
     ls.forEach((l,i)=>{ const k=l.orderNo||l.invoice||`line-${m}-${i}`; if(!om.has(k)) om.set(k,{gmv:0,lines:[]}); const o=om.get(k); o.gmv+=l.gmv||0; o.lines.push(l); });
     const O=[...om.values()], open=O.filter(o=>o.lines.some(l=>l.soStatus&&!/complete|done|selesai/i.test(l.soStatus))), part=O.filter(o=>o.lines.some(l=>/partial/i.test(l.payStatus||"")));
@@ -569,7 +604,7 @@ function monthTrend(L){
   const app=delta(Z.app,F.app), newReg=[...Z.region.keys()].filter(k=>!M.slice(0,-1).some(x=>x.region.has(k))).map(k=>({k,gmv:Z.region.get(k)})).sort((a,b)=>b.gmv-a.gmv);
   const bothC=cs.filter(c=>c.by[0]&&c.by[L1]);
   return {M,F,Z,months,vol,prices,gapMed:gaps.length?gaps[Math.floor(gaps.length/2)]:null,lapsedAll:lapsed,lapsedPic,app,newReg,
-    bothUp:bothC.filter(c=>c.by[L1]>c.by[0]).length,bothDown:bothC.filter(c=>c.by[L1]<c.by[0]).length,label:`${F.label}–${Z.label}`,dG:Z.gmv-F.gmv,pct:F.gmv?(Z.gmv-F.gmv)/F.gmv:null,total,low,weeks,peakWeek:weeks.slice().sort((a,b)=>b.gmv-a.gmv)[0],
+    bothUp:bothC.filter(c=>c.by[L1]>c.by[0]).length,bothDown:bothC.filter(c=>c.by[L1]<c.by[0]).length,label:`${F.label}–${Z.label}`,laterLabel:M.length<=3?M.slice(1).map(x=>x.label).join(" or "):`${M[1].label}–${Z.label}`,preLabel:M.length>2?`${F.label}–${M[M.length-2].label}`:F.label,dG:Z.gmv-F.gmv,pct:F.gmv?(Z.gmv-F.gmv)/F.gmv:null,total,low,weeks,peakWeek:weeks.slice().sort((a,b)=>b.gmv-a.gmv)[0],
     stopped,stopBy,rest,cust:cs,restPct:rest[0]?(rest[L1]-rest[0])/rest[0]:null,
     bridge:{lost:{n:lost.length,gmv:sum(lost,0)},both:{n:both.length,prev:sum(both,0),cur:sum(both,L1)},gained:{n:gained.length,gmv:sum(gained,L1)}},
     retained:{n:inF.filter(c=>c.by.slice(1).some(v=>v)).length,of:inF.length},fresh:{n:fresh.length,gmv:sum(fresh,L1)},
@@ -588,9 +623,16 @@ function detectTeam(d){
 }
 // Split the selected sources into one analysis per team. Sales files with a team column are split row by row.
 function analyseTeams(sources){
+  // a farmer acquisition export makes this an acquisition deck: its own analysis, other files are left out
+  const acq=sources.filter(d=>(d.role&&d.role!=="auto"?d.role:detectRole(d.headers))==="acq");
+  const dop=sources.filter(d=>(d.role&&d.role!=="auto"?d.role:detectRole(d.headers))==="do");
+  if(dop.length&&!acq.length){ const Q=doPipeline(dop); return [{name:"DO pipeline",A:{dop:Q,crm:[],orders:[],won:[],has:{},dates:Q.dates,gmv:0},C:null,sources:dop,left:sources.length-dop.length}]; }
+  if(acq.length){ const Q=acquisition(acq); return [{name:"Farmer acquisition",A:{acq:Q,crm:[],orders:[],won:[],has:{},dates:Q.dates,gmv:0},C:null,sources:acq,left:sources.length-acq.length}]; }
   const TR=trendMode(sources), parts=new Map(), add=(t,d)=>{ if(!parts.has(t)) parts.set(t,[]); parts.get(t).push(d); };
+  const prices=[];
   for(const d of sources){
     const role=d.role&&d.role!=="auto"?d.role:detectRole(d.headers), col=role==="sales"&&(!d.team||d.team==="auto")?detectSales(d.headers).team:null;
+    if(role==="price"){ prices.push(d); continue; }
     const split=col?countBy(d.rows,r=>teamOf(r[col])):[];
     if(split.length>1){ for(const [t] of split) add(t,{...d,role,rows:d.rows.filter(r=>teamOf(r[col])===t)}); }
     else add(detectTeam(d)||"_",{...d,role});
@@ -603,15 +645,20 @@ function analyseTeams(sources){
     .map(([name,srcs])=>{ const sales=srcs.filter(d=>d.role==="sales"), crm=srcs.filter(d=>d.role!=="sales");
       // trend review: sales over the months, CRM analysed on its own (its dates rarely match the sales months)
       let A=TR&&sales.length?analyse(sales,{trend:true}):null, C=null;
-      if(A&&A.trend){ if(crm.length){ C=analyse(crm); C.mode="crm"; linkTrendCrm(A,C); } } else A=analyse(srcs);
+      if(A&&A.trend){ if(crm.length){ const ds=A.dates.filter(Boolean), lo=ds.reduce((m,d)=>d<m?d:m,ds[0]), hi=ds.reduce((m,d)=>d>m?d:m,ds[0]);
+          C=analyse(crm,{window:[new Date(lo.getFullYear(),lo.getMonth(),1),new Date(hi.getFullYear(),hi.getMonth()+1,0,23,59,59)]});
+          if(!C.crm.length) C=analyse(crm); C.mode="crm"; linkTrendCrm(A,C); } } else A=analyse(srcs);
+      // stock forecast: the team's whole sales history (partial months included) against the uploaded price list
+      if(prices.length&&sales.length) A.forecast=forecastStock(salesLines(sales),priceList(prices),FC_TARGET);
       return {name:name==="_"?(A.team?A.team.replace(/s$/,""):"Team"):name,A,C,sources:srcs}; });
 }
-// A trend review is for exports that end on a full month and cover at least two full months (e.g. Jul–Sep).
+// A trend review is for exports that cover at least two full months and end on a full month (e.g. Jul–Sep),
+// or cover three or more full months and stop part-way through the last one (e.g. Jan – 13 Oct; the partial month is left out).
 function trendMode(sources){
   const ds=[]; for(const d of sources){ const role=d.role&&d.role!=="auto"?d.role:detectRole(d.headers); if(role!=="sales") continue;
     const c=detectSales(d.headers).date; if(c) for(const r of d.rows){ const x=toDate(r[c]); if(x) ds.push(+x); } }
   if(!ds.length) return false; const hi=new Date(Math.max(...ds)), lo=Math.min(...ds), D3=3*864e5;
-  if(+hi<+new Date(hi.getFullYear(),hi.getMonth()+1,0)-D3) return false;
+  if(+hi<+new Date(hi.getFullYear(),hi.getMonth()+1,0)-D3) return lo<=+new Date(hi.getFullYear(),hi.getMonth()-3,1)+D3;
   return lo<=+new Date(hi.getFullYear(),hi.getMonth()-1,1)+D3;
 }
 // Who the CRM engagements reached, against the customers the trend lost: past buyers, lapsed customers, stopped accounts, per PIC.
@@ -619,9 +666,160 @@ function linkTrendCrm(A,C){
   const T=A.trend, last=T.months.length-1, ph=new Map(), pk=v=>{ const t=(clean(v)||"").toLowerCase().replace(/[^a-z ]/g,"").split(" ").filter(w=>w.length>1); return t.length?t[0]+" "+(t[t.length-1]||""):null; };
   T.cust.forEach(c=>c.lines.forEach(l=>{ if(l.ph) ph.set(l.ph,c); }));
   const hit=new Map(); C.crm.forEach(r=>{ const c=r.ph&&ph.get(r.ph); if(c) hit.set(c.k,c); });
+  C.trendSales=true; C.wonInSales=(C.won||[]).filter(r=>r.ph&&ph.has(r.ph)).length;
   const lapsed=T.cust.filter(c=>!c.by[last]), H=[...hit.values()], eng=countBy(C.crm,r=>pk(r.pic)), mainPic=c=>countBy(c.lines,l=>l.pic)[0]?.[0];
   const pics=T.pic.map(x=>{ const e=eng.find(([k])=>k===pk(x.k)); const lp=lapsed.filter(c=>mainPic(c)===x.k); return {p:x.k,d:x.d,prev:x.prev,cur:x.cur,eng:e?e[1]:0,lapsed:lp.length,lapsedHit:lp.filter(c=>hit.has(c.k)).length}; });
   const others=eng.filter(([k])=>!T.pic.some(x=>pk(x.k)===k)).map(([k,n])=>({p:C.crm.find(r=>pk(r.pic)===k).pic,d:0,prev:0,cur:0,eng:n,lapsed:0,lapsedHit:0}));
   T.crm={n:C.crm.length,span:span(C.crm.map(r=>r.date)),past:H.length,pastGmv:H.reduce((s,c)=>s+c.tot,0),lapsed:lapsed.length,lapsedGmv:lapsed.reduce((s,c)=>s+c.tot,0),
     lapsedHit:H.filter(c=>!c.by[last]).length,stoppedHit:T.stopped.filter(s=>hit.has(s.k)).length,pics:[...pics,...others]};
+}
+
+/* ================= Price list & stock forecast ================= */
+// Monthly sales target the stock plan is sized for (IDR, GMV). Set from the page; Rp4B by default.
+let FC_TARGET=4e9;
+// Focus areas: province names as the sales export writes them.
+const FC_AREAS=[["Riau",/^riau$/],["Sumatera Utara",/^sumatera utara$|^sumut$/],["Sumatera Selatan",/^sumatera selatan$|^sumsel$|^lampung$|^jambi$|^bengkulu$/]];
+const FC_AREA_NOTE={"Sumatera Selatan":"incl. Lampung, Jambi, Bengkulu"};
+const areaOf=p=>{ const s=norm(p); const a=FC_AREAS.find(([,re])=>re.test(s)); return a?a[0]:null; };
+// Price tier from the sales product category: Pupuk = reguler, Grosir = grosir, Toling = toko keliling, Khusus Petani.
+const tierOf=c=>{ const s=norm(c); return /grosir/.test(s)?"Grosir":/toling|toko keliling/.test(s)?"Toko Keliling":/khusus petani/.test(s)?"Khusus Petani":"Reguler"; };
+const skuKey=n=>norm(String(n||"").replace(/\((grosir|khusus petani|toko keliling)\)/ig,"")).replace(/\s*kg\b/g,"kg");
+const skuName=n=>clean(String(n||"").replace(/\s*\((grosir|khusus petani|toko keliling)\)/ig,""));
+// Weight of one pack from the item name; bundles add up ("Pupuk SawitPRO 20kg + Abu Janjang 40kg" = 60 kg).
+const packKg=n=>{ const m=[...String(n||"").matchAll(/(\d+(?:[.,]\d+)?)\s*kg\b/gi)]; return m.length?m.reduce((s,x)=>s+parseFloat(x[1].replace(",",".")),0):null; };
+// Fertilizer = sold by the kg; liquids, seeds and pesticides are left out.
+const isFert=l=>packKg(l.item)>0&&!/liter|\bltr\b|\bml\b/i.test(l.item)&&!/racun|pestisida|herbisida/i.test(l.category||"")&&l.family!=="Herbicide & pesticide";
+function salesLines(sources){
+  const lines=[], seen=new Map();
+  for(const d of sources){ const m=detectSales(d.headers), label=srcLabel(d);
+    for(const r of d.rows){ if(!Object.values(r).some(v=>!blank(v))) continue; const l=canonSale(r,m,label), k=[l.orderNo||l.invoice,l.item,l.qty,l.gmv].join("|");
+      if(l.orderNo||l.invoice){ if(seen.has(k)&&seen.get(k)!==label) continue; seen.set(k,label); } lines.push(l); } }
+  return lines;
+}
+function priceList(sources){
+  const P={map:new Map(),any:new Map(),names:new Map(),label:sources.map(srcLabel).join(", ")};
+  for(const d of sources){ const H=d.headers, find=re=>H.find(h=>re.test(norm(h)));
+    const nc=find(/nama barang|item|product|produk/), pc=find(/harga|price/), cc=find(/^category$|kategori|^tier$/);
+    if(!nc||!pc) continue;
+    for(const r of d.rows){ const name=clean(r[nc]), price=toNum(r[pc]); if(!name||!price) continue;
+      const k=skuKey(name), t=cc?tierOf(r[cc]):tierOf(name);
+      P.map.set(t+"|"+k,price); if(!P.any.has(k)) P.any.set(k,[]); P.any.get(k).push(price); if(!P.names.has(k)) P.names.set(k,skuName(name)); } }
+  return P;
+}
+const median=a=>{ const s=a.slice().sort((x,y)=>x-y); return s.length?(s.length%2?s[(s.length-1)/2]:(s[s.length/2-1]+s[s.length/2])/2):null; };
+function priceOf(P,l){ const k=skuKey(l.item), t=tierOf(l.category);
+  if(P.map.has(t+"|"+k)) return {p:P.map.get(t+"|"+k),src:"list"};
+  if(P.map.has("Reguler|"+k)) return {p:P.map.get("Reguler|"+k),src:"reguler"};
+  if(P.any.has(k)) return {p:median(P.any.get(k)),src:"other tier"};
+  return {p:l.qty?(l.salesAmount??l.gmv??0)/l.qty:null,src:"history"}; }
+
+function forecastStock(lines,P,target){
+  const L=lines.filter(l=>l.date&&l.item&&l.qty); if(!L.length||!P.map.size) return null;
+  const known=p=>!!p&&!/^(no province|indonesia|-)$/i.test(p);
+  // a line with no province takes the customer's province from their other orders, else the PIC's main province
+  const vote=key=>{ const m=new Map(); L.forEach(l=>{ const k=key(l); if(!k||!known(l.province)) return; const c=m.get(k)||new Map(); c.set(l.province,(c.get(l.province)||0)+1); m.set(k,c); });
+    return k=>{ const c=k&&m.get(k); return c?[...c].sort((a,b)=>b[1]-a[1])[0][0]:null; }; };
+  const byPh=vote(l=>l.ph), byId=vote(l=>l.custId), byPic=vote(l=>l.pic), inf={n:0,gmv:0,byPic:0};
+  L.forEach(l=>{ let p=l.province; if(!known(p)){ p=byPh(l.ph)||byId(l.custId); if(!p){ p=byPic(l.pic); if(p) inf.byPic++; } if(p){ inf.n++; inf.gmv+=l.gmv||0; } } l.fcProv=p; l.fcArea=areaOf(p); });
+  const mk=d=>d.getFullYear()*12+d.getMonth(), mlab=m=>`${MON[m%12]} ${Math.floor(m/12)}`, sum=(a,f)=>a.reduce((s,x)=>s+(f(x)||0),0);
+  const F=L.filter(isFert); F.forEach(l=>{ l.fcKg=packKg(l.item)*l.qty; l.fcSku=skuKey(l.item); l.fcM=mk(l.date); const pr=priceOf(P,l); l.fcPrice=pr.p; l.fcPsrc=pr.src; });
+  const gmvAll=sum(L,l=>l.gmv), fertGmv=sum(F,l=>l.gmv), fertShare=gmvAll?fertGmv/gmvAll:0, shipShare=fertGmv?sum(F,l=>l.shipping)/fertGmv:0;
+  const FF=F.filter(l=>l.fcArea), focusGmv=sum(FF,l=>l.gmv);
+  const areas=FC_AREAS.map(([a])=>a).filter(a=>FF.some(l=>l.fcArea===a));
+  const share=Object.fromEntries(areas.map(a=>[a,sum(FF.filter(l=>l.fcArea===a),l=>l.gmv)/focusGmv]));
+  const last=Math.max(...L.map(l=>mk(l.date))), first=Math.min(...L.map(l=>mk(l.date))), lastDate=new Date(Math.max(...L.map(l=>+l.date)));
+  const monthsWithData=new Set(F.map(l=>l.fcM)), recent=[last-3,last-2,last-1,last];
+  const orders=a=>new Set(a.map(l=>l.orderNo||l.invoice)).size;
+  // history per month (all areas): GMV, fertilizer tonnes, orders
+  const hist=[]; for(let m=first;m<=last;m++){ const ls=L.filter(l=>mk(l.date)===m), fs=F.filter(l=>l.fcM===m);
+    hist.push({m,label:MON[m%12],gmv:sum(ls,l=>l.gmv),fertGmv:sum(fs,l=>l.gmv),kg:sum(fs,l=>l.fcKg),orders:orders(fs),partial:m===last&&lastDate.getDate()<new Date(lastDate.getFullYear(),lastDate.getMonth()+1,0).getDate()-3}); }
+  const full=hist.filter(h=>!h.partial), best=full.slice().sort((a,b)=>b.gmv-a.gmv)[0], bestKg=full.slice().sort((a,b)=>b.kg-a.kg)[0];
+  const areaBest=a=>{ let b=null; for(let m=first;m<=last;m++){ const kg=sum(FF.filter(l=>l.fcArea===a&&l.fcM===m),l=>l.fcKg); if(!b||kg>b.kg) b={m,kg}; } return b; };
+  const months=[1,2,3].map(i=>last+i).map(m=>{
+    // same calendar month in the history (with the month after it) = seasonal mix; otherwise the last 4 months
+    const same=[...monthsWithData].filter(x=>x%12===m%12), win=same.length?same.flatMap(x=>[x,x+1]):recent;
+    const winLabel=same.length?`${MON[win[0]%12]}–${MON[win[win.length-1]%12]} ${Math.floor(win[win.length-1]/12)}`:`${MON[recent[0]%12]}–${MON[last%12]} ${Math.floor(last/12)}`;
+    const rows=areas.map(a=>{
+      let w=FF.filter(l=>l.fcArea===a&&win.includes(l.fcM)), thin=false;
+      if(orders(w)<8){ w=FF.filter(l=>l.fcArea===a); thin=true; }
+      const kgW=sum(w,l=>l.fcKg), vpk=sum(w,l=>l.qty*l.fcPrice)/kgW;
+      const tgt=target*share[a], fg=tgt*fertShare, prod=fg*(1-shipShare), kg=prod/vpk;
+      const sk=new Map(); w.forEach(l=>{ const x=sk.get(l.fcSku)||{k:l.fcSku,name:P.names.get(l.fcSku)||skuName(l.item),pack:packKg(l.item),kg:0,val:0}; x.kg+=l.fcKg; x.val+=l.qty*l.fcPrice; sk.set(l.fcSku,x); });
+      const skus=[...sk.values()].map(x=>{ const bags=Math.round(x.kg/kgW*kg/x.pack); return {...x,bags,mt:bags*x.pack/1000,ppk:x.val/x.kg}; }).filter(x=>x.bags>0).sort((a,b)=>b.mt-a.mt);
+      const mt=skus.reduce((s,x)=>s+x.mt,0), ab=areaBest(a);
+      return {area:a,note:FC_AREA_NOTE[a]||"",target:tgt,fertGmv:fg,productValue:prod,vpk,mt,skus,orders:orders(w),thin,best:ab?{label:mlab(ab.m),mt:ab.kg/1000}:null}; });
+    return {m,label:mlab(m),win,winLabel,seasonal:!!same.length,rows,mt:rows.reduce((s,r)=>s+r.mt,0)}; });
+  // what the target asks for, at the recent run-rate
+  const R=F.filter(l=>recent.includes(l.fcM)), rOrders=orders(R), aov=rOrders?sum(R,l=>l.gmv)/rOrders:0;
+  const fullRecent=full.filter(h=>h.m>=last-6), avg=fullRecent.length?sum(fullRecent,h=>h.gmv)/fullRecent.length:0;
+  const recentFull=full.filter(h=>h.m>=last-3), ordersPerMonth=recentFull.length?sum(recentFull,h=>h.orders)/recentFull.length:0;
+  const bestRecent=fullRecent.slice().sort((a,b)=>b.gmv-a.gmv)[0];
+  // today's price vs what the top SKUs sold for in the last 4 months (same tier)
+  const priceMoves=[...new Set(R.map(l=>l.fcSku))].map(k=>{ const ls=R.filter(l=>l.fcSku===k&&l.fcPsrc==="list"&&l.salesAmount), q=sum(ls,l=>l.qty);
+    return q?{k,name:P.names.get(k)||k,kg:sum(R.filter(l=>l.fcSku===k),l=>l.fcKg),was:sum(ls,l=>l.salesAmount)/q,now:sum(ls,l=>l.fcPrice*l.qty)/q}:null; }).filter(Boolean).sort((a,b)=>b.kg-a.kg).slice(0,5);
+  const unpriced=[...new Set(F.filter(l=>l.fcPsrc==="history").map(l=>skuName(l.item)))];
+  const otherGmv=sum(F.filter(l=>!l.fcArea),l=>l.gmv);
+  return {target,months,areas,share,fertShare,shipShare,hist,best,bestKg,bestRecent,avg,avgN:fullRecent.length,ordersPerMonth,recentFullLabel:recentFull.length?`${recentFull[0].label}–${recentFull[recentFull.length-1].label}`:"",aov,ordersNeeded:aov?target*fertShare/aov:null,rOrders,
+    recentLabel:`${MON[recent[0]%12]}–${MON[last%12]}`,lastDate,inf,priceMoves,unpriced,otherShare:fertGmv?otherGmv/fertGmv:0,priceLabel:P.label};
+}
+
+/* ================= Farmer acquisition (Duta vs non-Duta) ================= */
+const ACQ_SRC_ORDER=["Organic","GADN","Meta","Identified Campaigns","Duta"];
+// Duta display name: internal-team Duta accounts carry "Test" in the name; show the user name without it.
+const dutaLabel=v=>{ const t=(clean(v)||"").replace(/\btest\b/ig,"").replace(/\s+/g," ").trim(); return t?t.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase()):null; };
+const isUnder=v=>/under|^duta$/i.test(String(v||""))&&!/non/i.test(String(v||""));
+// Weekly registrations from the export: the last full week against the week before, split by Duta / non-Duta, channel and campaign.
+// A week that is still in progress (its data stops before the Sunday) is left out.
+function acquisition(sources){
+  const R=[];
+  for(const d of sources){ const m=detectAcq(d.headers);
+    for(const r of d.rows){ const wk=toDate(r[m.week]), jd=toDate(r[m.joined]); if(!wk&&!jd) continue;
+      const w=wk||new Date(jd.getFullYear(),jd.getMonth(),jd.getDate()-((jd.getDay()+6)%7));
+      const under=m.type?isUnder(r[m.type]):!blank(r[m.duta]);
+      const test=under&&(String(r[m.test]??"").trim()==="1"||/^true$/i.test(String(r[m.test]??""))||/test/i.test(String(r[m.dutaName]??"")));
+      R.push({w:+w,jd,under,test,real:under&&!test,src:clean(r[m.source])||(under?"Duta":"Unknown"),camp:(clean(r[m.campaign])||"").replace(/_/g," ").trim()||"No campaign",
+        status:clean(r[m.status]),duta:clean(r[m.duta]),dname:dutaLabel(r[m.dutaName])||clean(r[m.duta]),phone:!blank(r[m.phone])}); } }
+  const all=[...new Set(R.map(r=>r.w))].sort((a,b)=>a-b), lastW=all[all.length-1], lastJ=Math.max(...R.filter(r=>r.w===lastW&&r.jd).map(r=>+r.jd));
+  const dropped=all.length>2&&lastJ<lastW+6*864e5?{w:lastW,n:R.filter(r=>r.w===lastW).length,to:new Date(lastJ)}:null;
+  const weeks=dropped?all.slice(0,-1):all;
+  const wl=w=>{ const a=new Date(w), b=new Date(w+6*864e5); return a.getMonth()===b.getMonth()?`${a.getDate()}–${b.getDate()} ${MON[b.getMonth()]}`:`${fds(a)} – ${fds(b)}`; };
+  const stat=w=>{ const x=R.filter(r=>r.w===w), u=x.filter(r=>r.under);
+    return {w,label:wl(w),short:fds(new Date(w)),total:x.length,under:u.length,non:x.length-u.length,test:u.filter(r=>r.test).length,real:u.filter(r=>r.real).length,
+      sale:u.filter(r=>/sale/i.test(r.status||"")).length,leads:u.filter(r=>/lead/i.test(r.status||"")).length,dutas:new Set(u.map(r=>r.duta).filter(Boolean)).size,
+      realDutas:new Set(u.filter(r=>r.real).map(r=>r.duta).filter(Boolean)).size,noPhone:x.filter(r=>!r.phone).length,
+      src:new Map(countBy(x,r=>r.src)),nonSrc:new Map(countBy(x.filter(r=>!r.under),r=>r.src)),camp:new Map(countBy(x.filter(r=>!r.under),r=>r.camp)),
+      days:[0,1,2,3,4,5,6].map(i=>x.filter(r=>r.jd&&(Math.round((+r.jd-w)/864e5)%7+7)%7===i).length)}; };  // the next Monday morning (before the week cut) counts as Monday
+  const W=weeks.map(stat), L=W[W.length-1], P=W.length>1?W[W.length-2]:null;
+  const srcs=[...new Set(R.map(r=>r.src))].sort((a,b)=>(ACQ_SRC_ORDER.indexOf(a)+1||9)-(ACQ_SRC_ORDER.indexOf(b)+1||9));
+  const dSrc=P?srcs.map(k=>({k,p:P.src.get(k)||0,l:L.src.get(k)||0})).map(o=>({...o,d:o.l-o.p})):[];
+  const camps=P?[...new Set([...L.camp.keys(),...P.camp.keys()])].map(k=>({k,p:P.camp.get(k)||0,l:L.camp.get(k)||0})).map(o=>({...o,d:o.l-o.p})).sort((a,b)=>a.d-b.d):[];
+  const base=W.slice(Math.max(0,W.length-5),-1), avg=base.length?base.reduce((s,x)=>s+x.total,0)/base.length:null;
+  const peak=W.reduce((m,x)=>x.total>m.total?x:m,W[0]);
+  // per Duta: farmers last week, the week before and over all weeks shown; internal team (is_test_duta) or external
+  const inW=new Set(weeks), U=R.filter(r=>r.under&&inW.has(r.w)), dk=[...new Set(U.map(r=>r.dname||"(no Duta name)"))];
+  const dutas=dk.map(k=>{ const x=U.filter(r=>(r.dname||"(no Duta name)")===k);
+    return {k,internal:x.some(r=>r.test),l:x.filter(r=>r.w===L.w).length,p:P?x.filter(r=>r.w===P.w).length:0,tot:x.length,
+      sale:x.filter(r=>/sale/i.test(r.status||"")).length,leads:x.filter(r=>/lead/i.test(r.status||"")).length,weeks:new Set(x.map(r=>r.w)).size}; })
+    .sort((a,b)=>b.l-a.l||b.tot-a.tot||a.k.localeCompare(b.k));
+  return {weeks:W,L,P,dutas,srcs,dSrc,camps,avg,avgN:base.length,peak,dropped,rows:R.length,realAll:R.filter(r=>r.real).length,underAll:R.filter(r=>r.under).length,
+    realWeeks:W.filter(x=>x.real).length,lastDate:dropped?dropped.to:new Date(lastJ),dates:R.map(r=>r.jd).filter(Boolean),files:sources.map(srcLabel)};
+}
+
+/* ================= DO pipeline (FFB supplier leads) ================= */
+const DO_STATUS=["HOT","WARM","COLD"], DO_ASK=[["dist","distance to the nearest mill"],["supply","who they supply today"],["detail","engagement detail"],["closing","closing date"],["mill","nearest mill"],["area","area (ha)"],["ffb","potential FFB"]];
+function doPipeline(sources){
+  const R=[]; let asOf=null;
+  for(const d of sources){ const m=detectDo(d.headers);
+    for(const r of d.rows){ if(blank(r[m.id])&&blank(r[m.doName])) continue;
+      const loc=clean(r[m.location])||"", parts=loc.split(/\s+-\s+/), created=toDate(r[m.created]);
+      R.push({id:clean(r[m.id])||"–",pic:clean(r[m.pic]),progress:clean(r[m.progress])||"No progress",status:(clean(r[m.status])||"No status").toUpperCase(),
+        prov:parts[0]?parts[0].toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase()):null,regency:parts[1]?regionOf(parts[1]):null,source:clean(r[m.source]),
+        area:toNum(r[m.area]),ffb:toNum(r[m.ffb]),dist:toNum(r[m.dist]),mill:clean(r[m.mill]),supply:clean(r[m.supply]),custType:clean(r[m.custType]),
+        created,closing:toDate(r[m.closing]),detail:clean(r[m.detail]),missing:DO_ASK.filter(([k])=>m[k]&&blank(r[m[k]])).map(([,l])=>l)}); } }
+  const today=new Date(); today.setHours(0,0,0,0);
+  R.forEach(r=>{ r.age=r.created?Math.round((today-r.created)/864e5):null; });
+  const sum=k=>R.reduce((s,r)=>s+(r[k]||0),0), ids=R.map(r=>parseInt(String(r.id).replace(/\D/g,""),10)).filter(n=>!isNaN(n));
+  return {rows:R,n:R.length,area:sum("area"),ffb:sum("ffb"),status:countBy(R,r=>r.status),progress:countBy(R,r=>r.progress),pic:countBy(R,r=>r.pic),prov:countBy(R,r=>r.prov),
+    regency:countBy(R,r=>r.regency),source:countBy(R,r=>r.source),custType:countBy(R,r=>r.custType),mill:countBy(R,r=>r.mill),
+    maxId:ids.length?Math.max(...ids):null,today,dates:R.map(r=>r.created).filter(Boolean).sort((a,b)=>a-b),files:sources.map(srcLabel)};
 }

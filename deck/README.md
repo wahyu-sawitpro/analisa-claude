@@ -1,4 +1,10 @@
-# SawitPRO Sales & Leads Deck (Smallholder + Plantation)
+# SawitPRO Deck (Smallholder + Plantation)
+
+The page title, the cover and the PPTX file name follow what was analysed (e.g. "SawitPRO Deck · Farmer Acquisition").
+One deck page for every analysis request: sales reviews, lead acquisition (CRM), stock forecasting and more. The
+slides follow the files you upload: sales exports give the sales review, CRM exports the acquisition slides, and a
+sales history with a price list adds the stock forecast. A farmer acquisition export (e.g. `farmer akusisi.csv`) makes it a
+farmer acquisition review (Duta vs non-Duta).
 
 An English deck in the SawitPRO template that turns weekly CRM and sales exports into a short, insight-led review.
 It is an HTML page: upload any number of files, check the detected data type of each one, then click **Analyze**.
@@ -6,9 +12,9 @@ Parsing and analysis happen in the browser; data is not sent anywhere.
 
 | Control | What it does |
 |---|---|
-| Upload files | Adds one or many CSV, TSV, XLSX, XLS, ODS or JSON files (or drag and drop). Nothing changes until you click Analyze |
+| Upload files | Replaces the deck's data with one or many CSV, TSV, XLSX, XLS, ODS or JSON files (or drag and drop) and rebuilds the deck from them straight away. **+ Add files** in the data sources bar adds files to the current set instead |
 | Data sources bar | Each file or lead-like sheet, with its row count, an include toggle, a data-type selector (CRM / Sales, auto-detected) and remove |
-| Analyze | Builds the deck from the included sources |
+| Analyze | Rebuilds the deck after you change a data type, team, include toggle or the monthly target |
 | Present | Full-screen slide mode (arrow keys, Esc) |
 | Download PPTX | Editable 16:9 PowerPoint of the current deck. Bar charts are drawn from shapes and text boxes (no embedded chart workbooks), so they look the same in PowerPoint and Google Slides |
 | Open in Google Slides | Uploads the PPTX to the viewer's Google Drive via the Google Drive connector (converted to Slides), with a manual-import fallback |
@@ -69,6 +75,56 @@ PPTX (no native charts, so Google Slides keeps every label). Chart types: column
    - Recoverable demand: leads still in play
 3. Next steps and closing
 
+## DO pipeline (CRM DO export)
+A CRM export of DO (FFB supplier) leads, with `DO Name`, `Potensial FFB (Ton)` and `Mills terdekat` columns, is read as
+**DO pipeline** and sets the deck. Slides: where the leads stand (status HOT / WARM / COLD with potential FFB, progress
+stage with area), who and where (PIC, regency, nearest mill, lead source, customer type, FFB by PIC), and the lead list
+with each lead's age and missing fields. Owner names, DO names and phone numbers are never shown. When the lead IDs run
+far past the number of rows (e.g. DOOP-022 in a 1-row file) the deck flags the export as partial.
+
+Findings for `CRM DO smallholder status.csv` (18 Oct 2026, the sample): 1 lead (DOOP-022, Sazali Wandana, Asahan,
+Gapoktan / Kelompok Tani via canvassing), 50 ha and 200 t potential FFB near PGS, COLD at first outreach for 13 days;
+distance to mill, current buyer, detail and closing date are empty.
+
+## Farmer acquisition (Duta vs non-Duta)
+A file with `akuisisi_type` / `minggu_register` / `join_date_farmer` columns is read as **Acquisition** and sets the whole
+deck (other files are left out). Last week = the latest full registration week; a week still in progress (its data stops
+before the Sunday, e.g. the week of 12 Oct with data to 14 Oct) is left out and the slide says so. Slides:
+- **Duta vs non-Duta:** last week vs the week before (count, change, change %, share). Internal-team Dutas
+  (`is_test_duta` = 1) and external Dutas are both Duta; the farmers-by-Duta table shows each Duta's user name without
+  "Test", type, last week, the week before and all weeks. Slides use plain labels, not raw field names.
+- **What moved the total:** waterfall by channel (`utm_source`) and the largest campaign moves (`utm_source_name`, non-Duta).
+- **Weekly trend:** farmers per week by channel, and farmers per day last week vs the week before.
+- **Channels in detail:** channel table with the 4-week average, campaign table, farmers without a phone number.
+
+Findings for the week of 5–11 Oct 2026 (sample): 376 farmers, −103 (−22%) on 28 Sep – 4 Oct; non-Duta 372 (−99), under
+Duta 4 (−4) from 3 internal-team Dutas (Rudi 2, Satria K 1, Sazali Wandana 1); 7 of the 8 Dutas with farmers in 7 weeks
+are internal team. Organic −95 explains 92%
+of the drop ("organic" campaign 111 → 47); GADN +10 and App-Register-Campaign-DG +36 grew. 28% of farmers have no phone.
+
+## Stock forecast (sales history + price list)
+Upload a sales history (e.g. `history sales Jan - Oct 2026 per 14 Oct.csv`) together with a price list (e.g.
+`Price per 14 Oct 2026.csv`, detected as **Price list**; a title row above the headers is skipped). A **Monthly target
+(Rp)** field appears in the data sources bar (Rp4B by default). With a price list the deck is a forecast deck: cover,
+forecast executive summary, the slides below, forecast next steps and closing (no sales review or CRM slides):
+- **Forecast · RpX a month**: GMV by month against the target, fertilizer tonnes by month with the plan, orders a
+  month the target needs, method, price moves and data notes.
+- **Forecast · stock plan by month and area**: Month | Area (province) | Stock required (MT, top 3 SKUs) | Target
+  sales (IDR) | Description, for the 3 months after the data ends.
+- **Forecast · stock plan by SKU**: MT per SKU and month, bags, average price per bag and main areas.
+
+Method: only items sold by the kg; the target is split by each area's share of fertilizer GMV (Riau, Sumatera Utara,
+Sumatera Selatan incl. Lampung, Jambi, Bengkulu), reduced by the non-fertilizer and shipping shares, and turned into kg
+at today's price for each SKU and price tier (product_cat Pupuk = Reguler, Pupuk Grosir = Grosir, Toling = Toko
+Keliling, Khusus Petani). The SKU mix comes from the same month last season when the history has it (Jan uses Jan–Feb),
+else the last 4 months. Lines with no province take the customer's province from other orders, else the PIC's.
+A long history is reviewed on its last 3 full months in the trend slides.
+
+Findings for Rp4B a month (history to 13 Oct 2026, prices of 14 Oct): Nov 600 MT, Dec 600 MT, Jan 469 MT
+(Riau 474 / 474 / 389, Sumatera Utara 112 / 112 / 63, Sumatera Selatan 15 / 15 / 17). Largest lines: KCL Canada Cap
+Mahkota 447 MT and RP Mahkota Egypt 364 MT over 3 months. The best month so far is 394 t (Sep), so the plan is about
+1.4–1.5× that; at the Jul–Oct average order (Rp27.8M) Rp4B needs about 138 fertilizer orders a month against 73 now.
+
 ## Comparing weeks
 Upload the week-before sales export (same columns as `sales from last week.csv`) next to last week's, or one export
 covering both weeks. Sales lines are grouped into Monday–Sunday weeks by order date: the latest week is analysed as
@@ -93,6 +149,7 @@ Months the data covers in full form the trend; a partial month is left out. The 
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
 - `src/sample-data.json`: the six weekly exports for 12–18 Oct (sales and CRM, both teams), with phone numbers and names replaced by anonymous tokens
+- Built PPTX files, `audit.csv` and `DECISIONS.md` for the forecast, acquisition, DO pipeline and Jul–Sep reviews are on branch `claude/pensive-ritchie-9d38qh` under `deck/output/`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
 ## Reading the CRM honestly
@@ -128,7 +185,7 @@ Plantation
 
 ## Findings for Jul–Sep 2026 (earlier sample: sales decline review)
 That sample was the two Smallholder exports in the repo: sales Jul–Sep (371 order lines, 237 orders) and the CRM
-engagement export (41 engagements, all dated 5–9 Oct).
+engagement export for the same months (850 engagements; the one dated 30 Jun is left out, so 849).
 - GMV Rp2.41B → Rp1.64B → Rp2.25B (−7% Jul to Sep), August the low point (52 orders from 36 customers).
 - Three wholesale fertilizer accounts of one PIC (Rp1.06B in Jul, 44% of the month) stopped ordering after 25 Jul,
   7 Aug and 27 Aug. All other customers grew 67% (Rp1.35B → Rp2.25B); Khusus Petani +Rp655M.
@@ -140,7 +197,10 @@ engagement export (41 engagements, all dated 5–9 Oct).
 - 62 customers bought in Jul–Aug but not in September (Rp3.1B), 19 of them repeat buyers (Rp2.22B). Customers reorder
   every 14 days (median). Of 18 customers who bought in both July and September, 14 spent more.
 - Rp569M of September GMV is not completed yet (Rp311M only partially paid).
-- Only 3 of the 41 October CRM engagements went to past buyers; 1 of 62 lapsed customers and none of the 3 stopped
+- CRM Jul–Sep: 27 of the 62 lapsed customers were contacted, none of the 3 stopped accounts. 767 of 849 engagements
+  reached the lead (a logged call result or an on-site visit), 590 showed interest and 2 ordered. Joko Prestiwo (195 of
+  195) and Edi Sutarsan (36 of 37) logged the same status and reason on nearly every engagement.
+- Next steps are marked [DRAFT] with owner and date left to agree; see `output/DECISIONS.md` for every default used.
   accounts were contacted, and the PIC of those accounts logged no engagements.
 
 ## Findings for the week of 5–11 Oct 2026 (earlier weekly sample)
