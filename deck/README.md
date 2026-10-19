@@ -159,13 +159,52 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: `smallholder sales ytd.csv` and `list pricing.csv` (no customer names or phones in either). Earlier samples: `CRM DO smallholder status.csv` (lead, owner and DO names and phone numbers replaced by tokens). Earlier sample: `farmer akusisi.csv` (registrations 24 Aug – 14 Oct 2026, the acquisition sample), with farmer names and all phone numbers replaced by anonymous tokens (Duta user names are kept: they appear on the Duta slide)
-- `output/Farmer Acquisition 5-11 Oct 2026.pptx`: the acquisition deck from the sample
-- `output/`: the Jul–Sep PPTX, `audit.csv` (each number re-derived from the CSVs) and `DECISIONS.md`
+- `src/sample-data.json`: `smallholder sales ytd.csv` and `list pricing.csv` (the weekly forecast sample; no customer names or phones in either). Earlier samples: the six weekly exports for 12–18 Oct (sales and CRM, both teams, anonymised, on branch `claude/deck-slide-data-upload-c45lkx`), `CRM DO smallholder status.csv` and `farmer akusisi.csv` (names and phones replaced by tokens; Duta user names kept)
+- `output/`: built PPTX files for the forecast, acquisition, DO pipeline and Jul–Sep reviews, `audit.csv` and `DECISIONS.md`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
-## Findings for Jul–Sep 2026 (sample data: sales decline review)
-The sample is the two Smallholder exports in the repo: sales Jul–Sep (371 order lines, 237 orders) and the CRM
+## Reading the CRM honestly
+- **What a “win” is.** Rows marked as ordered are split into leads that were worked, sales logged at checkout (mobile
+  shop or walk-in: “toko keliling”, “beli pupuk …”) and after-sales calls on orders already placed. Only worked leads
+  count in the funnel, the PIC conversion note and “what separates winners”.
+- **Order follow-ups.** Engagements where the customer asks about an existing order (“Menanyakan Status Pesanan”) are
+  taken out of the rejection reasons and shown on a customer-service slide with the orders named, the issue read from
+  the notes (past SLA, queue, delivery, documents, damaged goods) and first purchases.
+- **Templated logging.** A PIC whose engagements all share one status, one reason and one location (or exactly the
+  same count every day) with no notes is flagged; those rows are left out of the driver analysis and the call-back
+  list, and the rejection slide says the real reasons are unknown.
+- **Potential loss.** Leads who didn't order are valued from what they said they needed: the potential GMV logged in
+  the CRM, a rupiah amount in the notes, sacks or tonnes in the notes, or the fertilizer need in kg, priced at this
+  week's selling price per product (50 kg sacks). Leads who ordered this week (by phone) are left out. The value is
+  grouped by reason, with stock-outs, slow delivery, price and payment terms marked as on our side, and shown on a
+  “Rejection reasons · potential loss” slide with the biggest leads at stake and any competitor price in the notes.
+- **Overdue prospects.** Prospects whose estimated closing date has passed by the end of the week become an action.
+
+## Findings for the week of 12–18 Oct 2026 (sample data)
+The sample is the six exports in the repo for this week: Smallholder and Plantation sales (last two weeks), and the
+rejection-reason and success-story CRM exports for both teams.
+
+Smallholder
+- Rp376M from 25 orders, up 77% from Rp212M: more orders (11 → 25); KCL / MOP +Rp123M, NPK +Rp107M. The largest order
+  (Rp110M, a group purchase of NPK and urea in Bungo) is 29% of GMV; without each week's largest order GMV is still +49%.
+- 19 “wins” in the CRM, but 14 are mobile-shop sales logged at checkout and 3 are after-sales calls; only 2 came from
+  working a lead. Of 62 reached leads that showed interest, 2 ordered. TikTok: 38 leads, 0 orders, mostly price questions.
+- Potential loss: Rp277M of named demand from 8 leads didn't convert; Rp230M of it on our side. Payment terms Rp119M
+  (3 leads asked to pay in instalments, incl. 10 t of NPK Pak Tani) and stock-outs Rp111M (NPK Mahkota 13-6-27 10 t,
+  AC Powder AKP, KCL Sasco). Price is not the blocker: one lead paid Rp450k a sack of KCL Mahkota elsewhere vs our
+  Rp419k. 72 of 80 leads have no quantity logged, and 3 leads in the not-ordered export ordered anyway (Rp145M).
+- 10 engagements were customers chasing 8 orders; 6 mention the SLA or a queue (Topaz seeds 30–40 days).
+- Joko Prestiwo and Muhammad Abdul Wahab closed 4 orders (Rp59.8M) with no CRM entry; Rp67.7M is still unpaid.
+
+Plantation
+- Rp39.1M from 5 orders, up 50% from Rp26M on bigger orders (rock phosphate Rp17.2M).
+- 76 of 78 “not interested” entries are templated (Devi Mariana Naibaho, exactly 10 ads leads a day, and Naya
+  Huwaidah): one status, one reason, one location and no notes, so the ads and event results can't be judged.
+- The 2 real wins are leaf and soil tests from Khoirul Huda's field visits in Jambi; 2 prospects (drone mapping
+  Rp9.6M, leaf test Rp3.2M) are past their closing date. Eko Prastyo's 2 orders (Rp15.5M) have no CRM entry.
+
+## Findings for Jul–Sep 2026 (earlier sample: sales decline review)
+That sample was the two Smallholder exports in the repo: sales Jul–Sep (371 order lines, 237 orders) and the CRM
 engagement export for the same months (850 engagements; the one dated 30 Jun is left out, so 849).
 - GMV Rp2.41B → Rp1.64B → Rp2.25B (−7% Jul to Sep), August the low point (52 orders from 36 customers).
 - Three wholesale fertilizer accounts of one PIC (Rp1.06B in Jul, 44% of the month) stopped ordering after 25 Jul,
