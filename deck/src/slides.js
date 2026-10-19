@@ -498,58 +498,65 @@ function acqNarrative(T){
     {t:"Make the phone number required at registration",d:`${pct(L.noPhone,L.total)}% of last week's farmers (${nf.format(L.noPhone)}) have no phone number, so they cannot be followed up by sales or a Duta.`,o:"",w:""}].filter(Boolean);
   return X;
 }
-// Stock forecast: what the history says, the plan by month and area, and the plan by SKU.
+// Stock forecast: what the history says, the weekly plan, the weekly plan by SKU, where the stock goes and the plan by month and area.
+const fcSpan=F=>`${fds(F.start)} – ${fds(F.end)} ${F.end.getFullYear()}`;
 function forecastSpecs(F,pre){
-  const S=[], H=F.hist, M=F.months, tgt=F.target, avgMt=M.reduce((s,m)=>s+m.mt,0)/M.length, kgBest=F.bestKg;
-  const mult=F.best?tgt/F.best.gmv:null, gB=v=>v>=1e9?`${(v/1e9).toFixed(1)}B`:`${Math.round(v/1e6)}M`;
-  const histLab=h=>h.partial?`${h.label}\n(to ${fds(F.lastDate)})`:h.label;
+  const S=[], H=F.hist, M=F.months, W=F.weeks, tgt=F.target, kgBest=F.bestKg, totMt=M.reduce((s,m)=>s+m.mt,0);
+  const full=M.filter(m=>!m.partial), mMt=(full.length?full:M).reduce((s,m)=>s+m.mtMonth,0)/(full.length||M.length), wkMt=totMt/W.reduce((s,w)=>s+w.days,0)*7;
+  const gB=v=>v>=1e9?`${(v/1e9).toFixed(1)}B`:`${Math.round(v/1e6)}M`, ord=F.hasOrderNo?"orders":"order lines";
+  const histLab=h=>h.partial?`${h.label}\nto ${F.lastDate.getDate()}`:h.label, planLab=m=>m.partial?`${MON[m.m%12]}\n${m.range.split(" ")[0]}`:m.label.replace(" ","\n");
+  const mixNote=M.some(m=>!m.seasonal)?`the last 4 months (${F.recentLabel})`:"", seaNote=M.some(m=>m.seasonal)?`the same month last season (${M.filter(m=>m.seasonal).map(m=>m.winLabel).join(", ")})`:"";
   // 1. What the target asks for
   S.push({kicker:pre+`Forecast · ${rp(tgt)} a month`,
-    title:`${rp(tgt)} a month needs about ${mt0(avgMt)} t of fertilizer, ${kgBest?`${(avgMt*1000/kgBest.kg).toFixed(1)}× our best month (${mt0(kgBest.kg/1000)} t in ${kgBest.label})`:""}`,
+    title:`${rp(tgt)} a month needs about ${mt0(mMt)} t of fertilizer a month${kgBest?`, ${(mMt*1000/kgBest.kg).toFixed(1)}× our best month (${mt0(kgBest.kg/1000)} t in ${kgBest.label})`:""}`,
     rows:[{h:84,cards:[{kpiRow:[
       {v:rpParts(tgt)[0],u:rpParts(tgt)[1],l:`monthly sales target used for the plan`,hot:true},
-      {v:rpParts(F.best.gmv)[0],u:rpParts(F.best.gmv)[1],l:`best month so far (${F.best.label}${F.bestRecent&&F.bestRecent!==F.best?`; best of the last ${F.avgN} months ${rp(F.bestRecent.gmv)} in ${F.bestRecent.label}`:""})`},
+      {v:rpParts(F.best.gmv)[0],u:rpParts(F.best.gmv)[1],l:`best month in this data (${F.best.label}); target is ${(tgt/F.best.gmv).toFixed(1)}×`},
       {v:rpParts(F.avg)[0],u:rpParts(F.avg)[1],l:`average month, last ${F.avgN} full months; target is ${(tgt/F.avg).toFixed(1)}×`},
-      {v:mt0(F.ordersNeeded),u:"",l:`fertilizer orders a month at the ${F.recentLabel} average order of ${rp(F.aov)} (${F.recentFullLabel}: ${Math.round(F.ordersPerMonth)} a month)`}]}]},
+      {v:mt0(F.ordersNeeded),u:"",l:`${ord} a month at the ${F.recentLabel} average of ${rp(F.aov)} (${F.recentFullLabel}: ${Math.round(F.ordersPerMonth)} a month)`}]}]},
       {cards:[
-        {w:1,title:"GMV by month vs the target",sub:`All products; ${histLab(H[H.length-1]).replace("\n"," ")} is partial`,chart:{type:"column",cats:[...H.map(histLab),"Target"],
+        {w:1,title:"GMV by month vs the target",sub:`Fertilizer sales; ${histLab(H[H.length-1]).replace("\n"," ")} is partial`,chart:{type:"column",cats:[...H.map(histLab),"Target"],
           series:[{name:"GMV",values:[...H.map(h=>h.gmv),tgt],colors:[...H.map(h=>h.partial?"#B3BBAB":CAT[0]),CAT[1]]}],fmt:gB,lblH:30}},
-        {w:1,title:"Fertilizer tonnes: history and the plan",sub:"Tonnes sold per month; plan months in yellow",chart:{type:"column",cats:[...H.map(histLab),...M.map(m=>m.label.replace(" ","\n"))],
+        {w:1,title:"Fertilizer tonnes: history and the plan",sub:"Tonnes per month; plan in yellow",chart:{type:"column",cats:[...H.map(histLab),...M.map(planLab)],
           series:[{name:"Tonnes",values:[...H.map(h=>h.kg/1000),...M.map(m=>m.mt)],colors:[...H.map(h=>h.partial?"#B3BBAB":CAT[0]),...M.map(()=>CAT[1])]}],fmt:v=>mt0(v),lblH:30}}]}],
     notes:[
-      `<b>Method:</b> the ${rp(tgt)} target is split by each area's share of fertilizer GMV (${F.areas.map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")}); ${pct(F.fertShare,1)}% of GMV is fertilizer and ${(F.shipShare*100).toFixed(1)}% is shipping. The rest is turned into kg at the prices in “${esc(F.priceLabel.replace(/\.csv$/i,""))}”, with each area's product and price-tier mix from ${M.some(m=>!m.seasonal)?`the last 4 months (${F.recentLabel})`:""}${M.some(m=>m.seasonal)?`${M.some(m=>!m.seasonal)?"; January uses ":""}the same month last season (${M.filter(m=>m.seasonal).map(m=>m.winLabel).join(", ")})`:""}.`,
+      `<b>Method:</b> the ${rp(tgt)} target is split by each area's share of fertilizer GMV (${F.areas.map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")})${F.fertShare<.999?`; ${pct(F.fertShare,1)}% of GMV is fertilizer`:""}${F.shipShare?` and ${(F.shipShare*100).toFixed(1)}% is shipping`:""}. Rupiah is turned into kg at the prices in “${esc(F.priceLabel.replace(/\.csv$/i,""))}”, with each area's product and price-tier mix from ${[mixNote,seaNote].filter(Boolean).join("; ")}. Part months are pro rata by day.`,
       F.priceMoves.length&&`<b>Prices today vs what we sold at (${F.recentLabel}):</b> ${esc(F.priceMoves.slice(0,4).map(x=>`${skuShort(x.name)} ${rp(x.was)} → ${rp(x.now)} a bag (${x.now>=x.was?"+":"−"}${Math.abs(Math.round((x.now/x.was-1)*100))}%)`).join("; "))}.`,
-      (F.inf.n||F.unpriced.length)&&`<b>Data:</b> ${F.inf.n?`${F.inf.n} lines (${rp(F.inf.gmv)}) had no province and took the customer's province from other orders${F.inf.byPic?` (${F.inf.byPic} from the PIC's main area)`:""}. `:""}${F.unpriced.length?`${F.unpriced.length} SKUs are not on the price list and use their last selling price (${esc(F.unpriced.slice(0,3).map(skuShort).join(", "))}${F.unpriced.length>3?"…":""}).`:""}`
+      (F.inf.n||F.unpriced.length)&&`<b>Data:</b> ${F.inf.n?`${F.inf.n} lines (${rp(F.inf.gmv)}) had no province and took the customer's province from other orders. `:""}${F.unpriced.length?`${F.unpriced.length} SKU${F.unpriced.length===1?" is":"s are"} not on the price list and use${F.unpriced.length===1?"s":""} the last selling price (${esc(F.unpriced.slice(0,3).map(skuShort).join(", "))}${F.unpriced.length>3?"…":""}).`:""}`
     ].filter(Boolean)});
-  // 2. Where the stock goes: tonnes by area per month, and the largest SKUs over the 3 months
-  const ARC=[CAT[0],CAT[1],CAT[2]], skT=new Map(); M.forEach(m=>m.rows.forEach(r=>r.skus.forEach(x=>skT.set(x.name,(skT.get(x.name)||0)+x.mt))));
-  const topSk=[...skT].sort((a,b)=>b[1]-a[1]).slice(0,8), totMt=M.reduce((s,m)=>s+m.mt,0), r0=M[0].rows[0], rJ=M[M.length-1].rows[0];
-  S.push({kicker:pre+"Forecast · where the stock goes",title:`${F.areas[0]} needs ${pct(M[0].rows[0].mt,M[0].mt)}% of the stock; ${skuShort(topSk[0][0])} and ${skuShort(topSk[1][0])} are ${pct(topSk[0][1]+topSk[1][1],totMt)}% of the tonnes`,
+  // 2. Weekly plan (the table asked for)
+  const skT=new Map(); W.forEach(w=>w.skus.forEach(x=>{ const o=skT.get(x.k)||{name:x.name,pack:x.pack,mt:0,bags:0}; o.mt+=x.mt; o.bags+=x.bags; skT.set(x.k,o); }));
+  const topAll=[...skT.values()].sort((a,b)=>b.mt-a.mt);
+  const wrows=W.map(w=>[{v:`W${w.n}`,bold:true},`${w.label}${w.days<7?` (${w.days} days)`:""}`,rp(w.target),{v:mt1(w.mt),bold:true},nf.format(w.skus.reduce((s,x)=>s+x.bags,0)),w.skus.slice(0,3).map(x=>`${skuShort(x.name)} ${nf.format(x.bags)}`).join(" · ")]);
+  wrows.push([{v:"Total",bold:true},fcSpan(F),{v:rp(W.reduce((s,w)=>s+w.target,0)),bold:true},{v:mt1(W.reduce((s,w)=>s+w.mt,0)),bold:true},{v:nf.format(W.reduce((s,w)=>s+w.skus.reduce((a,x)=>a+x.bags,0),0)),bold:true},""]);
+  S.push({kicker:pre+"Forecast · weekly stock plan",title:`${mt0(totMt)} MT from ${fds(F.start)} to ${fds(F.end)}: about ${mt0(wkMt)} MT a week for ${rp(tgt)} a month`,
+    rows:[{cards:[{foot:`Weeks run Monday to Sunday; each month's plan is spread evenly over its days, so a short week needs less. Bags are rounded per week; top 3 SKUs in bags.`,
+      table:{colW:[5,15,11,10,8,51],head:["Week","Dates","Target sales (IDR)","Stock (MT)","Bags","Largest SKUs (bags)"],align:["l","l","r","r","r","l"],rows:wrows}}]}]});
+  // 3. Weekly plan by SKU
+  const topW=topAll.slice(0,10), othW=topAll.slice(10), wk=(n,f)=>W.map(w=>{ const v=w.skus.filter(f).reduce((s,x)=>s+x.mt,0); return v?mt1(v):"–"; });
+  const srows=topW.map(o=>[skuShort(o.name),...wk(0,x=>x.name===o.name),{v:mt1(o.mt),bold:true},nf.format(o.bags)]);
+  if(othW.length) srows.push([`Other ${othW.length} SKUs`,...wk(0,x=>othW.some(o=>o.name===x.name)),{v:mt1(othW.reduce((s,o)=>s+o.mt,0)),bold:true},nf.format(othW.reduce((s,o)=>s+o.bags,0))]);
+  srows.push([{v:"Total",bold:true},...W.map(w=>({v:mt1(w.mt),bold:true})),{v:mt1(totMt),bold:true},{v:nf.format(topAll.reduce((s,o)=>s+o.bags,0)),bold:true}]);
+  S.push({kicker:pre+"Forecast · weekly plan by SKU",title:`${topAll.slice(0,3).map(o=>skuShort(o.name)).join(", ")} are ${pct(topAll.slice(0,3).reduce((s,o)=>s+o.mt,0),totMt)}% of the tonnes to stock by week`,
+    rows:[{cards:[{foot:`MT per week (Monday start date shown). Bags = total over the plan.`,table:{colW:[24,...W.map(()=>6),8,8],head:["SKU",...W.map(w=>w.short),"Total MT","Bags"],align:["l",...W.map(()=>"r"),"r","r"],rows:srows}}]}]});
+  // 4. Where the stock goes: tonnes by area per week, and the largest SKUs over the plan
+  const ARC=[CAT[0],CAT[1],CAT[2]], topSk=topAll.slice(0,8), r0=M[M.length-1].rows[0];
+  S.push({kicker:pre+"Forecast · where the stock goes",title:`${F.areas[0]} needs ${pct(F.share[F.areas[0]],1)}% of the stock; ${skuShort(topSk[0].name)} and ${skuShort(topSk[1].name)} are ${pct(topSk[0].mt+topSk[1].mt,totMt)}% of the tonnes`,
     rows:[{cards:[
-      {w:1,title:"Stock required by area (MT)",sub:"Tonnes per month to reach the target",chart:{type:"column",stacked:true,cats:M.map(m=>m.label),
-        series:F.areas.map((a,i)=>({name:a,color:ARC[i],values:M.map(m=>m.rows.find(r=>r.area===a)?.mt||0)})),fmt:v=>mt0(v),lblH:28}},
-      {w:1.1,title:"Largest SKUs, Nov–Jan (MT)",sub:"Tonnes over the 3 months; bags in grey",chart:{type:"hbar",items:topSk.map(([n,v])=>({k:skuShort(n),v,r:`${nf.format(Math.round(v*1000/(packKg(n)||50)))} bags`})),fmt:v=>mt1(v)}}]}],
+      {w:1.2,title:"Stock required by area, per week (MT)",sub:"Week starting Monday",chart:{type:"column",stacked:true,cats:W.map(w=>w.short),
+        series:F.areas.map((a,i)=>({name:a,color:ARC[i],values:W.map(w=>w.areas[a]||0)})),fmt:v=>mt0(v),lblH:24}},
+      {w:1,title:`Largest SKUs, ${fds(F.start)} – ${fds(F.end)} (MT)`,sub:"Tonnes over the plan; bags in grey",chart:{type:"hbar",items:topSk.map(o=>({k:skuShort(o.name),v:o.mt,r:`${nf.format(o.bags)} bags`})),fmt:v=>mt1(v)}}]}],
     notes:[
-      `<b>${M[0].label.split(" ")[0]} and ${M[1].label.split(" ")[0]} lean on rock phosphate and KCL</b> (the ${F.recentLabel} mix), so they need more tonnes at a lower ${rp(r0.vpk)}/kg in ${F.areas[0]}.`,
-      `<b>${M[M.length-1].label.split(" ")[0]} follows last season</b> (${M[M.length-1].winLabel}): more KCL and NPK at ${rp(rJ.vpk)}/kg, so the same rupiah needs fewer tonnes (${mt0(M[M.length-1].mt)} MT).`,
-      `<b>Sumatera Selatan is small and thin:</b> ${M[0].rows.find(r=>r.area==="Sumatera Selatan")?`${mt1(M[0].rows.find(r=>r.area==="Sumatera Selatan").mt)} MT a month from ${M[0].rows.find(r=>r.area==="Sumatera Selatan").orders} orders of history`:"no history"}, so its mix can swing with one or two customers.`].filter(Boolean)});
-  // 3. Stock plan by month and area (the table management asked for)
-  const rows=[]; M.forEach(m=>m.rows.forEach((r,i)=>{ const top=r.skus.slice(0,3).map(x=>`${skuShort(x.name)} ${mt1(x.mt)}`).join(" · "), rest=r.skus.length-3;
-    rows.push([i?"":{v:m.label,bold:true},`${r.area}${r.note?"*":""}`,{v:`${mt1(r.mt)} MT: ${top}`},
-      `${rp(r.target)}\n(fertilizer ${rp(r.fertGmv)})`,
-      `${r.thin?`Full-history mix (too few orders in ${m.winLabel.split(" ")[0]})`:`${m.winLabel.split(" ")[0]} mix, ${r.orders} orders`} · ${rp(r.vpk)}/kg${r.best&&r.best.mt?` · ${(r.mt/r.best.mt).toFixed(1)}× best month (${mt0(r.best.mt)} t, ${r.best.label.split(" ")[0]})`:""}`]); }));
+      M.some(m=>!m.seasonal)&&`<b>${andList(M.filter(m=>!m.seasonal).map(m=>MON[m.m%12]))} use the ${F.recentLabel} mix</b>${M.some(m=>m.seasonal)?"":" (the data has no same month last season)"}: ${rp(r0.vpk)}/kg in ${F.areas[0]}, so each Rp1B needs about ${mt0(1e9*F.fertShare*(1-F.shipShare)/r0.vpk/1000)} t.`,
+      M.some(m=>m.seasonal)&&`<b>${andList(M.filter(m=>m.seasonal).map(m=>MON[m.m%12]))} follow last season</b> (${M.filter(m=>m.seasonal).map(m=>m.winLabel).join(", ")}).`,
+      F.areas.slice(1).some(a=>F.share[a]<.05)&&`<b>Small areas are thin:</b> ${F.areas.filter(a=>F.share[a]<.05).map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")} of fertilizer GMV, so their mix can swing with one or two customers.`].filter(Boolean)});
+  // 5. Plan by month and area
+  const rows=[]; M.forEach(m=>m.rows.forEach((r,i)=>{ const top=r.skus.slice(0,2).map(x=>`${skuShort(x.name)} ${mt1(x.mt)}`).join(" · ");
+    rows.push([i?"":{v:m.partial?`${m.range}`:m.label,bold:true},`${r.area}${r.note?"*":""}`,{v:`${mt1(r.mt)} MT: ${top}`},`${rp(r.target)}`,
+      `${r.thin?"Full-history mix":`${m.winLabel.split(" ")[0]} mix, ${r.orders} lines`} · ${rp(r.vpk)}/kg${r.best&&r.best.mt?` · ${(r.mt/m.frac/r.best.mt).toFixed(1)}× best month`:""}`]); }));
   const notes=M[0].rows.filter(r=>r.note).map(r=>`*${r.area} ${r.note}.`);
-  S.push({kicker:pre+"Forecast · stock plan by month and area",title:`Stock needed for ${rp(tgt)} a month: ${M.map(m=>`${mt0(m.mt)} MT in ${m.label.split(" ")[0]}`).join(", ")}`,
-    rows:[{cards:[{foot:`${notes.join(" ")} Stock required = tonnes to sell at 14 Oct prices, rounded to whole bags; top 3 SKUs shown (all SKUs on the next slide).`,table:{colW:[7,12,40,12,29],head:["Month","Area (province)","Stock required (MT)","Target sales (IDR)","Description"],align:["l","l","l","l","l"],rows}}]}]});
-  // 3. Stock plan by SKU
-  const sk=new Map(); M.forEach((m,mi)=>m.rows.forEach(r=>r.skus.forEach(x=>{ const o=sk.get(x.k)||{name:x.name,pack:x.pack,mt:M.map(()=>0),val:0,kg:0,areas:new Map()}; o.mt[mi]+=x.mt; o.val+=x.ppk*x.mt*1000; o.kg+=x.mt*1000; o.areas.set(r.area,(o.areas.get(r.area)||0)+x.mt); sk.set(x.k,o); })));
-  const all=[...sk.values()].map(o=>({...o,tot:o.mt.reduce((a,b)=>a+b,0)})).sort((a,b)=>b.tot-a.tot), top=all.slice(0,13), oth=all.slice(13);
-  const line=(name,mt,tot,bags,ppb,ar)=>[name,...mt.map(v=>v?mt1(v):"–"),{v:mt1(tot),bold:true},bags,ppb,ar];
-  const srows=top.map(o=>line(skuShort(o.name),o.mt,o.tot,nf.format(Math.round(o.tot*1000/o.pack)),rp(o.val/o.kg*o.pack),[...o.areas].sort((a,b)=>b[1]-a[1]).map(([a,v])=>`${a.replace("Sumatera ","Sum")} ${pct(v,o.tot)}%`).slice(0,2).join(", ")));
-  if(oth.length) srows.push(line(`Other ${oth.length} SKUs`,M.map((_,i)=>oth.reduce((s,o)=>s+o.mt[i],0)),oth.reduce((s,o)=>s+o.tot,0),"–","–","–"));
-  srows.push(line({v:"Total",bold:true},M.map(m=>m.mt),M.reduce((s,m)=>s+m.mt,0),"–","–","–").map((c,i)=>i===0?c:typeof c==="object"?c:{v:c,bold:true}));
-  S.push({kicker:pre+"Forecast · stock plan by SKU",title:`${all.slice(0,3).map(o=>skuShort(o.name)).join(", ")} are ${pct(all.slice(0,3).reduce((s,o)=>s+o.tot,0),all.reduce((s,o)=>s+o.tot,0))}% of the tonnes to stock`,
-    rows:[{cards:[{table:{colW:[30,9,9,9,10,9,12,18],head:["SKU",...M.map(m=>`${m.label} (MT)`),"3 months (MT)","Bags","Avg price / bag","Main areas"],align:["l","r","r","r","r","r","r","l"],rows:srows}}]}]});
+  S.push({kicker:pre+"Forecast · stock plan by month and area",title:`Stock needed for ${rp(tgt)} a month: ${M.map(m=>`${mt0(m.mt)} MT in ${m.partial?m.range:MON[m.m%12]}`).join(", ")}`,
+    rows:[{cards:[{foot:`${notes.join(" ")} Stock required = tonnes to sell at today's list prices, rounded to whole bags; part months pro rata by day.`,table:{colW:[9,12,40,11,28],head:["Month","Area (province)","Stock required (MT)","Target sales (IDR)","Description"],align:["l","l","l","l","l"],rows}}]}]});
   return S;
 }
 function teamSpecs(A,N,pre){
@@ -762,41 +769,41 @@ function basisOf(T,X){
   if(T[0].A.acq){ const Q=T[0].A.acq; return `Farmers by registration week${Q.P?` · last week vs the week before`:""} · data to ${fds(Q.lastDate)} ${Q.lastDate.getFullYear()}`; }
   const tr=T.find(t=>t.A.trend)?.A.trend, sales=T.some(t=>t.A.has.sales), fc=T.find(t=>t.A.forecast)?.A.forecast, last=fc?fc.lastDate:X.dates[X.dates.length-1];
   const asOf=last?`data to ${fds(last)} ${last.getFullYear()}`:"";
-  return [sales&&"GMV incl. shipping, before discount",fc?`target ${rp(fc.target)} a month at ${fc.priceLabel.replace(/^price (per )?/i,"prices of ").replace(/\.csv$/i,"")}`:tr?`${tr.Z.label} vs ${tr.F.label}`:T.some(t=>t.A.wow)?"last week vs the week before":null,asOf].filter(Boolean).join(" · ")||"SAWITPRO PROPRIETARY";
+  return [sales&&(fc&&!fc.shipShare?"Sales amount":"GMV incl. shipping, before discount"),fc?`target ${rp(fc.target)} a month · plan ${fcSpan(fc)}`:tr?`${tr.Z.label} vs ${tr.F.label}`:T.some(t=>t.A.wow)?"last week vs the week before":null,asOf].filter(Boolean).join(" · ")||"SAWITPRO PROPRIETARY";
 }
 function deckNarrative(T){
   if(T[0].A.dop){ const X=doNarrative(T); X.actions=draftActs(X.actions); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X; }
   if(T[0].A.acq){ const X=acqNarrative(T); X.actions=draftActs(X.actions); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X; }
   const X=deckNarrative0(T), fa=[];
-  T.filter(t=>t.A.forecast).forEach(t=>{ const F=t.A.forecast, m0=F.months[0], top=new Map();
-    m0.rows.forEach(r=>r.skus.forEach(x=>top.set(x.name,(top.get(x.name)||0)+x.mt)));
-    const tops=[...top].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,v])=>`${skuShort(n)} ${mt0(v)} MT`).join(", ");
-    fa.push({t:`Secure ${mt0(m0.mt)} MT for ${m0.label}`,d:`${tops} are the largest lines. Check stock on hand and supplier lead time against the plan by area (${m0.rows.map(r=>`${r.area} ${mt0(r.mt)} MT`).join(", ")}).`,o:"",w:"",team:X.multi?t.name:null});
-    fa.push({t:`Plan ${mt0(F.ordersNeeded)} fertilizer orders a month`,d:`${rp(F.target)} a month at the ${F.recentLabel} average order of ${rp(F.aov)} needs ${mt0(F.ordersNeeded)} orders; the team closed ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}. Split the gap by PIC and area.`,o:"",w:"",team:X.multi?t.name:null}); });
-  T.filter(t=>t.A.forecast).forEach(t=>{ const F=t.A.forecast, mJ=F.months[F.months.length-1], m0=F.months[0];
-    const kcl=[...new Map(mJ.rows.flatMap(r=>r.skus).map(x=>[x.name,0])).keys()].map(n=>[n,mJ.rows.reduce((s,r)=>s+(r.skus.find(x=>x.name===n)?.mt||0),0)]).sort((a,b)=>b[1]-a[1])[0];
-    if(kcl) fa.push({t:`Book ${mt0(kcl[1])} MT of ${skuShort(kcl[0])} for ${mJ.label.split(" ")[0]}`,d:`${mJ.label.split(" ")[0]} shifts to last season's mix (${mJ.winLabel}); ${skuShort(kcl[0])} is the largest line at ${mt0(kcl[1])} MT, against ${mt0(m0.rows.reduce((s,r)=>s+(r.skus.find(x=>x.name===kcl[0])?.mt||0),0))} MT in ${m0.label.split(" ")[0]}. Confirm supplier allocation before December.`,o:"",w:"",team:X.multi?t.name:null});
-    if(F.unpriced.length) fa.push({t:`Add ${F.unpriced.length} SKUs to the price list`,d:`${F.unpriced.slice(0,4).map(skuShort).join(", ")}${F.unpriced.length>4?" and others":""} sell but are not on the 14 Oct price list, so the plan uses their last selling price.`,o:"",w:"",team:X.multi?t.name:null});
-    if(F.inf.n) fa.push({t:`Fill the province on ${F.inf.n} order lines`,d:`${rp(F.inf.gmv)} of sales had no province (mostly Jan–Feb); the plan took it from the customer's other orders. Fix it at the source so the area split stays right.`,o:"",w:"",team:X.multi?t.name:null}); });
+  T.filter(t=>t.A.forecast).forEach(t=>{ const F=t.A.forecast, W=F.weeks, M=F.months, two=W.slice(0,2), ord=F.hasOrderNo?"orders":"order lines", team=X.multi?t.name:null;
+    const sk=new Map(); two.forEach(w=>w.skus.forEach(x=>sk.set(x.name,(sk.get(x.name)||0)+x.bags))); const tops=[...sk].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,v])=>`${skuShort(n)} ${nf.format(v)} bags`).join(", ");
+    const tw=two.reduce((s,w)=>s+w.mt,0);
+    fa.push({t:`Stock ${mt0(tw)} MT for the first two weeks (${fds(two[0].a)} – ${fds(two[two.length-1].b)})`,d:`${tops} are the largest lines. Check stock on hand and supplier lead time against the weekly plan, then confirm the following weeks every Monday.`,o:"",w:"",team});
+    fa.push({t:`Plan ${mt0(F.ordersNeeded)} ${ord} a month`,d:`${rp(F.target)} a month at the ${F.recentLabel} average of ${rp(F.aov)} needs ${mt0(F.ordersNeeded)} ${ord}; the team closed ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}. Split the gap by week and area.`,o:"",w:"",team});
+    const tot=new Map(); W.forEach(w=>w.skus.forEach(x=>tot.set(x.name,(tot.get(x.name)||0)+x.mt))); const big=[...tot].sort((a,b)=>b[1]-a[1])[0];
+    if(big) fa.push({t:`Book ${mt0(big[1])} MT of ${skuShort(big[0])} to ${fds(F.end)}`,d:`The largest line in the plan (${pct(big[1],W.reduce((s,w)=>s+w.mt,0))}% of the tonnes). Confirm supplier allocation for ${andList(M.map(m=>MON[m.m%12]))} now, at about ${mt0(big[1]/W.length)} MT a week.`,o:"",w:"",team});
+    if(F.unpriced.length) fa.push({t:`Add ${F.unpriced.length} SKU${F.unpriced.length===1?"":"s"} to the price list`,d:`${F.unpriced.slice(0,4).map(skuShort).join(", ")}${F.unpriced.length>4?" and others":""} ${F.unpriced.length===1?"sells but is":"sell but are"} not on the price list, so the plan uses their last selling price.`,o:"",w:"",team});
+    if(F.inf.n) fa.push({t:`Fill the province on ${F.inf.n} order lines`,d:`${rp(F.inf.gmv)} of sales had no province; the plan took it from the customer's other orders. Fix it at the source so the area split stays right.`,o:"",w:"",team}); });
   if(fa.length) X.actions=fa.slice(0,6);
   // the cover says the deck carries a stock plan
   const fc0=T.find(t=>t.A.forecast)?.A.forecast;
-  if(fc0){ const F=fc0, m=F.months, tg=F.target, avgMt=m.reduce((s,x)=>s+x.mt,0)/m.length, name=T.find(t=>t.A.forecast).name;
-    const skT=new Map(); m.forEach(x=>x.rows.forEach(r=>r.skus.forEach(k=>skT.set(k.name,(skT.get(k.name)||0)+k.mt)))); const top=[...skT].sort((a,b)=>b[1]-a[1]);
-    X.forecast=true; X.gaps=[]; X.eyebrow="Stock Forecast"; X.title=`${name} · ${m[0].label} – ${m[m.length-1].label}`;
-    X.period=`Sales history ${fds(F.hist[0]&&new Date(Math.floor(F.hist[0].m/12),F.hist[0].m%12,1))} – ${fds(F.lastDate)} ${F.lastDate.getFullYear()}`; X.meta=`target ${rp(tg)} a month`;
-    X.headline=`${rp(tg)} a month needs ${m.map(x=>`${mt0(x.mt)} MT in ${x.label.split(" ")[0]}`).join(", ")}: about ${(avgMt*1000/F.bestKg.kg).toFixed(1)}× our best month`;
-    X.kpis=[{v:mt0(m[0].mt),u:" MT",l:`stock for ${m[0].label} (${m.slice(1).map(x=>`${x.label.split(" ")[0]} ${mt0(x.mt)} MT`).join(", ")})`,hot:true},
-      {v:rpParts(tg)[0],u:rpParts(tg)[1],l:`target a month: ${(tg/F.best.gmv).toFixed(1)}× the best month (${rp(F.best.gmv)}, ${F.best.label}), ${(tg/F.avg).toFixed(1)}× the ${F.avgN}-month average`},
-      {v:mt0(F.ordersNeeded),u:"",l:`fertilizer orders a month needed, vs ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}`},
-      {v:String(pct(F.share[F.areas[0]],1)),u:"%",l:`of the target and stock in ${F.areas[0]}; ${F.areas.slice(1).map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")}`}];
+  if(fc0){ const F=fc0, m=F.months, W=F.weeks, tg=F.target, totMt=m.reduce((s,x)=>s+x.mt,0), name=T.find(t=>t.A.forecast).name, ord=F.hasOrderNo?"orders":"order lines";
+    const full=m.filter(x=>!x.partial), mMt=(full.length?full:m).reduce((s,x)=>s+x.mtMonth,0)/(full.length||m.length), wkMt=totMt/W.reduce((s,w)=>s+w.days,0)*7;
+    const skT=new Map(); W.forEach(w=>w.skus.forEach(k=>skT.set(k.name,(skT.get(k.name)||0)+k.mt))); const top=[...skT].sort((a,b)=>b[1]-a[1]);
+    X.forecast=true; X.gaps=[]; X.eyebrow="Stock Forecast"; X.title=`${name} · ${fcSpan(F)}`;
+    X.period=`Sales history ${fds(F.hist[0]&&new Date(Math.floor(F.hist[0].m/12),F.hist[0].m%12,1))} – ${fds(F.lastDate)} ${F.lastDate.getFullYear()}`; X.meta=`target ${rp(tg)} a month · ${W.length} weeks`;
+    X.headline=`${rp(tg)} a month needs ${mt0(totMt)} MT from ${fds(F.start)} to ${fds(F.end)}: about ${mt0(wkMt)} MT a week, ${(mMt*1000/F.bestKg.kg).toFixed(1)}× our best month`;
+    X.kpis=[{v:mt0(totMt),u:" MT",l:`stock for ${fcSpan(F)} (${m.map(x=>`${x.partial?x.range:MON[x.m%12]} ${mt0(x.mt)}`).join(", ")})`,hot:true},
+      {v:mt0(wkMt),u:" MT",l:`a week on average over ${W.length} weeks; the first full week ${mt0((W.find(w=>w.days===7)||W[0]).mt)} MT`},
+      {v:rpParts(tg)[0],u:rpParts(tg)[1],l:`target a month: ${(tg/F.best.gmv).toFixed(1)}× the best month in this data (${rp(F.best.gmv)}, ${F.best.label})`},
+      {v:mt0(F.ordersNeeded),u:"",l:`${ord} a month needed, vs ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}`}];
     X.findings=[
-      [`Rp4B is a step up, not a stretch of today`.replace("Rp4B",rp(tg)),`The best month so far was ${rp(F.best.gmv)} (${F.best.label}); the last ${F.avgN} full months averaged ${rp(F.avg)}. The plan needs ${mt0(avgMt)} MT a month against a record of ${mt0(F.bestKg.kg/1000)} t (${F.bestKg.label}).`],
-      [`Two SKUs carry the plan`,`${top.slice(0,3).map(([n,v])=>`${skuShort(n)} ${mt0(v)} MT`).join(", ")} over the 3 months (${pct(top.slice(0,3).reduce((s,x)=>s+x[1],0),top.reduce((s,x)=>s+x[1],0))}% of the tonnes). A stock-out of either stops the plan.`],
-      [`January is a different mix`,`Last season's Jan–Feb sold more KCL and NPK, so January needs ${mt0(m[m.length-1].mt)} MT for the same ${rp(tg)}, against ${mt0(m[0].mt)} MT in ${m[0].label.split(" ")[0]}.`],
-      [`The gap is orders, not price`,`At the ${F.recentLabel} average order of ${rp(F.aov)}, ${rp(tg)} needs ${mt0(F.ordersNeeded)} orders a month; the team closed ${Math.round(F.ordersPerMonth)}. Today's prices are within ${Math.max(...F.priceMoves.map(x=>Math.abs(Math.round((x.now/x.was-1)*100))),0)}% of what the top SKUs sold for.`]];
-    X.bottom={p:`Stock ${top.slice(0,2).map(([n])=>skuShort(n)).join(" and ")} first, and plan ${mt0(F.ordersNeeded)} orders a month by PIC and area.`,
-      s:`Stock required is the tonnage to sell at 14 Oct prices; stock on hand and supplier lead times are not in the data.`}; }
+      [`${rp(tg)} is a step up from this data`,`The best month in the file was ${rp(F.best.gmv)} (${F.best.label}); the last ${F.avgN} full months averaged ${rp(F.avg)}. The plan needs ${mt0(mMt)} MT a month against a record of ${mt0(F.bestKg.kg/1000)} t (${F.bestKg.label}).`],
+      [`A few SKUs carry the plan`,`${top.slice(0,3).map(([n,v])=>`${skuShort(n)} ${mt0(v)} MT`).join(", ")} to ${fds(F.end)} (${pct(top.slice(0,3).reduce((s,x)=>s+x[1],0),totMt)}% of the tonnes). A stock-out of any of them stops the plan.`],
+      [`${F.areas[0]} takes ${pct(F.share[F.areas[0]],1)}% of the stock`,`${F.areas.map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")} of fertilizer GMV; ${W.length} weekly deliveries of about ${mt0(wkMt*F.share[F.areas[0]])} MT to ${F.areas[0]}.`],
+      [`The gap is volume, not price`,`At the ${F.recentLabel} average of ${rp(F.aov)}, ${rp(tg)} needs ${mt0(F.ordersNeeded)} ${ord} a month; the team closed ${Math.round(F.ordersPerMonth)}.${F.priceMoves.length?` Today's prices are within ${Math.max(...F.priceMoves.map(x=>Math.abs(Math.round((x.now/x.was-1)*100))),0)}% of what the top SKUs sold for.`:""}`]];
+    X.bottom={p:`Stock ${top.slice(0,2).map(([n])=>skuShort(n)).join(" and ")} first, about ${mt0(wkMt)} MT a week, and plan ${mt0(F.ordersNeeded)} ${ord} a month.`,
+      s:`Stock required is the tonnage to sell at today's list prices; stock on hand and supplier lead times are not in the data.`}; }
   X.actions=draftActs(X.actions||[]); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X;
 }
 function deckNarrative0(T){

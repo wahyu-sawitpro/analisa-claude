@@ -644,6 +644,8 @@ function linkTrendCrm(A,C){
 /* ================= Price list & stock forecast ================= */
 // Monthly sales target the stock plan is sized for (IDR, GMV). Set from the page; Rp4B by default.
 let FC_TARGET=4e9;
+// Plan horizon: from the day after the last sale to FC_END (default: 31 Dec of that year; from December, 31 Mar of the next year).
+let FC_END=null;
 // Focus areas: province names as the sales export writes them.
 const FC_AREAS=[["Riau",/^riau$/],["Sumatera Utara",/^sumatera utara$|^sumut$/],["Sumatera Selatan",/^sumatera selatan$|^sumsel$|^lampung$|^jambi$|^bengkulu$/]];
 const FC_AREA_NOTE={"Sumatera Selatan":"incl. Lampung, Jambi, Bengkulu"};
@@ -696,26 +698,40 @@ function forecastStock(lines,P,target){
   const share=Object.fromEntries(areas.map(a=>[a,sum(FF.filter(l=>l.fcArea===a),l=>l.gmv)/focusGmv]));
   const last=Math.max(...L.map(l=>mk(l.date))), first=Math.min(...L.map(l=>mk(l.date))), lastDate=new Date(Math.max(...L.map(l=>+l.date)));
   const monthsWithData=new Set(F.map(l=>l.fcM)), recent=[last-3,last-2,last-1,last];
-  const orders=a=>new Set(a.map(l=>l.orderNo||l.invoice)).size;
+  // with no order number in the export every line counts as one order
+  const orders=a=>new Set(a.map(l=>l.orderNo||l.invoice||l)).size, hasOrderNo=L.some(l=>l.orderNo||l.invoice);
   // history per month (all areas): GMV, fertilizer tonnes, orders
   const hist=[]; for(let m=first;m<=last;m++){ const ls=L.filter(l=>mk(l.date)===m), fs=F.filter(l=>l.fcM===m);
     hist.push({m,label:MON[m%12],gmv:sum(ls,l=>l.gmv),fertGmv:sum(fs,l=>l.gmv),kg:sum(fs,l=>l.fcKg),orders:orders(fs),partial:m===last&&lastDate.getDate()<new Date(lastDate.getFullYear(),lastDate.getMonth()+1,0).getDate()-3}); }
   const full=hist.filter(h=>!h.partial), best=full.slice().sort((a,b)=>b.gmv-a.gmv)[0], bestKg=full.slice().sort((a,b)=>b.kg-a.kg)[0];
   const areaBest=a=>{ let b=null; for(let m=first;m<=last;m++){ const kg=sum(FF.filter(l=>l.fcArea===a&&l.fcM===m),l=>l.fcKg); if(!b||kg>b.kg) b={m,kg}; } return b; };
-  const months=[1,2,3].map(i=>last+i).map(m=>{
-    // same calendar month in the history (with the month after it) = seasonal mix; otherwise the last 4 months
-    const same=[...monthsWithData].filter(x=>x%12===m%12), win=same.length?same.flatMap(x=>[x,x+1]):recent;
+  const start=new Date(lastDate.getFullYear(),lastDate.getMonth(),lastDate.getDate()+1);
+  const end=FC_END&&FC_END>start?FC_END:lastDate.getMonth()>=11?new Date(lastDate.getFullYear()+1,2,31):new Date(lastDate.getFullYear(),11,31);
+  const dim=m=>new Date(Math.floor(m/12),m%12+1,0).getDate(), D=864e5;
+  const span_=m=>{ const a=new Date(Math.max(+start,+new Date(Math.floor(m/12),m%12,1))), b=new Date(Math.min(+end,+new Date(Math.floor(m/12),m%12,dim(m)))); return {a,b,days:Math.round((b-a)/D)+1}; };
+  const planM=[]; for(let m=mk(start);m<=mk(end);m++) planM.push(m);
+  const months=planM.map(m=>{ const sp=span_(m), frac=sp.days/dim(m);
+    // the same month last season (with the month after it) = seasonal mix; otherwise the last 4 months
+    const same=monthsWithData.has(m-12)?[m-12]:[], win=same.length?[m-12,m-11]:recent;
     const winLabel=same.length?`${MON[win[0]%12]}–${MON[win[win.length-1]%12]} ${Math.floor(win[win.length-1]/12)}`:`${MON[recent[0]%12]}–${MON[last%12]} ${Math.floor(last/12)}`;
     const rows=areas.map(a=>{
       let w=FF.filter(l=>l.fcArea===a&&win.includes(l.fcM)), thin=false;
       if(orders(w)<8){ w=FF.filter(l=>l.fcArea===a); thin=true; }
       const kgW=sum(w,l=>l.fcKg), vpk=sum(w,l=>l.qty*l.fcPrice)/kgW;
-      const tgt=target*share[a], fg=tgt*fertShare, prod=fg*(1-shipShare), kg=prod/vpk;
+      const tgt=target*share[a]*frac, fg=tgt*fertShare, prod=fg*(1-shipShare), kg=prod/vpk;
       const sk=new Map(); w.forEach(l=>{ const x=sk.get(l.fcSku)||{k:l.fcSku,name:P.names.get(l.fcSku)||skuName(l.item),pack:packKg(l.item),kg:0,val:0}; x.kg+=l.fcKg; x.val+=l.qty*l.fcPrice; sk.set(l.fcSku,x); });
       const skus=[...sk.values()].map(x=>{ const bags=Math.round(x.kg/kgW*kg/x.pack); return {...x,bags,mt:bags*x.pack/1000,ppk:x.val/x.kg}; }).filter(x=>x.bags>0).sort((a,b)=>b.mt-a.mt);
       const mt=skus.reduce((s,x)=>s+x.mt,0), ab=areaBest(a);
       return {area:a,note:FC_AREA_NOTE[a]||"",target:tgt,fertGmv:fg,productValue:prod,vpk,mt,skus,orders:orders(w),thin,best:ab?{label:mlab(ab.m),mt:ab.kg/1000}:null}; });
-    return {m,label:mlab(m),win,winLabel,seasonal:!!same.length,rows,mt:rows.reduce((s,r)=>s+r.mt,0)}; });
+    const mt=rows.reduce((s,r)=>s+r.mt,0);
+    return {m,label:mlab(m),win,winLabel,seasonal:!!same.length,rows,mt,frac,from:sp.a,to:sp.b,days:sp.days,partial:frac<1,range:frac<1?`${sp.a.getDate()}–${sp.b.getDate()} ${MON[m%12]}`:mlab(m),target:target*frac,mtMonth:mt/frac}; });
+  // weekly plan: Monday-to-Sunday weeks, each month's plan spread evenly over its days in the plan
+  const weeks=[]; for(let a=new Date(start);a<=end;){ const b=new Date(Math.min(+end,+new Date(a.getFullYear(),a.getMonth(),a.getDate()+((7-a.getDay())%7)))); weeks.push({a:new Date(a),b}); a=new Date(b.getFullYear(),b.getMonth(),b.getDate()+1); }
+  weeks.forEach((w,i)=>{ const sk=new Map(), ar={}; let tgt=0;
+    months.forEach(M=>{ const a=Math.max(+w.a,+M.from), b=Math.min(+w.b,+M.to); if(a>b) return; const f=(Math.round((b-a)/D)+1)/M.days; tgt+=M.target*f;
+      M.rows.forEach(r=>{ ar[r.area]=(ar[r.area]||0)+r.mt*f; r.skus.forEach(x=>{ const o=sk.get(x.k)||{k:x.k,name:x.name,pack:x.pack,kg:0,ppk:x.ppk}; o.kg+=x.mt*1000*f; sk.set(x.k,o); }); }); });
+    const skus=[...sk.values()].map(o=>({...o,bags:Math.round(o.kg/o.pack)})).map(o=>({...o,mt:o.bags*o.pack/1000})).filter(o=>o.bags>0).sort((x,y)=>y.mt-x.mt);
+    Object.assign(w,{n:i+1,days:Math.round((w.b-w.a)/D)+1,label:w.a.getMonth()===w.b.getMonth()?`${w.a.getDate()}–${w.b.getDate()} ${MON[w.b.getMonth()]}`:`${fds(w.a)} – ${fds(w.b)}`,short:fds(w.a),target:tgt,areas:ar,skus,mt:skus.reduce((s,x)=>s+x.mt,0)}); });
   // what the target asks for, at the recent run-rate
   const R=F.filter(l=>recent.includes(l.fcM)), rOrders=orders(R), aov=rOrders?sum(R,l=>l.gmv)/rOrders:0;
   const fullRecent=full.filter(h=>h.m>=last-6), avg=fullRecent.length?sum(fullRecent,h=>h.gmv)/fullRecent.length:0;
@@ -726,7 +742,7 @@ function forecastStock(lines,P,target){
     return q?{k,name:P.names.get(k)||k,kg:sum(R.filter(l=>l.fcSku===k),l=>l.fcKg),was:sum(ls,l=>l.salesAmount)/q,now:sum(ls,l=>l.fcPrice*l.qty)/q}:null; }).filter(Boolean).sort((a,b)=>b.kg-a.kg).slice(0,5);
   const unpriced=[...new Set(F.filter(l=>l.fcPsrc==="history").map(l=>skuName(l.item)))];
   const otherGmv=sum(F.filter(l=>!l.fcArea),l=>l.gmv);
-  return {target,months,areas,share,fertShare,shipShare,hist,best,bestKg,bestRecent,avg,avgN:fullRecent.length,ordersPerMonth,recentFullLabel:recentFull.length?`${recentFull[0].label}–${recentFull[recentFull.length-1].label}`:"",aov,ordersNeeded:aov?target*fertShare/aov:null,rOrders,
+  return {target,months,weeks,start,end,hasOrderNo,areas,share,fertShare,shipShare,hist,best,bestKg,bestRecent,avg,avgN:fullRecent.length,ordersPerMonth,recentFullLabel:recentFull.length?`${recentFull[0].label}–${recentFull[recentFull.length-1].label}`:"",aov,ordersNeeded:aov?target*fertShare/aov:null,rOrders,
     recentLabel:`${MON[recent[0]%12]}–${MON[last%12]}`,lastDate,inf,priceMoves,unpriced,otherShare:fertGmv?otherGmv/fertGmv:0,priceLabel:P.label};
 }
 

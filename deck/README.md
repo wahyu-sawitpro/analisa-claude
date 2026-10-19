@@ -103,6 +103,17 @@ are internal team. Organic −95 explains 92%
 of the drop ("organic" campaign 111 → 47); GADN +10 and App-Register-Campaign-DG +36 grew. 28% of farmers have no phone.
 
 ## Stock forecast (sales history + price list)
+The plan runs from the day after the last sale to **Plan until** (default 31 Dec of that year; a date field next to the
+monthly target changes it). Part months are pro rata by day, and the plan is broken down by week (Monday to Sunday):
+weekly stock plan (target, MT, bags, largest SKUs), weekly plan by SKU (MT per week), stock by area per week, and the
+plan by month and area. Exports without order numbers count each line as one order line; without a shipping column
+the footer says "Sales amount".
+
+Findings for `smallholder sales ytd.csv` + `list pricing.csv` (sample, data to 18 Oct 2026, target Rp4B a month): 1,551 MT
+from 19 Oct to 31 Dec, about 147 MT a week (269 MT 19–31 Oct, 641 MT Nov, 641 MT Dec); Riau 83%, Sumatera Utara 10%,
+Sumatera Selatan (incl. Jambi) 7%; KCL Canada Cap Mahkota 483 MT, RP Mahkota Egypt 214 MT, RP Sasco Egypt 116 MT. The
+best month in this file is Rp755M (Sep), so the file looks like part of total sales (the business best is about Rp2.2B).
+
 Upload a sales history (e.g. `history sales Jan - Oct 2026 per 14 Oct.csv`) together with a price list (e.g.
 `Price per 14 Oct 2026.csv`, detected as **Price list**; a title row above the headers is skipped). A **Monthly target
 (Rp)** field appears in the data sources bar (Rp4B by default). With a price list the deck is a forecast deck: cover,
@@ -148,7 +159,7 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: `CRM DO smallholder status.csv` (lead, owner and DO names and phone numbers replaced by tokens). Earlier sample: `farmer akusisi.csv` (registrations 24 Aug – 14 Oct 2026, the acquisition sample), with farmer names and all phone numbers replaced by anonymous tokens (Duta user names are kept: they appear on the Duta slide)
+- `src/sample-data.json`: `smallholder sales ytd.csv` and `list pricing.csv` (no customer names or phones in either). Earlier samples: `CRM DO smallholder status.csv` (lead, owner and DO names and phone numbers replaced by tokens). Earlier sample: `farmer akusisi.csv` (registrations 24 Aug – 14 Oct 2026, the acquisition sample), with farmer names and all phone numbers replaced by anonymous tokens (Duta user names are kept: they appear on the Duta slide)
 - `output/Farmer Acquisition 5-11 Oct 2026.pptx`: the acquisition deck from the sample
 - `output/`: the Jul–Sep PPTX, `audit.csv` (each number re-derived from the CSVs) and `DECISIONS.md`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
