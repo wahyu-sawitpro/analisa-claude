@@ -1,0 +1,21 @@
+sale_order_date,item,product_category,pic_names,customer_ref,invoice_status,sale_order_status,sales,Aging
+3/10/2026,NPK DGW 13-8-27-4 TE 50kg,Khusus Petani,Rudi Nirwana,#B2C25745,PARTIAL_PAID,NEW,"37,553,160",16
+2/10/2026,Urea Nitrea 46% N 50kg,Khusus Petani,Simon Sutrado Simanjuntak,#B2C25720,PAID,NEW,"47,741,256",17
+2/10/2026,RP Mahkota 50kg - Peru,Pupuk,Simon Sutrado Simanjuntak,#B2C25720,PAID,NEW,"25,874,744",17
+1/10/2026,NPK DGW 13-8-27-4 TE 50kg,Pupuk Grosir,Rudi Nirwana,#B2C25671,PARTIAL_PAID,NEW,"110,140,000",18
+29/9/2026,RP Mahkota 50kg - Egypt,Khusus Petani,Rudi Nirwana,#B2C25563,PAID,NEW,"7,947,417",20
+29/9/2026,ZA Cap Daun 50kg,Khusus Petani,Rudi Nirwana,#B2C25563,PAID,NEW,"10,331,103",20
+29/9/2026,RP Mahkota 50kg - Egypt,Khusus Petani,Muhammad Abdul Wahab,#B2C25587,PAID,NEW,"18,056,391",20
+29/9/2026,Borate Dunia Subur 25kg,Toko Keliling,Muhammad Abdul Wahab,#B2C25587,PAID,NEW,"23,094,969",20
+24/9/2026,NPK Mahkota 13-6-27-4 0.65 B 50kg,Khusus Petani,Deby Zea Efendi,#B2C25386,PARTIAL_PAID,NEW,"10,142,919",25
+24/9/2026,MOP/KCL Canada Cap Mahkota 50kg,Khusus Petani,Deby Zea Efendi,#B2C25386,PARTIAL_PAID,NEW,"17,082,811",25
+24/9/2026,MOP/KCL Mentari 50kg,Khusus Petani,Deby Zea Efendi,#B2C25386,PARTIAL_PAID,NEW,"8,327,870",25
+24/9/2026,MOP/KCL Canada Cap Mahkota 50kg,Khusus Petani,Deby Zea Efendi,#B2C25387,PARTIAL_PAID,NEW,"9,039,951",25
+24/9/2026,RP Sasco 50kg - Egypt,Khusus Petani,Deby Zea Efendi,#B2C25387,PARTIAL_PAID,NEW,"2,485,987",25
+24/9/2026,RP Mahkota 50kg - Egypt,Khusus Petani,Deby Zea Efendi,#B2C25387,PARTIAL_PAID,NEW,"7,152,861",25
+24/9/2026,ZA Cap Daun 50kg,Khusus Petani,Deby Zea Efendi,#B2C25387,PARTIAL_PAID,NEW,"7,231,961",25
+22/9/2026,MOP/KCL Mentari 50kg,Khusus Petani,Deby Zea Efendi,#B2C25295,PAID,NEW,"61,825,500",27
+22/9/2026,NPK Mahkota 13-6-27-4 0.65 B 50kg,Khusus Petani,Joko Prestiwo,#B2C25303,PARTIAL_PAID,NEW,"10,230,413",27
+22/9/2026,Urea Nitrea 46% N 50kg,Khusus Petani,Joko Prestiwo,#B2C25303,PARTIAL_PAID,NEW,"14,146,743",27
+22/9/2026,MOP/KCL Canada Cap Mahkota 50kg,Khusus Petani,Joko Prestiwo,#B2C25303,PARTIAL_PAID,NEW,"8,525,344",27
+18/9/2026,NPK Mahkota 13-8-27-4 0.5 B 50kg,Khusus Petani,Muhammad Abdul Wahab,#B2C25175,PAID,NEW,"10,986,000",31
