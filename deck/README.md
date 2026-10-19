@@ -109,10 +109,11 @@ weekly stock plan (target, MT, bags, largest SKUs), weekly plan by SKU (MT per w
 plan by month and area. Exports without order numbers count each line as one order line; without a shipping column
 the footer says "Sales amount".
 
-Findings for `smallholder sales ytd.csv` + `list pricing.csv` (sample, data to 18 Oct 2026, target Rp4B a month): 1,551 MT
-from 19 Oct to 31 Dec, about 147 MT a week (269 MT 19–31 Oct, 641 MT Nov, 641 MT Dec); Riau 83%, Sumatera Utara 10%,
-Sumatera Selatan (incl. Jambi) 7%; KCL Canada Cap Mahkota 483 MT, RP Mahkota Egypt 214 MT, RP Sasco Egypt 116 MT. The
-best month in this file is Rp755M (Sep), so the file looks like part of total sales (the business best is about Rp2.2B).
+Findings for `smallholder sales ytd.csv` (full export, all categories; only items sold by the kg are forecast) + `list pricing.csv`
+(sample, data to 18 Oct 2026, target Rp4B a month): 1,442 MT from 19 Oct to 31 Dec, about 136 MT a week (250 MT 19–31 Oct,
+596 MT Nov, 596 MT Dec); Riau 81%, Sumatera Utara 16%, Sumatera Selatan 3%. SKUs are ranked by number of orders (top 12 on
+the slide, all 26 in `output/forecast_weekly_by_sku_19Oct-31Dec.csv`): KCL Canada Cap Mahkota 178 orders, RP Mahkota Egypt 70,
+Urea Nitrea 44, KCL Sasco 40.
 
 Upload a sales history (e.g. `history sales Jan - Oct 2026 per 14 Oct.csv`) together with a price list (e.g.
 `Price per 14 Oct 2026.csv`, detected as **Price list**; a title row above the headers is skipped). A **Monthly target
