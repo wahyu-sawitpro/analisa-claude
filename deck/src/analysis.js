@@ -70,7 +70,7 @@ const detectCrm=h=>detectWith(CRM_FIELDS,h), detectSales=h=>detectWith(SALES_FIE
 // A farmer acquisition export: one row per registered farmer, with the registration week and Duta / non-Duta type.
 const ACQ_FIELDS=[["week",[/minggu_?register|register_?week|week_?register|^minggu$|^week$/]],["type",[/akuisisi_?type|acquisition_?type/]],["joined",[/join_?date_?farmer|register_?date|join_?date|tanggal_?daftar/]],
   ["source",[/^utm_?source$/]],["campaign",[/^utm_?source_?name$|utm_?campaign/]],["status",[/status_?under_?duta/]],["duta",[/^duta_?id$|^duta_?name$/]],["dutaName",[/^duta_?name$/]],
-  ["test",[/is_?test_?duta|is_?test/]],["role",[/user_?role|^role$/]],["farms",[/jumlah_?farm|farm_?count|num_?farms/]],["ha",[/total_?area_?hectare|area_?hectare|^hectare|luas/]],["prov",[/^province$|^provinsi$/]],["regency",[/^regency$|^kabupaten$/]],["farmHa",[/detail_?hectare|farm_?hectares?$/]],["farmLoc",[/^location$|farm_?location/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
+  ["test",[/is_?test_?duta|is_?test/]],["role",[/user_?role|^role$/]],["farms",[/jumlah_?farm|farm_?count|num_?farms/]],["ha",[/total_?area_?hectare|area_?hectare|^hectare|luas/]],["prov",[/^province$|^provinsi$/]],["regency",[/^regency$|^kabupaten$/]],["farmHa",[/detail_?hectare|farm_?hectares?$/]],["name",[/farmer_?name|^name$|user_?name/]],["email",[/farmer_?email|^e-?mail$/]],["farmLoc",[/^location$|farm_?location/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
 const detectAcq=h=>detectWith(ACQ_FIELDS,h);
 const isAcqList=headers=>{ const m=detectAcq(headers); return !!(m.type||m.week&&m.joined&&(m.id||m.duta)); };
 // A DO (FFB supplier) pipeline export from the CRM: one row per DO lead, with area, potential FFB and the nearest mill.
@@ -854,7 +854,7 @@ function acqProfile(r,m){ if(!m.role&&!m.ha&&!m.prov) return {};
   const fh=m.farmHa?String(r[m.farmHa]??"").replace(/[\[\]]/g,"").split(",").map(x=>parseFloat(x)).filter(x=>!isNaN(x)):[];
   const fl=m.farmLoc?[...String(r[m.farmLoc]??"").matchAll(/\[([^\[\]]+)\]/g)].map(x=>x[1].split(",").map(t=>t.trim())):[];
   const farmList=fh.map((h,i)=>({ha:Math.round(h*100)/100,district:fl[i]?.[0]||null,regency:fl[i]?.[1]||null,prov:fl[i]?.[2]||null}));
-  return {farmList,role:m.role?ROLE_OF(r[m.role]):null,roleRaw:clean(r[m.role]),ha:ha||0,farms:farms||0,hasFarm:(farms||0)>0||(ha||0)>0,prov:m.prov?firstOf(r[m.prov]):null,regency:m.regency?firstOf(r[m.regency]):null}; }
+  return {farmList,name:m.name?clean(r[m.name]):null,contact:(m.phone&&clean(r[m.phone]))||(m.email&&clean(r[m.email]))||null,role:m.role?ROLE_OF(r[m.role]):null,roleRaw:clean(r[m.role]),ha:ha||0,farms:farms||0,hasFarm:(farms||0)>0||(ha||0)>0,prov:m.prov?firstOf(r[m.prov]):null,regency:m.regency?firstOf(r[m.regency]):null}; }
 // Weekly registrations from the export: the last full week against the week before, split by Duta / non-Duta, channel and campaign.
 // A week that is still in progress (its data stops before the Sunday) is left out.
 function acquisition(sources){

@@ -563,15 +563,15 @@ function acqProfileSpecs(Q,pre){
   [[L,"last week"],...(P?[[P,"the week before"]]:[])].forEach(([w,lab],wi)=>{
     const us=[...w.big].sort((a,b)=>b.ha-a.ha), rowsB=[];
     us.forEach(r=>{ const fs=r.farmList.length?r.farmList:[{ha:r.ha,district:null,regency:r.regency,prov:r.prov}];
-      fs.forEach((f,k)=>rowsB.push(k?["","","",{v:fs.length>1?`Farm ${k+1}`:"",color:CMUTE},{v:`${haF(f.ha)}${flag(f,r)?" *":""}`},f.district||"–",f.regency||"–",f.prov||"–"]
-        :[{v:String(r.id||"").slice(0,8),bold:true},r.role||"–",{v:`${haF(r.ha)}`,bold:true},fs.length>1?`Farm 1 of ${fs.length}`:"1 farm",{v:`${haF(f.ha)}${flag(f,r)?" *":""}`},f.district||"–",f.regency||"–",f.prov||"–"])); });
+      fs.forEach((f,k)=>rowsB.push(k?["","","","",{v:fs.length>1?`Farm ${k+1}`:"",color:CMUTE},{v:`${haF(f.ha)}${flag(f,r)?" *":""}`},f.district||"–",f.regency||"–",f.prov||"–"]
+        :[{v:r.name||"–",bold:true},r.contact||"–",r.role||"–",{v:`${haF(r.ha)}`,bold:true},fs.length>1?`Farm 1 of ${fs.length}`:"1 farm",{v:`${haF(f.ha)}${flag(f,r)?" *":""}`},f.district||"–",f.regency||"–",f.prov||"–"])); });
     const odd=us.filter(userOdd), multi=us.filter(r=>r.farmList.length>1);
     const chunks=[]; for(let k=0;k<rowsB.length;k+=12) chunks.push(rowsB.slice(k,k+12));
     (chunks.length?chunks:[[]]).forEach((ch,ci)=>S.push({kicker:pre+`Registrations · users above 100 ha, ${lab}${chunks.length>1?` (${ci+1}/${chunks.length})`:""}`,
       title:wi===0?`${us.length} users above 100 ha last week${P?`, ${sg(us.length-P.big.length)} on the week before (${P.big.length})`:""}; ${odd.length} with a farm that looks mistyped`
         :`${us.length} users above 100 ha the week before (${w.label}); ${odd.length} with a farm that looks mistyped`,
-      rows:[{cards:[{table:{colW:[10,10,10,11,11,15,16,17],head:["User ID","Role","Total ha","Farms","Farm ha","District","Regency","Province"],align:["l","l","r","l","r","l","l","l"],rows:ch.length?ch:[["No users above 100 ha","","","","","","",""]]}}]}],
-      notes:ci?[]:[`<b>${us.length} users, ${haF(us.reduce((t,r)=>t+r.ha,0))} ha${multi.length?`; ${multi.length} with several farms, one row per farm`:""}.</b> * Likely mistyped (5,000 ha or more, or far bigger than the user's other farms): check before following up. ID = first 8 characters; no names or phones.`]})); });
+      rows:[{cards:[{table:{colW:[19,13,7,8,9,8,12,12,12],head:["Name","Contact","Role","Total ha","Farms","Farm ha","District","Regency","Province"],align:["l","l","l","r","l","r","l","l","l"],rows:ch.length?ch:[["No users above 100 ha","","","","","","","",""]]}}]}],
+      notes:ci?[]:[`<b>${us.length} users, ${haF(us.reduce((t,r)=>t+r.ha,0))} ha${multi.length?`; ${multi.length} with several farms, one row per farm`:""}.</b> * Likely mistyped (5,000 ha or more, or far bigger than the user's other farms): check before following up. Contact = phone number, or email when there is no phone.`]})); });
   return S;
 }
 function acqNarrative(T){

@@ -90,8 +90,8 @@ distance to mill, current buyer, detail and closing date are empty.
 When the export also has `user_role`, `jumlah_farm`, `total_area_hectare`, `province` and `regency` (e.g. `Farmer register for
 weekly farmer.csv`) three slides are added: farmers vs estate owners (estate owner = the ESTATE_OWNER role; every other role, farmer & agent
 included, is a farmer; who added a farm; median farm size), where users are (province and regency of the first farm), and users
-above 100 ha (one slide per week, by user ID only, one row per farm from `detail_hectare` and `location`; a farm of
-5,000 ha or more, or far bigger than the user's other farms, is flagged as likely mistyped). Farm names are not shown. All
+above 100 ha (one slide per week, with each user's name and contact: phone, else email; one row per farm from `detail_hectare` and `location`; a farm of
+5,000 ha or more, or far bigger than the user's other farms, is flagged as likely mistyped). Farm names are not shown. In the committed sample, names, phones and emails are hashed. All
 wording follows the direction of the change (rise or drop).
 
 Findings for 12–18 Oct 2026 (sample): 600 farmers, +223 (+59%) on 5–11 Oct, the highest week in the file; 0 under a Duta
