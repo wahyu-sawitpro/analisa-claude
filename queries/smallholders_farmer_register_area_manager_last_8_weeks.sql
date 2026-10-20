@@ -1,31 +1,26 @@
 -- =====================================================================
--- (2) LIST per farmer dari summary
--- (smallholders_farmer_register_area_manager_summary_last_8_weeks.sql).
--- CTE sama persis, jadi jumlah baris per minggu_register = akuisisi_farmer.
--- Definisi (mengikuti 2 query panduan):
---   * Akuisisi farmer  = datamart_user REGISTERED, is_active, role FARMER
---                        (sama dengan query target akuisisi farmer)
---   * Under duta       = leads TERBARU farmer di ambassador_leads
---                        berstatus SALE / LEADS (sama dengan query track
---                        akuisisi farmer by duta)
---   * Area manager     = CASE area_manager dari query track by duta
---   * Periode          = Senin 7 minggu lalu s/d hari ini (8 minggu,
---                        Asia/Jakarta), berdasar tanggal register farmer
---   * Akun test TIDAK dibuang (versi sebelumnya membuang, ini salah satu
---     penyebab farmer hilang); ditandai lewat is_test_duta / kolom test.
+-- (2) LIST akuisisi farmer 8 minggu terakhir: under duta vs non duta,
+-- + UTM (datamart_user & event app) + data kebun (dim_farm).
+--   * Akuisisi farmer = datamart_user REGISTERED, is_active,
+--                       role FARMER atau ESTATE
+--   * Under duta      = leads TERBARU di ambassador_leads berstatus
+--                       SALE / LEADS
+--   * Kebun           = 1 farmer bisa punya banyak farm: luas di-SUM,
+--                       province / regency / district dijadikan array
 -- =====================================================================
 WITH
     toMonday(toDate(now('Asia/Jakarta'))) - INTERVAL 7 WEEK AS period_start,
     toDate(now('Asia/Jakarta')) + 1                         AS period_end,
 
     -- Akuisisi farmer: definisi sama dengan query target akuisisi
-    -- (datamart_user REGISTERED + is_active + role FARMER)
+    -- (datamart_user REGISTERED + is_active + role FARMER / ESTATE)
     farmers AS (
         SELECT id, name, phone_no, created_at_utc7, referral_utm, utm_source, user_role
         FROM sawitpro_datamart.datamart_user
         WHERE status = 'REGISTERED'
+          AND id NOT IN ('df27bf4c-2314-4e91-a8b3-11b5ca86f3f7')
           AND is_active = TRUE
-          AND user_role ILIKE '%FARMER%'
+          AND (user_role ILIKE '%FARMER%' OR user_role ILIKE '%estate%')
           AND toDate(created_at_utc7) >= period_start
           AND toDate(created_at_utc7) <  period_end
         LIMIT 1 BY id
@@ -55,6 +50,33 @@ WITH
         GROUP BY user_id
     ),
 
+    -- Kebun per farmer: 1 baris per farm_id dulu (jaga-jaga dim_farm
+    -- dobel), lalu diringkas per owner supaya farmer tidak dobel.
+    data_farm AS (
+        SELECT
+            user_id,
+            count()                                     AS jumlah_farm,
+            sum(ifNull(area_hectare, 0))                AS total_area_hectare,
+            min(farm_created_at_utc7)                   AS first_farm_created_at,
+            groupUniqArrayIf(province, ifNull(province, '') != '') AS province,
+            groupUniqArrayIf(regency,  ifNull(regency, '')  != '') AS regency,
+            groupUniqArrayIf(district, ifNull(district, '') != '') AS district
+        FROM (
+            SELECT
+                owner_id AS user_id,
+                farm_id,
+                area_hectare,
+                farm_created_at_utc7,
+                province,
+                regency,
+                district
+            FROM sawitpro_datamart.dim_farm
+            WHERE owner_id IN (SELECT id FROM farmers)
+            LIMIT 1 BY farm_id
+        )
+        GROUP BY user_id
+    ),
+
     unique_kyc AS (
         SELECT user_id, updated_by,
                toDateTime(toInt64(created_at_utc0) / 1000) + INTERVAL 7 HOUR AS join_date_duta
@@ -75,6 +97,12 @@ WITH
             ev.utm_source_name           AS utm_source_name,
             ev.stslc_utm_campaign        AS stslc_utm_campaign,
             ev.stslc_utm_source_platform AS stslc_utm_source_platform,
+            df.jumlah_farm               AS jumlah_farm,
+            df.total_area_hectare        AS total_area_hectare,
+            df.first_farm_created_at     AS first_farm_created_at,
+            df.province                  AS province,
+            df.regency                   AS regency,
+            df.district                  AS district,
             toMonday(f.created_at_utc7)  AS join_week_farmer,
             ifNull(al.status, '')        AS status_under_duta,
             status_under_duta IN ('SALE', 'LEADS') AS under_duta,
@@ -95,6 +123,7 @@ WITH
         FROM farmers AS f
         LEFT JOIN latest_leads AS al     ON al.leads_user_id = f.id
         LEFT JOIN event_utm    AS ev     ON ev.user_id       = f.id
+        LEFT JOIN data_farm    AS df     ON df.user_id       = f.id
         LEFT JOIN default.user AS u_duta ON u_duta.id        = al.ambassador_user_id
         LEFT JOIN unique_kyc   AS ak     ON ak.user_id       = al.ambassador_user_id
         LEFT JOIN default.user AS u_am   ON u_am.id          = ak.updated_by
@@ -113,6 +142,12 @@ SELECT DISTINCT
     nullIf(utm_source_name, '')           AS utm_source_name,
     nullIf(stslc_utm_campaign, '')        AS stslc_utm_campaign,
     nullIf(stslc_utm_source_platform, '') AS stslc_utm_source_platform,
+    jumlah_farm,
+    total_area_hectare,
+    first_farm_created_at,
+    province,
+    regency,
+    district,
     nullIf(status_under_duta, '')   AS status_under_duta,
     if(under_duta, duta_id, NULL)   AS duta_id,
     if(under_duta, duta_name, NULL) AS duta_name,
