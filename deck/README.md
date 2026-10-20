@@ -88,13 +88,14 @@ distance to mill, current buyer, detail and closing date are empty.
 
 ## Farmer acquisition (Duta vs non-Duta)
 When the export also has `user_role`, `jumlah_farm`, `total_area_hectare`, `province` and `regency` (e.g. `Farmer register for
-weekly farmer.csv`) three slides are added: farmers vs estate owners (estate owner = any role with OWNER; farmer & agent
-shown apart; who added a farm; median farm size), where users are (province and regency of the first farm), and users
-above 100 ha (last week and the week before, by user ID only; 5,000 ha or more flagged as a likely entry error). All
+weekly farmer.csv`) three slides are added: farmers vs estate owners (estate owner = the ESTATE_OWNER role; every other role, farmer & agent
+included, is a farmer; who added a farm; median farm size), where users are (province and regency of the first farm), and users
+above 100 ha (one slide per week, by user ID only, one row per farm from `detail_hectare` and `location`; a farm of
+5,000 ha or more, or far bigger than the user's other farms, is flagged as likely mistyped). Farm names are not shown. All
 wording follows the direction of the change (rise or drop).
 
 Findings for 12–18 Oct 2026 (sample): 600 farmers, +223 (+59%) on 5–11 Oct, the highest week in the file; 0 under a Duta
-(4 the week before); 0 estate owners, farmer & agent 28 → 124; 34% added a farm (205), median 2 ha; Riau 53, Kalimantan
+(4 the week before); 0 estate owners; 34% added a farm (205), median 2 ha; Riau 53, Kalimantan
 13 → 64; 11 users above 100 ha (4 the week before), 2 report 5,000 ha or more; Organic +203 (direct 48 → 153, organic
 46 → 126) explains 91% of the rise; 184 registrations on Wed 14 Oct.
 
