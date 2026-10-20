@@ -531,7 +531,7 @@ function acqSpecs(Q,pre){
 }
 // Who registered: farmers vs estate owners, whether they added a farm, where they are, and users above 100 ha.
 const ROLES=["Farmer","Estate owner"], ROLE_C={"Farmer":CAT[0],"Estate owner":CAT[3]};
-// a farm that looks mistyped: 5,000 ha or more, or far bigger than the same user's other farms
+// a farm far out of line: 5,000 ha or more, or far bigger than the same user's other farms (counted, not labelled)
 const farmFlag=(f,r)=>f.ha>=5000||((r.farmList||[]).length>1&&f.ha>=100&&f.ha>20*median(r.farmList.map(x=>x.ha)));
 const userOdd=r=>r.ha>=5000||(r.farmList||[]).some(f=>farmFlag(f,r));
 const haF=v=>v>=100?nf.format(Math.round(v)):(Math.round(v*10)/10).toLocaleString("en-US");
@@ -563,15 +563,15 @@ function acqProfileSpecs(Q,pre){
   [[L,"last week"],...(P?[[P,"the week before"]]:[])].forEach(([w,lab],wi)=>{
     const us=[...w.big].sort((a,b)=>b.ha-a.ha), rowsB=[];
     us.forEach(r=>{ const fs=r.farmList.length?r.farmList:[{ha:r.ha,district:null,regency:r.regency,prov:r.prov}];
-      fs.forEach((f,k)=>rowsB.push(k?["","","","",{v:fs.length>1?`Farm ${k+1}`:"",color:CMUTE},{v:`${haF(f.ha)}${flag(f,r)?" *":""}`},f.district||"–",f.regency||"–",f.prov||"–"]
-        :[{v:r.name||"–",bold:true},r.contact||"–",r.role||"–",{v:`${haF(r.ha)}`,bold:true},fs.length>1?`Farm 1 of ${fs.length}`:"1 farm",{v:`${haF(f.ha)}${flag(f,r)?" *":""}`},f.district||"–",f.regency||"–",f.prov||"–"])); });
+      fs.forEach((f,k)=>rowsB.push(k?["","","","",{v:fs.length>1?`Farm ${k+1}`:"",color:CMUTE},{v:haF(f.ha)},f.district||"–",f.regency||"–",f.prov||"–"]
+        :[{v:r.name||"–",bold:true},r.contact||"–",r.role||"–",{v:`${haF(r.ha)}`,bold:true},fs.length>1?`Farm 1 of ${fs.length}`:"1 farm",{v:haF(f.ha)},f.district||"–",f.regency||"–",f.prov||"–"])); });
     const odd=us.filter(userOdd), multi=us.filter(r=>r.farmList.length>1);
     const chunks=[]; for(let k=0;k<rowsB.length;k+=12) chunks.push(rowsB.slice(k,k+12));
     (chunks.length?chunks:[[]]).forEach((ch,ci)=>S.push({kicker:pre+`Registrations · users above 100 ha, ${lab}${chunks.length>1?` (${ci+1}/${chunks.length})`:""}`,
-      title:wi===0?`${us.length} users above 100 ha last week${P?`, ${sg(us.length-P.big.length)} on the week before (${P.big.length})`:""}; ${odd.length} with a farm that looks mistyped`
-        :`${us.length} users above 100 ha the week before (${w.label}); ${odd.length} with a farm that looks mistyped`,
+      title:wi===0?`${us.length} users above 100 ha last week${P?`, ${sg(us.length-P.big.length)} on the week before (${P.big.length})`:""}`
+        :`${us.length} users above 100 ha the week before (${w.label})`,
       rows:[{cards:[{table:{colW:[19,13,7,8,9,8,12,12,12],head:["Name","Contact","Role","Total ha","Farms","Farm ha","District","Regency","Province"],align:["l","l","l","r","l","r","l","l","l"],rows:ch.length?ch:[["No users above 100 ha","","","","","","","",""]]}}]}],
-      notes:ci?[]:[`<b>${us.length} users, ${haF(us.reduce((t,r)=>t+r.ha,0))} ha${multi.length?`; ${multi.length} with several farms, one row per farm`:""}.</b> * Likely mistyped (5,000 ha or more, or far bigger than the user's other farms): check before following up. Contact = phone number, or email when there is no phone.`]})); });
+      notes:ci?[]:[`<b>${us.length} users, ${haF(us.reduce((t,r)=>t+r.ha,0))} ha${multi.length?`; ${multi.length} with several farms, one row per farm`:""}.</b> Contact = phone number, or email when there is no phone.`,`<b>Note:</b> hectares are the area each user entered in the app; they have not yet been validated and need to be confirmed with the user.`]})); });
   return S;
 }
 function acqNarrative(T){
@@ -593,7 +593,7 @@ function acqNarrative(T){
     mv&&[`${mv.k} drove the ${rise?"rise":"drop"}`,`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)} (${sg(mv.d)}), ${pct(Math.abs(mv.d),Math.max(1,Math.abs(d)))}% of the ${nf.format(Math.abs(d))} ${rise?"more":"fewer"} farmers.${mvC?` “${mvC.k}” ${nf.format(mvC.p)} → ${nf.format(mvC.l)}${mvC2?`, “${mvC2.k}” ${nf.format(mvC2.p)} → ${nf.format(mvC2.l)}`:""}.`:""}`],
     P&&[L.under?`Dutas brought ${L.under}`:`No farmer came through a Duta`,`${nf.format(P.under)} → ${nf.format(L.under)} under a Duta (${(L.under/L.total*100).toFixed(1)}% of all). ${act.length} of ${D.length} Dutas registered a farmer last week${lead?`; ${lead.k} leads with ${lead.tot} in ${Q.weeks.length} weeks`:""}. ${intD.length} of the ${D.length} are internal team.`],
     Q.profile&&[`All farmers, ${own} estate owner${own===1?"":"s"}`,`${nf.format(L.total-own)} farmers${P?` (${nf.format(P.total-(P.roles?.get("Estate owner")||0))} the week before)`:""}; every role other than estate owner counts as a farmer. ${pct(L.withFarm,L.total)}% added a farm (median ${L.haMed!=null?haF(L.haMed):"–"} ha); ${nf.format(L.total-L.withFarm)} have no farm or location yet.`],
-    Q.profile&&[`${L.big.length} users above 100 ha; Kalimantan grows`.replace("; Kalimantan grows",kal(L.prov)>kal(P?.prov)?"; Kalimantan grows":""),`${P?`${P.big.length} the week before (${sg(L.big.length-P.big.length)}). `:""}${provs.slice(0,2).map(([k,v])=>`${k} ${v}`).join(", ")} lead on location${kal(L.prov)?`; Kalimantan ${kal(P?.prov)} → ${kal(L.prov)}`:""}. ${odd?`${odd} of the ${L.big.length} big users have a farm that looks mistyped: check the entry before following up.`:""}`],
+    Q.profile&&[`${L.big.length} users above 100 ha; Kalimantan grows`.replace("; Kalimantan grows",kal(L.prov)>kal(P?.prov)?"; Kalimantan grows":""),`${P?`${P.big.length} the week before (${sg(L.big.length-P.big.length)}). `:""}${provs.slice(0,2).map(([k,v])=>`${k} ${v}`).join(", ")} lead on location${kal(L.prov)?`; Kalimantan ${kal(P?.prov)} → ${kal(L.prov)}`:""}. Hectares are as entered by users, not yet validated.`],
     !Q.profile&&!rise&&ups.length&&[`Paid channels held up`,`${ups.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}; “${gainC.k}” added ${sg(gainC.d)} farmers.`],
     !Q.profile&&P&&[rise?`Last week is a new high`:`The week before was a peak`,`${nf.format(L.total)} farmers last week; ${Q.avg?`${spc(L.total,Q.avg)} on the ${Q.avgN}-week average of ${nf.format(Math.round(Q.avg))}`:""}, ${spc(L.total,Q.weeks[0].total)} on the week of ${Q.weeks[0].short}.`]].filter(Boolean).slice(0,4);
   X.bottom={p:rise?`${mv?mv.k:"Non-Duta"} carried the week: find what drove it and repeat it. Then get new users to add a farm, and get every Duta registering farmers each week.`:`Non-Duta channels bring ${pct(L.non,L.total)}% of farmers. Win back ${mv?mv.k.toLowerCase():"organic"} registrations, and get every Duta registering farmers each week.`,
@@ -602,7 +602,7 @@ function acqNarrative(T){
   X.actions=[
     mv&&(rise?{t:`Find out what drove ${mv.k} ${sg(mv.d)} and repeat it`,d:`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)}${mvC?`, mostly “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)})`:""}. Check what happened that week (a broadcast, a post, an app release, a field event) and plan it again.`,o:"",w:""}
       :{t:`Find out why ${mv.k} fell ${sg(mv.d)}`,d:`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)}${mvC?`, mostly “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)})`:""}. Check what drove the ${P?P.short:""} peak (a broadcast, a post, an app release) and repeat it.`,o:"",w:""}),
-    Q.profile&&L.big.length&&{t:`Verify and call the ${L.big.length} users above 100 ha`,d:`They declared ${haF(L.big.reduce((t,r)=>t+r.ha,0))} ha between them${odd?`; ${odd} have a farm that looks mistyped (5,000 ha or more)`:""}. Confirm the area, then hand real estates to the plantation team.`,o:"",w:""},
+    Q.profile&&L.big.length&&{t:`Verify and call the ${L.big.length} users above 100 ha`,d:`They declared ${haF(L.big.reduce((t,r)=>t+r.ha,0))} ha between them; the area is as entered by the user and not yet validated. Confirm it on the call, then hand real estates to the plantation team.`,o:"",w:""},
     Q.profile&&{t:`Get ${nf.format(L.total-L.withFarm)} new users to add a farm`,d:`${pct(L.total-L.withFarm,L.total)}% of last week's users have no farm, so location and hectares are unknown. Prompt them in the app and on the first call.`,o:"",w:""},
     {t:"Set a weekly farmer target per Duta",d:`Dutas brought ${nf.format(L.under)} farmers last week${P?` (${nf.format(P.under)} the week before)`:""}. ${idle.length?`${idle.map(x=>x.k).join(", ")} registered none last week.`:""} Agree a weekly number per Duta and track it in this deck.`,o:"",w:""},
     !Q.profile&&{t:"Grow the external Duta network",d:`${intD.length} of the ${D.length} Dutas with farmers are internal team; external Dutas brought ${extAll} farmer${extAll===1?"":"s"} in ${Q.weeks.length} weeks. Recruit and activate external Dutas in the main areas.`,o:"",w:""},
