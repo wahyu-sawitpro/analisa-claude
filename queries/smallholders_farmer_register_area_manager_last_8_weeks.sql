@@ -26,7 +26,6 @@ WITH
         WHERE status = 'REGISTERED'
           AND is_active = TRUE
           AND user_role ILIKE '%FARMER%'
-          AND user_role ILIKE '%estate%'
           AND toDate(created_at_utc7) >= period_start
           AND toDate(created_at_utc7) <  period_end
         LIMIT 1 BY id
