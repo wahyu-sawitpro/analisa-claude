@@ -65,11 +65,11 @@ WITH
             arraySort(groupArray((
                 farm_created_at_utc7,
                 farm_id,
-                ifNull(farm_name, ''),
+                ifNull(fm_name, ''),
                 ifNull(area_hectare, 0),
-                ifNull(district, ''),
-                ifNull(regency, ''),
-                ifNull(province, '')
+                ifNull(fm_district, ''),
+                ifNull(fm_regency, ''),
+                ifNull(fm_province, '')
             )))                                          AS farms,
             arrayMap(x -> x.3, farms)                    AS farm_name,
             arrayMap(x -> x.4, farms)                    AS detail_hectare,
@@ -77,16 +77,18 @@ WITH
             arrayMap(x -> x.7, farms)                    AS province,
             arrayMap(x -> x.6, farms)                    AS regency,
             arrayMap(x -> x.5, farms)                    AS district
+        -- kolom sumber diberi prefix fm_ supaya tidak bentrok dengan alias
+        -- output (farm_name, province, ...) -> hindari error CYCLIC_ALIASES
         FROM (
             SELECT
                 owner_id AS user_id,
                 farm_id,
-                farm_name,
+                farm_name AS fm_name,
                 area_hectare,
                 farm_created_at_utc7,
-                province,
-                regency,
-                district
+                province  AS fm_province,
+                regency   AS fm_regency,
+                district  AS fm_district
             FROM sawitpro_datamart.dim_farm
             WHERE owner_id IN (SELECT id FROM farmers)
               -- nama kolom di dim_farm memang `f.is_active` (pakai titik),
