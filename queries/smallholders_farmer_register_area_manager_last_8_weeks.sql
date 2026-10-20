@@ -89,7 +89,9 @@ WITH
                 district
             FROM sawitpro_datamart.dim_farm
             WHERE owner_id IN (SELECT id FROM farmers)
-              AND is_active = TRUE
+              -- dim_farm tidak punya kolom is_active; status aktif farm
+              -- diambil dari tabel sumber default.farm
+              AND farm_id IN (SELECT id FROM default.farm WHERE is_active = TRUE)
             LIMIT 1 BY farm_id
         )
         GROUP BY user_id
