@@ -8,7 +8,9 @@ def img(m):
     f = root / "assets" / m.group(1)
     return f"data:{mime[f.suffix]};base64," + base64.b64encode(f.read_bytes()).decode()
 html = re.sub(r"\{\{IMG:([\w.-]+)\}\}", img, html)
-sample = json.loads((root / "src/sample-data.json").read_text())
+# SAMPLE=<path> builds with another dataset (e.g. the real export for the private published deck; never committed)
+import os
+sample = json.loads(pathlib.Path(os.environ.get("SAMPLE") or root / "src/sample-data.json").read_text())
 html = html.replace("/*SAMPLE_DATA*/null", json.dumps(sample, ensure_ascii=False))
-(root / "index.html").write_text(html)
-print("wrote", root / "index.html", f"{len(html)/1e6:.2f} MB")
+out = pathlib.Path(os.environ.get("OUT") or root / "index.html"); out.write_text(html)
+print("wrote", out, f"{len(html)/1e6:.2f} MB")

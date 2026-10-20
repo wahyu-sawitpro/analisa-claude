@@ -90,7 +90,7 @@ distance to mill, current buyer, detail and closing date are empty.
 When the export also has `user_role`, `jumlah_farm`, `total_area_hectare`, `province` and `regency` (e.g. `Farmer register for
 weekly farmer.csv`) three slides are added: farmers vs estate owners (estate owner = the ESTATE_OWNER role; every other role, farmer & agent
 included, is a farmer; who added a farm; median farm size), where users are (province and regency of the first farm), and users
-above 100 ha (one slide per week, with each user's name and contact: phone, else email; one row per farm from `detail_hectare` and `location`, with a note that
+above 100 ha (one slide per week, with each user's name and contact: phone, else email; one row per farm with its farm name from `detail_hectare` and `location`, with a note that
 hectares are as entered by the user and not yet validated). Farm names are not shown. In the committed sample, names, phones and emails are hashed. All
 wording follows the direction of the change (rise or drop).
 
@@ -174,7 +174,8 @@ Months the data covers in full form the trend; a partial month is left out. The 
   `src/export-pptx.js`: PPTX builder and Google Drive upload
 - `src/sample-data.json`: `Farmer register for weekly farmer.csv` (farmer names and phones hashed; Duta user names kept). Earlier samples: `smallholder sales ytd.csv` + `list pricing.csv` (forecast; customer names, phones and IDs hashed). Earlier samples: the six weekly exports for 12–18 Oct (sales and CRM, both teams, anonymised, on branch `claude/deck-slide-data-upload-c45lkx`), `CRM DO smallholder status.csv` and `farmer akusisi.csv` (names and phones replaced by tokens; Duta user names kept)
 - `output/`: built PPTX files for the forecast, acquisition, DO pipeline and Jul–Sep reviews, `audit.csv` and `DECISIONS.md`
-- `build.py`: run `python3 deck/build.py` to regenerate `index.html`
+- `build.py`: run `python3 deck/build.py` to regenerate `index.html`. `SAMPLE=<json> OUT=<file>` builds with another dataset;
+  the private published deck is built from the real export this way, and that build is not committed
 
 ## Reading the CRM honestly
 - **What a “win” is.** Rows marked as ordered are split into leads that were worked, sales logged at checkout (mobile
