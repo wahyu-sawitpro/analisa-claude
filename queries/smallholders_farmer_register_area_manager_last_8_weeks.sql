@@ -21,11 +21,12 @@ WITH
     -- Akuisisi farmer: definisi sama dengan query target akuisisi
     -- (datamart_user REGISTERED + is_active + role FARMER)
     farmers AS (
-        SELECT id, name, phone_no, created_at_utc7, referral_utm, utm_source
+        SELECT id, name, phone_no, created_at_utc7, referral_utm, utm_source, user_role
         FROM sawitpro_datamart.datamart_user
         WHERE status = 'REGISTERED'
           AND is_active = TRUE
           AND user_role ILIKE '%FARMER%'
+          AND user_role ILIKE '%estate%'
           AND toDate(created_at_utc7) >= period_start
           AND toDate(created_at_utc7) <  period_end
         LIMIT 1 BY id
@@ -82,6 +83,7 @@ WITH
             u_duta.name                  AS duta_name,
             u_duta.phone_no              AS duta_phone,
             ak.join_date_duta            AS join_date_duta,
+            f.user_role                  AS user_role,
             -- sama dengan CASE area_manager di query track akuisisi by duta
             multiIf(
                 ifNull(u_am.name, '') = 'Fauzy Nurazhari Pane', 'Fauzy Nur Azhari Pane Test',
@@ -106,6 +108,7 @@ SELECT DISTINCT
     farmer_name,
     farmer_phone,
     join_date_farmer,
+    user_role,
     referral_utm,
     utm_source,
     nullIf(utm_source_name, '')           AS utm_source_name,
