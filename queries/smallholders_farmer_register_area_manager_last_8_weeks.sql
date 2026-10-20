@@ -89,9 +89,9 @@ WITH
                 district
             FROM sawitpro_datamart.dim_farm
             WHERE owner_id IN (SELECT id FROM farmers)
-              -- dim_farm tidak punya kolom is_active; status aktif farm
-              -- diambil dari tabel sumber default.farm
-              AND farm_id IN (SELECT id FROM default.farm WHERE is_active = TRUE)
+              -- nama kolom di dim_farm memang `f.is_active` (pakai titik),
+              -- jadi wajib dibungkus backtick supaya tidak dibaca alias.tabel
+              AND `f.is_active` = TRUE
             LIMIT 1 BY farm_id
         )
         GROUP BY user_id
