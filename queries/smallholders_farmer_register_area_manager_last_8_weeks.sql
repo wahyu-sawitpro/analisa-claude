@@ -1,12 +1,13 @@
 -- =====================================================================
 -- (2) LIST akuisisi farmer 8 minggu terakhir: under duta vs non duta,
--- + UTM (datamart_user & event app) + data kebun (dim_farm).
+-- + UTM (datamart_user & event app) + data kebun (dim_farm aktif).
 --   * Akuisisi farmer = datamart_user REGISTERED, is_active,
 --                       role FARMER atau ESTATE
 --   * Under duta      = leads TERBARU di ambassador_leads berstatus
 --                       SALE / LEADS
---   * Kebun           = 1 farmer bisa punya banyak farm: luas di-SUM,
---                       province / regency / district dijadikan array
+--   * Kebun           = 1 farmer bisa punya banyak farm: total luas di-SUM,
+--                       detail per farm (nama, hektar, lokasi) jadi array
+--                       yang urutannya sama (urut tanggal farm dibuat)
 -- =====================================================================
 WITH
     toMonday(toDate(now('Asia/Jakarta'))) - INTERVAL 7 WEEK AS period_start,
@@ -50,21 +51,37 @@ WITH
         GROUP BY user_id
     ),
 
-    -- Kebun per farmer: 1 baris per farm_id dulu (jaga-jaga dim_farm
-    -- dobel), lalu diringkas per owner supaya farmer tidak dobel.
+    -- Kebun per farmer (dim_farm, hanya farm aktif). 1 baris per farm_id
+    -- dulu (jaga-jaga dobel), lalu diringkas per owner. Semua detail farm
+    -- dikumpulkan ke SATU array tuple yang diurutkan berdasar tanggal farm
+    -- dibuat, lalu dipecah -> elemen ke-i di farm_name / detail_hectare /
+    -- location / province / regency / district = farm yang sama.
     data_farm AS (
         SELECT
             user_id,
             count()                                     AS jumlah_farm,
             sum(ifNull(area_hectare, 0))                AS total_area_hectare,
             min(farm_created_at_utc7)                   AS first_farm_created_at,
-            groupUniqArrayIf(province, ifNull(province, '') != '') AS province,
-            groupUniqArrayIf(regency,  ifNull(regency, '')  != '') AS regency,
-            groupUniqArrayIf(district, ifNull(district, '') != '') AS district
+            arraySort(groupArray((
+                farm_created_at_utc7,
+                farm_id,
+                ifNull(farm_name, ''),
+                ifNull(area_hectare, 0),
+                ifNull(district, ''),
+                ifNull(regency, ''),
+                ifNull(province, '')
+            )))                                          AS farms,
+            arrayMap(x -> x.3, farms)                    AS farm_name,
+            arrayMap(x -> x.4, farms)                    AS detail_hectare,
+            arrayMap(x -> [x.5, x.6, x.7], farms)        AS location,
+            arrayMap(x -> x.7, farms)                    AS province,
+            arrayMap(x -> x.6, farms)                    AS regency,
+            arrayMap(x -> x.5, farms)                    AS district
         FROM (
             SELECT
                 owner_id AS user_id,
                 farm_id,
+                farm_name,
                 area_hectare,
                 farm_created_at_utc7,
                 province,
@@ -72,6 +89,7 @@ WITH
                 district
             FROM sawitpro_datamart.dim_farm
             WHERE owner_id IN (SELECT id FROM farmers)
+              AND is_active = TRUE
             LIMIT 1 BY farm_id
         )
         GROUP BY user_id
@@ -103,6 +121,9 @@ WITH
             df.province                  AS province,
             df.regency                   AS regency,
             df.district                  AS district,
+            df.location                  AS location,
+            df.farm_name                 AS farm_name,
+            df.detail_hectare            AS detail_hectare,
             toMonday(f.created_at_utc7)  AS join_week_farmer,
             ifNull(al.status, '')        AS status_under_duta,
             status_under_duta IN ('SALE', 'LEADS') AS under_duta,
@@ -144,10 +165,13 @@ SELECT DISTINCT
     nullIf(stslc_utm_source_platform, '') AS stslc_utm_source_platform,
     jumlah_farm,
     total_area_hectare,
-    first_farm_created_at,
+    detail_hectare,
+    farm_name,
+    location,
     province,
     regency,
     district,
+    first_farm_created_at,
     nullIf(status_under_duta, '')   AS status_under_duta,
     if(under_duta, duta_id, NULL)   AS duta_id,
     if(under_duta, duta_name, NULL) AS duta_name,
