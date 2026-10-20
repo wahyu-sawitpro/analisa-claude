@@ -87,6 +87,17 @@ Gapoktan / Kelompok Tani via canvassing), 50 ha and 200 t potential FFB near PGS
 distance to mill, current buyer, detail and closing date are empty.
 
 ## Farmer acquisition (Duta vs non-Duta)
+When the export also has `user_role`, `jumlah_farm`, `total_area_hectare`, `province` and `regency` (e.g. `Farmer register for
+weekly farmer.csv`) three slides are added: farmers vs estate owners (estate owner = any role with OWNER; farmer & agent
+shown apart; who added a farm; median farm size), where users are (province and regency of the first farm), and users
+above 100 ha (last week and the week before, by user ID only; 5,000 ha or more flagged as a likely entry error). All
+wording follows the direction of the change (rise or drop).
+
+Findings for 12–18 Oct 2026 (sample): 600 farmers, +223 (+59%) on 5–11 Oct, the highest week in the file; 0 under a Duta
+(4 the week before); 0 estate owners, farmer & agent 28 → 124; 34% added a farm (205), median 2 ha; Riau 53, Kalimantan
+13 → 64; 11 users above 100 ha (4 the week before), 2 report 5,000 ha or more; Organic +203 (direct 48 → 153, organic
+46 → 126) explains 91% of the rise; 184 registrations on Wed 14 Oct.
+
 A file with `akuisisi_type` / `minggu_register` / `join_date_farmer` columns is read as **Acquisition** and sets the whole
 deck (other files are left out). Last week = the latest full registration week; a week still in progress (its data stops
 before the Sunday, e.g. the week of 12 Oct with data to 14 Oct) is left out and the slide says so. Slides:
@@ -160,7 +171,7 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: `smallholder sales ytd.csv` and `list pricing.csv` (the weekly forecast sample; no customer names or phones in either). Earlier samples: the six weekly exports for 12–18 Oct (sales and CRM, both teams, anonymised, on branch `claude/deck-slide-data-upload-c45lkx`), `CRM DO smallholder status.csv` and `farmer akusisi.csv` (names and phones replaced by tokens; Duta user names kept)
+- `src/sample-data.json`: `Farmer register for weekly farmer.csv` (farmer names and phones hashed; Duta user names kept). Earlier samples: `smallholder sales ytd.csv` + `list pricing.csv` (forecast; customer names, phones and IDs hashed). Earlier samples: the six weekly exports for 12–18 Oct (sales and CRM, both teams, anonymised, on branch `claude/deck-slide-data-upload-c45lkx`), `CRM DO smallholder status.csv` and `farmer akusisi.csv` (names and phones replaced by tokens; Duta user names kept)
 - `output/`: built PPTX files for the forecast, acquisition, DO pipeline and Jul–Sep reviews, `audit.csv` and `DECISIONS.md`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 

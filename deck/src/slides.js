@@ -480,26 +480,27 @@ function acqSpecs(Q,pre){
     [{v:"Total farmers",bold:true},P?{v:nf.format(P.total),bold:true}:"–",{v:nf.format(L.total),bold:true},P?{v:sg(d),bold:true}:"–",P?{v:spc(L.total,P.total),bold:true}:"–","100%"]];
   const rowsD=D.slice(0,12).map(x=>[{v:x.k,bold:!!x.l},x.internal?"Internal team":"External",P?(x.p?nf.format(x.p):"–"):"–",x.l?{v:nf.format(x.l),bold:true}:"–",nf.format(x.tot)]);
   S.push({kicker:pre+"Acquisition · Duta vs non-Duta",
-    title:P?`Dutas brought ${nf.format(L.under)} farmers last week (${sg(du)}), ${(L.under/L.total*100).toFixed(1)}% of ${nf.format(L.total)}; non-Duta ${nf.format(L.non)} (${sg(dn)})`:`Dutas brought ${nf.format(L.under)} of ${nf.format(L.total)} farmers in the week of ${L.label}`,
+    title:P?`${L.under?`Dutas brought ${nf.format(L.under)} farmers last week (${sg(du)}), ${(L.under/L.total*100).toFixed(1)}% of ${nf.format(L.total)}`:`No farmer came through a Duta last week (${P.under} the week before)`}; non-Duta ${nf.format(L.non)} (${sg(dn)})`:`Dutas brought ${nf.format(L.under)} of ${nf.format(L.total)} farmers in the week of ${L.label}`,
     rows:[
       {cards:[
         {w:1.1,title:"Duta vs non-Duta, last week vs the week before",sub:P?`${P.label} vs ${L.label}`:L.label,table:{colW:[30,13,13,12,11,13],head:["Farmers",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change","Change %","Share last week"],align:["l","r","r","r","r","r"],rows:rowsT}},
         {w:1,title:"Farmers by Duta",sub:`Last week first; ${W.length} weeks = ${W[0].short} – ${L.short}`,table:{colW:[32,24,15,15,14],head:["Duta","Type",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,`${W.length} weeks`],align:["l","l","r","r","r"],rows:rowsD}}]}],
     notes:[
-      `<b>Dutas:</b> ${L.under} farmers last week came through ${act.length} Duta${act.length===1?"":"s"} (${act.map(x=>`${x.k} ${x.l}`).join(", ")||"none"}), all ${L.real?"":"from "}${L.real?`${L.test} internal team, ${L.real} external`:"internal-team Dutas"}. ${intN} of the ${D.length} Dutas with farmers in ${W.length} weeks are internal team; external Dutas brought ${Q.weeks.reduce((s,x)=>s+x.real,0)}.`,
+      `<b>Dutas:</b> ${!L.under?`no farmer came through a Duta last week`:""}${L.under?`${L.under} farmers last week came through ${act.length} Duta${act.length===1?"":"s"} (${act.map(x=>`${x.k} ${x.l}`).join(", ")||"none"}), all ${L.real?"":"from "}${L.real?`${L.test} internal team, ${L.real} external`:"internal-team Dutas"}`:""}. ${intN} of the ${D.length} Dutas with farmers in ${W.length} weeks are internal team; external Dutas brought ${Q.weeks.reduce((s,x)=>s+x.real,0)}.`,
       Q.dropped&&`<b>Week left out:</b> the week of ${fds(new Date(Q.dropped.w))} (${nf.format(Q.dropped.n)} farmers to ${fds(Q.dropped.to)}) is still in progress, so last week is ${L.label}.`].filter(Boolean)});
+  if(Q.profile) S.push(...acqProfileSpecs(Q,pre));
   // 2. What moved the total
   if(P){ const steps=[{k:`Week before\n${P.short}`,v:P.total,total:true},...Q.dSrc.filter(x=>x.d).sort((a,b)=>a.d-b.d).map(x=>({k:x.k,v:x.d})),{k:`Last week\n${L.short}`,v:L.total,total:true,color:CAT[0]}];
     const cm=Q.camps.filter(x=>x.d), cItems=[...cm.slice(0,5),...cm.slice(-3).reverse()].filter((x,i,a)=>a.indexOf(x)===i).sort((a,b)=>a.d-b.d).map(x=>({k:x.k,v:x.d,tip:`${x.p} → ${x.l}`}));
-    const topC=Q.camps[0];
+    const rise=d>=0, mv=rise?ups[0]:top, mvC=rise?[...Q.camps].reverse().find(x=>x.d>0):Q.camps.find(x=>x.d<0), against=rise?drops:ups;
     S.push({kicker:pre+"Acquisition · what moved the total",
-      title:top?`${top.k} explains ${pct(-top.d,-d>0?-d:1)}% of the drop (${sg(top.d)}); ${ups.length?`${ups.map(x=>`${x.k} ${sg(x.d)}`).join(", ")} grew`:"no channel grew"}`:`Farmers ${sg(d)} on the week before`,
+      title:mv?`${mv.k} explains ${pct(Math.abs(mv.d),Math.max(1,Math.abs(d)))}% of the ${rise?"rise":"drop"} (${sg(mv.d)}); ${against.length?`${against.map(x=>`${x.k} ${sg(x.d)}`).join(", ")} ${rise?"fell":"grew"}`:`no channel ${rise?"fell":"grew"}`}`:`Farmers ${sg(d)} on the week before`,
       rows:[{cards:[
         {w:1,title:"From the week before to last week, by channel",sub:"Farmers registered, by acquisition channel",chart:{type:"waterfall",steps,lblH:36}},
         {w:1,title:"Largest moves by campaign, non-Duta",sub:"Change in farmers; hover for week before → last week",chart:{type:"diverge",items:cItems}}]}],
       notes:[
-        top&&`<b>${top.k} fell from ${nf.format(top.p)} to ${nf.format(top.l)}</b>${topC&&topC.d<0?`; inside it the largest single drop is “${topC.k}” (${nf.format(topC.p)} → ${nf.format(topC.l)}).`:"."}`,
-        ups.length&&`<b>Paid acquisition held up:</b> ${ups.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}${Q.camps.filter(x=>x.d>0).length?`; the largest campaign gain is “${Q.camps[Q.camps.length-1].k}” (${sg(Q.camps[Q.camps.length-1].d)}).`:"."}`].filter(Boolean)}); }
+        mv&&`<b>${mv.k} went from ${nf.format(mv.p)} to ${nf.format(mv.l)}</b>${mvC?`; the largest campaign ${rise?"gain":"drop"} is “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)}).`:"."}`,
+        against.length&&`<b>${rise?"Fell":"Grew"} against the trend:</b> ${against.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}.`].filter(Boolean)}); }
   // 3. Weekly trend and the days of the week
   const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   S.push({kicker:pre+`Acquisition · ${W.length}-week trend`,
@@ -509,7 +510,7 @@ function acqSpecs(Q,pre){
         series:Q.srcs.map((k,i)=>({name:k,color:srcC(k,i),values:W.map(x=>x.src.get(k)||0)})),lblH:24}},
       P&&{w:1,title:"Farmers per day, last week vs the week before",sub:"By join date",chart:{type:"line",cats:DAYS,show:"all",max:Math.ceil(Math.max(...P.days,...L.days)*1.15/10)*10,axisFmt:v=>nf.format(Math.round(v)),
         series:[{name:`Week before (${P.short})`,color:"#9AA592",values:P.days,show:[P.days.indexOf(Math.max(...P.days))]},{name:`Last week (${L.short})`,color:CAT[0],values:L.days}]}}].filter(Boolean)}],
-    notes:[P&&`<b>The week before had a mid-week spike:</b> ${Math.max(...P.days)} farmers on ${DAYS[P.days.indexOf(Math.max(...P.days))]}, against a high of ${Math.max(...L.days)} on any day last week. Last week's days were flatter (${Math.min(...L.days)}–${Math.max(...L.days)} a day).`,
+    notes:[P&&(Math.max(...L.days)>=Math.max(...P.days)?`<b>Last week had a spike:</b> ${Math.max(...L.days)} farmers on ${DAYS[L.days.indexOf(Math.max(...L.days))]}, against a high of ${Math.max(...P.days)} on any day the week before; the other days ran ${Math.min(...L.days)}–${[...L.days].sort((a,b)=>b-a)[1]} a day.`:`<b>The week before had a mid-week spike:</b> ${Math.max(...P.days)} farmers on ${DAYS[P.days.indexOf(Math.max(...P.days))]}, against a high of ${Math.max(...L.days)} on any day last week. Last week's days were flatter (${Math.min(...L.days)}–${Math.max(...L.days)} a day).`),
       `<b>Days:</b> the file's weeks run from Monday morning to the next Monday morning; registrations before the cut on the next Monday are counted as Monday, so each day is a full 24 hours.`].filter(Boolean)});
   // 4. Channel and campaign detail
   const base=Q.weeks.slice(Math.max(0,W.length-5),-1), av=k=>base.length?base.reduce((s,x)=>s+(x.src.get(k)||0),0)/base.length:0;
@@ -528,6 +529,44 @@ function acqSpecs(Q,pre){
     notes:[`<b>Phone numbers:</b> ${nf.format(ph)} of ${nf.format(L.total)} farmers last week (${pct(ph,L.total)}%)${pp!=null?` and ${nf.format(pp)} of ${nf.format(P.total)} the week before`:""} registered without a phone number, so sales and Dutas cannot follow them up.`]});
   return S;
 }
+// Who registered: farmers vs estate owners, whether they added a farm, where they are, and users above 100 ha.
+const ROLES=["Farmer","Farmer & agent","Estate owner"], ROLE_C={"Farmer":CAT[0],"Farmer & agent":CAT[1],"Estate owner":CAT[3]};
+const haF=v=>v>=100?nf.format(Math.round(v)):(Math.round(v*10)/10).toLocaleString("en-US");
+function acqProfileSpecs(Q,pre){
+  const S=[], L=Q.L, P=Q.P, W=Q.weeks, g=(w,k)=>w?w.roles.get(k)||0:0, row=(lab,l,p,bold,share)=>[bold?{v:lab,bold:true}:lab,P?nf.format(p):"–",bold?{v:nf.format(l),bold:true}:nf.format(l),P?sg(l-p):"–",P?spc(l,p):"–",share!=null?share:`${pct(l,L.total)}%`];
+  const own=g(L,"Estate owner"), ownP=g(P,"Estate owner"), ownAll=W.reduce((t,w)=>t+g(w,"Estate owner"),0);
+  const rows=[row("Farmers (all non-owner roles)",L.total-own,P?P.total-ownP:0,true),row("   Farmer only",g(L,"Farmer"),g(P,"Farmer")),row("   Farmer & agent",g(L,"Farmer & agent"),g(P,"Farmer & agent")),
+    row("Estate owners",own,ownP,true),row("Added a farm",L.withFarm,P?P.withFarm:0,true),row("   No farm yet",L.total-L.withFarm,P?P.total-P.withFarm:0),
+    [{v:"Median farm size",bold:true},P&&P.haMed!=null?`${haF(P.haMed)} ha`:"–",{v:L.haMed!=null?`${haF(L.haMed)} ha`:"–",bold:true},"","",""]];
+  S.push({kicker:pre+"Registrations · farmers vs estate owners",
+    title:`${nf.format(L.total-own)} farmers and ${own} estate owner${own===1?"":"s"} last week; farmer & agent ${sg(g(L,"Farmer & agent")-g(P,"Farmer & agent"))}, and ${pct(L.withFarm,L.total)}% added a farm`,
+    rows:[{cards:[
+      {w:1.15,title:"By user role, last week vs the week before",sub:P?`${P.label} vs ${L.label}`:L.label,table:{colW:[31,13,13,12,11,10],head:["Users",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change","Change %","Share"],align:["l","r","r","r","r","r"],rows}},
+      {w:1,title:"Registrations by role, per week",sub:"Estate owner = any role with OWNER",chart:{type:"column",stacked:true,cats:W.map(w=>w.short),series:ROLES.map(k=>({name:k,color:ROLE_C[k],values:W.map(w=>g(w,k))})),lblH:24}}]}],
+    notes:[`<b>Estate owners are rare:</b> ${ownAll} in ${W.length} weeks (${own} last week, ${ownP} the week before); almost every registration is a farmer. Farmer & agent went ${g(P,"Farmer & agent")} → ${g(L,"Farmer & agent")}.`,
+      `<b>Farm details:</b> ${nf.format(L.total-L.withFarm)} of ${nf.format(L.total)} (${pct(L.total-L.withFarm,L.total)}%) registered without a farm, so their location and hectares are unknown${P?` (week before ${pct(P.total-P.withFarm,P.total)}%)`:""}.`]});
+  // where they are (users who added a farm)
+  const provs=[...new Set([...L.prov.keys(),...(P?P.prov.keys():[])])].filter(Boolean).map(k=>({k,l:L.prov.get(k)||0,p:P?P.prov.get(k)||0:0})).sort((a,b)=>b.l-a.l||b.p-a.p);
+  const regs=[...L.regency].filter(([k])=>k).slice(0,10).map(([k,v])=>{ const [r,pv]=k.split("|"); const pp=P?P.regency.get(k)||0:0; return [{v:r,bold:true},pv||"–",P?nf.format(pp):"–",{v:nf.format(v),bold:true},P?sg(v-pp):"–"]; });
+  const kal=provs.filter(x=>/kalimantan/i.test(x.k)), kl=kal.reduce((t,x)=>t+x.l,0), kp=kal.reduce((t,x)=>t+x.p,0);
+  S.push({kicker:pre+"Registrations · where users are",
+    title:`${provs[0]?`${provs[0].k} leads with ${provs[0].l} users who added a farm`:"No locations yet"}${kal.length?`; Kalimantan ${kp} → ${kl}`:""}`,
+    rows:[{cards:[
+      {w:1,title:"Users with a farm, by province",sub:P?`Last week; week before in grey`:"Last week",chart:{type:"hbar",items:provs.slice(0,9).map(x=>({k:x.k,v:x.l,r:P?`was ${x.p}`:""})),rowH:36}},
+      {w:1.05,title:"Top regencies last week",sub:"Users who added a farm",table:{colW:[30,30,14,14,12],head:["Regency","Province",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change"],align:["l","l","r","r","r"],rows:regs}}]}],
+    notes:[`<b>Location is known only for users who added a farm:</b> ${nf.format(L.withFarm)} of ${nf.format(L.total)} last week; ${nf.format(L.total-L.withFarm)} more have no location yet.`]});
+  // users above 100 ha
+  const big=[...L.big.map(r=>({...r,wk:L.short})),...(P?P.big.map(r=>({...r,wk:P.short})):[])].sort((a,b)=>b.ha-a.ha), allBig=W.reduce((t,w)=>t+w.big.length,0), odd=big.filter(r=>r.ha>=5000);
+  const brows=big.slice(0,11).map(r=>[{v:String(r.id||"").slice(0,8),bold:true},r.wk,r.role||"–",{v:`${haF(r.ha)}${r.ha>=5000?" *":""}`,bold:true},nf.format(r.farms||0),r.regency||"–",r.prov||"–",r.src,r.under?"Duta":"Non Duta"]);
+  S.push({kicker:pre+"Registrations · users above 100 ha",
+    notes:[`<b>${L.big.length} users above 100 ha last week</b>${P?` (${P.big.length} the week before, ${sg(L.big.length-P.big.length)})`:""}, ${allBig} in all ${W.length} weeks. Last week's ${L.big.length} declared ${haF(L.big.reduce((t,r)=>t+r.ha,0))} ha; ${L.big.filter(r=>r.ha<5000).length} report under 5,000 ha (${haF(L.big.filter(r=>r.ha<5000).reduce((t,r)=>t+r.ha,0))} ha).${big.length>11?` ${big.length-11} smaller ones are not shown.`:""}`,
+      `<b>Reading the table:</b> users are shown by the first 8 characters of their user ID, no names or phones. * 5,000 ha or more for one account is likely an entry error (m² or a company estate): check before following up.`],
+    title:`${L.big.length} users above 100 ha last week${P?`, ${sg(L.big.length-P.big.length)} on the week before (${P.big.length})`:""}; ${odd.filter(r=>r.wk===L.short).length} of them report 5,000 ha or more`,
+    rows:[
+      {cards:[{
+        table:{colW:[10,8,13,10,6,16,15,14,9],head:["User ID","Week of","Role","Hectares","Farms","Regency","Province","Channel","Type"],align:["l","l","l","r","r","l","l","l","l"],rows:brows}}]}]});
+  return S;
+}
 function acqNarrative(T){
   const Q=T[0].A.acq, L=Q.L, P=Q.P, d=P?L.total-P.total:0, top=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0], ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), extAll=Q.weeks.reduce((s,x)=>s+x.real,0);
   const D=Q.dutas, act=D.filter(x=>x.l), intD=D.filter(x=>x.internal), extD=D.filter(x=>!x.internal), lead=[...D].sort((a,b)=>b.tot-a.tot)[0];
@@ -538,20 +577,29 @@ function acqNarrative(T){
     {v:nf.format(L.non),u:"",l:`non-Duta${P?`: ${sg(L.non-P.non)} (${spc(L.non,P.non)}) on the week before`:""}`},
     {v:nf.format(L.under),u:"",l:`under a Duta${P?`: ${sg(L.under-P.under)} (${spc(L.under,P.under)}) on the week before`:""}`},
     {v:String(act.length),u:`/${D.length}`,l:`Dutas registered a farmer last week (${act.map(x=>x.k).join(", ")||"none"})`}];
+  if(Q.profile&&L.big) X.kpis[3]={v:String(L.big.length),u:"",l:`users above 100 ha${P?` (${P.big.length} the week before)`:""}; ${pct(L.withFarm,L.total)}% added a farm`};
+  const rise=d>=0, mv=rise?ups[0]:top, mvC=rise?[...Q.camps].reverse().find(x=>x.d>0):Q.camps.find(x=>x.d<0), mvC2=rise?[...Q.camps].reverse().filter(x=>x.d>0)[1]:null;
+  const own=L.roles?.get("Estate owner")||0, ag=L.roles?.get("Farmer & agent")||0, agP=P?.roles?.get("Farmer & agent")||0, odd=L.big?L.big.filter(r=>r.ha>=5000).length:0;
+  const provs=L.prov?[...L.prov].filter(([k])=>k):[], kal=k=>[...(k||new Map())].filter(([x])=>/kalimantan/i.test(x||"")).reduce((t,[,v])=>t+v,0);
+  if(Q.profile) X.title=`Farmer Registrations, ${L.label}`;
   X.findings=[
-    top&&[`${top.k} drove the drop`,`${top.k} fell from ${nf.format(top.p)} to ${nf.format(top.l)} (${sg(top.d)}), ${pct(-top.d,Math.max(1,-d))}% of the ${nf.format(Math.abs(d))} fewer farmers.${topC&&topC.d<0?` The “${topC.k}” campaign alone went ${nf.format(topC.p)} → ${nf.format(topC.l)}.`:""}`],
-    P&&[`Dutas halved, from a small base`,`${nf.format(P.under)} → ${nf.format(L.under)} farmers (${(L.under/L.total*100).toFixed(1)}% of all). ${act.length} of ${D.length} Dutas registered a farmer last week; ${lead?`${lead.k} leads with ${lead.tot} in ${Q.weeks.length} weeks`:""}. ${intD.length} of the ${D.length} are internal team, external Dutas brought ${extAll}.`],
-    ups.length&&[`Paid channels held up`,`${ups.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}; “${gainC.k}” added ${sg(gainC.d)} farmers.`],
-    P&&[`The week before was a peak`,`${nf.format(P.total)} farmers with ${Math.max(...P.days)} on one day; last week is ${Q.avg?`${spc(L.total,Q.avg)} on the ${Q.avgN}-week average of ${nf.format(Math.round(Q.avg))}`:""}, still ${spc(L.total,Q.weeks[0].total)} on the week of ${Q.weeks[0].short}.`]].filter(Boolean).slice(0,4);
-  X.bottom={p:`Non-Duta channels bring ${pct(L.non,L.total)}% of farmers. Win back ${top?top.k.toLowerCase():"organic"} registrations, and get every Duta registering farmers each week.`,
-    s:`Farmers counted by the week they registered.${Q.dropped?` The week of ${fds(new Date(Q.dropped.w))} is in progress and left out.`:""} Duta covers internal-team and external Dutas alike.`};
+    mv&&[`${mv.k} drove the ${rise?"rise":"drop"}`,`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)} (${sg(mv.d)}), ${pct(Math.abs(mv.d),Math.max(1,Math.abs(d)))}% of the ${nf.format(Math.abs(d))} ${rise?"more":"fewer"} farmers.${mvC?` “${mvC.k}” ${nf.format(mvC.p)} → ${nf.format(mvC.l)}${mvC2?`, “${mvC2.k}” ${nf.format(mvC2.p)} → ${nf.format(mvC2.l)}`:""}.`:""}`],
+    P&&[L.under?`Dutas brought ${L.under}`:`No farmer came through a Duta`,`${nf.format(P.under)} → ${nf.format(L.under)} under a Duta (${(L.under/L.total*100).toFixed(1)}% of all). ${act.length} of ${D.length} Dutas registered a farmer last week${lead?`; ${lead.k} leads with ${lead.tot} in ${Q.weeks.length} weeks`:""}. ${intD.length} of the ${D.length} are internal team.`],
+    Q.profile&&[`All farmers, ${own} estate owner${own===1?"":"s"}`,`${nf.format(L.total-own)} farmers, of whom ${ag} also agents (${agP} the week before). ${pct(L.withFarm,L.total)}% added a farm (median ${L.haMed!=null?haF(L.haMed):"–"} ha); ${nf.format(L.total-L.withFarm)} have no farm or location yet.`],
+    Q.profile&&[`${L.big.length} users above 100 ha; Kalimantan grows`.replace("; Kalimantan grows",kal(L.prov)>kal(P?.prov)?"; Kalimantan grows":""),`${P?`${P.big.length} the week before (${sg(L.big.length-P.big.length)}). `:""}${provs.slice(0,2).map(([k,v])=>`${k} ${v}`).join(", ")} lead on location${kal(L.prov)?`; Kalimantan ${kal(P?.prov)} → ${kal(L.prov)}`:""}. ${odd?`${odd} of the ${L.big.length} big users report 5,000 ha or more: check the entry before following up.`:""}`],
+    !Q.profile&&!rise&&ups.length&&[`Paid channels held up`,`${ups.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}; “${gainC.k}” added ${sg(gainC.d)} farmers.`],
+    !Q.profile&&P&&[rise?`Last week is a new high`:`The week before was a peak`,`${nf.format(L.total)} farmers last week; ${Q.avg?`${spc(L.total,Q.avg)} on the ${Q.avgN}-week average of ${nf.format(Math.round(Q.avg))}`:""}, ${spc(L.total,Q.weeks[0].total)} on the week of ${Q.weeks[0].short}.`]].filter(Boolean).slice(0,4);
+  X.bottom={p:rise?`${mv?mv.k:"Non-Duta"} carried the week: find what drove it and repeat it. Then get new users to add a farm, and get every Duta registering farmers each week.`:`Non-Duta channels bring ${pct(L.non,L.total)}% of farmers. Win back ${mv?mv.k.toLowerCase():"organic"} registrations, and get every Duta registering farmers each week.`,
+    s:`Farmers counted by the week they registered.${Q.dropped?` The week of ${fds(new Date(Q.dropped.w))} is in progress and left out.`:""} Duta covers internal-team and external Dutas alike${Q.profile?"; estate owner = any role with OWNER; location = the user's first farm":""}.`};
   const idle=D.filter(x=>!x.l);
   X.actions=[
-    top&&{t:`Find out why ${top.k} fell ${sg(top.d)}`,d:`${top.k} went ${nf.format(top.p)} → ${nf.format(top.l)}${topC&&topC.d<0?`, mostly “${topC.k}” (${nf.format(topC.p)} → ${nf.format(topC.l)})`:""}. Check what drove the ${P?P.short:""} peak (a broadcast, a post, an app release) and repeat it.`,o:"",w:""},
+    mv&&(rise?{t:`Find out what drove ${mv.k} ${sg(mv.d)} and repeat it`,d:`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)}${mvC?`, mostly “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)})`:""}. Check what happened that week (a broadcast, a post, an app release, a field event) and plan it again.`,o:"",w:""}
+      :{t:`Find out why ${mv.k} fell ${sg(mv.d)}`,d:`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)}${mvC?`, mostly “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)})`:""}. Check what drove the ${P?P.short:""} peak (a broadcast, a post, an app release) and repeat it.`,o:"",w:""}),
+    Q.profile&&L.big.length&&{t:`Verify and call the ${L.big.length} users above 100 ha`,d:`They declared ${haF(L.big.reduce((t,r)=>t+r.ha,0))} ha between them${odd?`; ${odd} report 5,000 ha or more, likely an entry error`:""}. Confirm the area, then hand real estates to the plantation team.`,o:"",w:""},
+    Q.profile&&{t:`Get ${nf.format(L.total-L.withFarm)} new users to add a farm`,d:`${pct(L.total-L.withFarm,L.total)}% of last week's users have no farm, so location and hectares are unknown. Prompt them in the app and on the first call.`,o:"",w:""},
     {t:"Set a weekly farmer target per Duta",d:`Dutas brought ${nf.format(L.under)} farmers last week${P?` (${nf.format(P.under)} the week before)`:""}. ${idle.length?`${idle.map(x=>x.k).join(", ")} registered none last week.`:""} Agree a weekly number per Duta and track it in this deck.`,o:"",w:""},
-    {t:"Grow the external Duta network",d:`${intD.length} of the ${D.length} Dutas with farmers are internal team; external Dutas brought ${extAll} farmer${extAll===1?"":"s"} in ${Q.weeks.length} weeks${extD.length?` (${extD.map(x=>x.k).join(", ")})`:""}. Recruit and activate external Dutas in the main areas.`,o:"",w:""},
-    gainC&&gainC.d>0&&{t:`Keep funding “${gainC.k}”`,d:`It added ${sg(gainC.d)} farmers (${nf.format(gainC.p)} → ${nf.format(gainC.l)}). Compare its cost per farmer with the other campaigns before shifting budget.`,o:"",w:""},
-    {t:"Make the phone number required at registration",d:`${pct(L.noPhone,L.total)}% of last week's farmers (${nf.format(L.noPhone)}) have no phone number, so they cannot be followed up by sales or a Duta.`,o:"",w:""}].filter(Boolean);
+    !Q.profile&&{t:"Grow the external Duta network",d:`${intD.length} of the ${D.length} Dutas with farmers are internal team; external Dutas brought ${extAll} farmer${extAll===1?"":"s"} in ${Q.weeks.length} weeks. Recruit and activate external Dutas in the main areas.`,o:"",w:""},
+    {t:"Make the phone number required at registration",d:`${pct(L.noPhone,L.total)}% of last week's farmers (${nf.format(L.noPhone)}) have no phone number, so they cannot be followed up by sales or a Duta.`,o:"",w:""}].filter(Boolean).slice(0,6);
   return X;
 }
 // Stock forecast: what the history says, the weekly plan, the weekly plan by SKU, where the stock goes and the plan by month and area.
