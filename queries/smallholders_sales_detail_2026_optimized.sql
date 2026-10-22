@@ -504,8 +504,10 @@ SELECT
     CAST(sum(c.discount) AS Int64)                                       AS discount,
     CAST(sum(c.sales_amount) AS Int64)                                   AS sales_amount,
     CAST(sum(c.shipping_cost) AS Int64)                                  AS shipping_cost,
-    CAST(sum(c.sales_amount) + sum(c.shipping_cost) AS Int64)            AS gmv,
-    CAST(sum(c.sales_amount) + sum(c.shipping_cost) - sum(c.discount) AS Int64) AS nett_sales,
+    -- sales_amount (potential_gmv / total_price_idr + porsi ongkir) sudah termasuk ongkir,
+    -- jadi shipping_cost tidak ditambahkan lagi (dulu ongkir terhitung 2x)
+    CAST(sum(c.sales_amount) AS Int64)                                   AS gmv,
+    CAST(sum(c.sales_amount) - sum(c.discount) AS Int64)                 AS nett_sales,
     CAST(sum(c.paid_with_bank_idr) AS Int64)                             AS revenue,
     trimBoth(c.item_name)                                                AS item_name,
     c.product_cat                                                        AS product_cat,

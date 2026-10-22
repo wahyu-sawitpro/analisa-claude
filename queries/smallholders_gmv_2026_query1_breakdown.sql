@@ -386,7 +386,8 @@ SELECT
   uniqExact(invoice_no)              AS invoices,
   sum(sales_amount)                  AS total_sales_amount,    -- datamart: total_price_idr + porsi ongkir; shopify: potential_gmv
   sum(shipping_cost)                 AS ongkir,
-  sum(sales_amount + shipping_cost)  AS gmv_query1
+  sum(sales_amount + shipping_cost)  AS gmv_query1,       -- rumus lama (ongkir terhitung 2x)
+  sum(sales_amount)                  AS gmv_benar          -- sales_amount sudah termasuk ongkir
 FROM
   (
     SELECT 'datamart (ecommerce_rows)' AS sumber, * FROM ecommerce_rows
