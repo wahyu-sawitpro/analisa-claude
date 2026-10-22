@@ -384,7 +384,7 @@ SELECT
   sumber,
   count()                            AS rows,
   uniqExact(invoice_no)              AS invoices,
-  sum(sales_amount)                  AS sales_amount,      -- datamart: total_price_idr + porsi ongkir; shopify: potential_gmv
+  sum(sales_amount)                  AS total_sales_amount,    -- datamart: total_price_idr + porsi ongkir; shopify: potential_gmv
   sum(shipping_cost)                 AS ongkir,
   sum(sales_amount + shipping_cost)  AS gmv_query1
 FROM
