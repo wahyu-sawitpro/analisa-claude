@@ -1,3 +1,5 @@
+-- [FIX ongkir] sales_amount (potential_gmv / total_price_idr + porsi ongkir) sudah termasuk ongkir;
+-- shipping_cost tidak ditambahkan lagi ke GMV / nett sales (dulu ongkir terhitung 2x).
 -- =====================================================================
 -- GMV Smallholders per PIC (pic_name), tahun berjalan (1 Jan s/d akhir
 -- tahun ini, Asia/Jakarta) — versi optimasi.
@@ -481,7 +483,7 @@ WITH
 -- hasil akhir: GMV per pic_name, urut GMV terbesar
 SELECT
   p.pic_name AS pic_name,
-  sum(r.sales_amount + r.shipping_cost) AS total_gmv
+  sum(r.sales_amount) AS total_gmv
 FROM
   (
     SELECT * FROM ecommerce_rows

@@ -1,3 +1,5 @@
+-- [FIX ongkir] sales_amount (potential_gmv / total_price_idr + porsi ongkir) sudah termasuk ongkir;
+-- shipping_cost tidak ditambahkan lagi ke GMV / nett sales (dulu ongkir terhitung 2x).
 -- =====================================================================
 -- Jumlah invoice Smallholders MINGGU INI (Senin s/d Minggu, Asia/Jakarta)
 -- — versi optimasi. Turunan dari smallholders_gmv_this_week_optimized.sql
@@ -459,7 +461,7 @@ FROM
     )
     SELECT
       invoice_no AS main_invoice_no
-      -- sum(sales_amount + shipping_cost) AS gmv
+      -- sum(sales_amount) AS gmv
     FROM
       (
         SELECT * FROM ecommerce_rows

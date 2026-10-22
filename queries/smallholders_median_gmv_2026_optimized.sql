@@ -1,3 +1,5 @@
+-- [FIX ongkir] sales_amount (potential_gmv / total_price_idr + porsi ongkir) sudah termasuk ongkir;
+-- shipping_cost tidak ditambahkan lagi ke GMV / nett sales (dulu ongkir terhitung 2x).
 -- =====================================================================
 -- Median GMV per baris final_result, tim Smallholders (sale_order_date >= 2026)
 -- Optimasi sama dengan smallholders_gmv_2026_optimized.sql, bedanya median
@@ -430,7 +432,7 @@ FROM
     ),
     final_result AS (
       SELECT
-        CAST(sum(cs.sales_amount) + sum(cs.shipping_cost) AS Int64) AS gmv
+        CAST(sum(cs.sales_amount) AS Int64) AS gmv
       FROM
         combined_sales cs
       WHERE

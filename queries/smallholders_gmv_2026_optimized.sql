@@ -1,9 +1,11 @@
+-- [FIX ongkir] sales_amount (potential_gmv / total_price_idr + porsi ongkir) sudah termasuk ongkir;
+-- shipping_cost tidak ditambahkan lagi ke GMV / nett sales (dulu ongkir terhitung 2x).
 -- =====================================================================
 -- GMV Smallholders (sale_order_date >= 2026) — versi optimasi
 -- Poin 1-5 tidak mengubah angka; poin 6 sengaja mengubah definisi
 -- (semua invoice yang di-claim Smallholders):
 --
---  1. sum(gmv) per grup = sum(sales_amount + shipping_cost) per baris, jadi
+--  1. sum(gmv) per grup = sum(sales_amount) per baris, jadi
 --     GROUP BY final_result & join customer_first_order (key unik, tidak
 --     menggandakan baris) dihapus -> combined_sales tidak dihitung 2x lagi.
 --  2. Join ss (data_order_pic, unik per invoice) + WHERE pic_teams='Smallholders'
@@ -403,7 +405,7 @@ FROM
         AND item NOT IN ('Biaya Layanan', 'Minyak Goreng 1 Liter - Minyak Hemat Petani Hebat')
     )
     SELECT
-      sum(sales_amount + shipping_cost) AS `sum(gmv)`
+      sum(sales_amount) AS `sum(gmv)`
     FROM
       (
         SELECT * FROM ecommerce_rows

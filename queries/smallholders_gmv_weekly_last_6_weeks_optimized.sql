@@ -1,3 +1,5 @@
+-- [FIX ongkir] sales_amount (potential_gmv / total_price_idr + porsi ongkir) sudah termasuk ongkir;
+-- shipping_cost tidak ditambahkan lagi ke GMV / nett sales (dulu ongkir terhitung 2x).
 -- =====================================================================
 -- GMV Smallholders per minggu, 6 minggu terakhir yang sudah selesai
 -- (Senin 6 minggu lalu s/d sebelum Senin minggu ini, Asia/Jakarta)
@@ -466,7 +468,7 @@ WITH
 -- hasil akhir: GMV per minggu (Senin), urut dari minggu terlama
 SELECT
   toMonday(order_date) AS sale_order_date,
-  sum(sales_amount + shipping_cost) AS total_gmv
+  sum(sales_amount) AS total_gmv
 FROM
   (
     -- kolom tanggal diberi nama lain supaya tidak bentrok dengan alias

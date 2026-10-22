@@ -219,7 +219,7 @@ SELECT
     count()                                 AS rows,
     uniqExact(invoice_no)                   AS invoices,
     sum(potential_gmvs)                     AS gmv_tanpa_ongkir,
-    sum(potential_gmvs + shipping_cost)     AS gmv_dengan_ongkir
+    sum(potential_gmvs + shipping_cost)     AS gmv_dengan_ongkir   -- ongkir terhitung 2x (potential_gmv sudah termasuk ongkir), hanya untuk diagnosa
 FROM q2_rows
 WHERE Sales_App != 'Marketplace'
   AND pic_teams = 'Smallholders'

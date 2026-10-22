@@ -1,3 +1,5 @@
+-- [FIX ongkir] sales_amount (potential_gmv / total_price_idr + porsi ongkir) sudah termasuk ongkir;
+-- shipping_cost tidak ditambahkan lagi ke GMV / nett sales (dulu ongkir terhitung 2x).
 -- =====================================================================
 -- Cek selisih GMV 2026: smallholders_gmv_2026_optimized.sql (~15 M) vs
 -- smallholders_top_items_2026_optimized.sql (~17 M).
@@ -477,7 +479,7 @@ WITH
 -- hasil akhir: GMV & invoice per sumber
 SELECT
   src,
-  sum(sales_amount + shipping_cost) AS gmv,
+  sum(sales_amount) AS gmv,
   uniqExact(invoice_no) AS invoice_count
 FROM
   (

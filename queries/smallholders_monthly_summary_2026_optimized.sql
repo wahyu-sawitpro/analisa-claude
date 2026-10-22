@@ -1,3 +1,5 @@
+-- [FIX ongkir] sales_amount (potential_gmv / total_price_idr + porsi ongkir) sudah termasuk ongkir;
+-- shipping_cost tidak ditambahkan lagi ke GMV / nett sales (dulu ongkir terhitung 2x).
 -- =====================================================================
 -- Ringkasan bulanan Smallholders (qty, GMV, nett sales, revenue; >= 2026)
 -- Poin 1-5 tidak mengubah angka; poin 6 sengaja mengubah definisi
@@ -419,8 +421,8 @@ FROM
     SELECT
       toStartOfMonth(sale_order_date) AS sales_month,
       sum(qty) AS total_qty,
-      sum(sales_amount + shipping_cost) AS total_gmv,
-      sum(sales_amount + shipping_cost - discount) AS total_nett_sales,
+      sum(sales_amount) AS total_gmv,
+      sum(sales_amount - discount) AS total_nett_sales,
       sum(paid_with_bank_idr) AS total_revenue
     FROM
       (

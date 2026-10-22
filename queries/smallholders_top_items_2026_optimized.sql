@@ -1,3 +1,5 @@
+-- [FIX ongkir] sales_amount (potential_gmv / total_price_idr + porsi ongkir) sudah termasuk ongkir;
+-- shipping_cost tidak ditambahkan lagi ke GMV / nett sales (dulu ongkir terhitung 2x).
 -- =====================================================================
 -- Item yang paling banyak di-order customer Smallholders, tahun 2026.
 -- Per item (trimBoth(item_name), sama dengan item_name di final_result asli):
@@ -5,7 +7,7 @@
 --   total_qty    : total kuantitas (dm.quantity / d.qty / e.quantity,
 --                  sama dengan kolom qty di combined_sales)
 --   customer_count: jumlah customer unik yang membeli item tsb
---   total_gmv    : sum(sales_amount + shipping_cost), sama dengan gmv di
+--   total_gmv    : sum(sales_amount), sama dengan gmv di
 --                  final_result asli (branch 2b di-comment, jadi tidak dobel).
 -- Diurutkan dari order_count terbanyak.
 -- Turunan dari smallholders_invoice_count_monthly_2026_optimized.sql
@@ -481,7 +483,7 @@ SELECT
   uniqExact(invoice_no) AS order_count,
   sum(qty) AS total_qty,
   uniqExactIf(trimBoth(user_id), trimBoth(ifNull(user_id, '')) != '') AS customer_count,
-  sum(sales_amount + shipping_cost) AS total_gmv
+  sum(sales_amount) AS total_gmv
 FROM
   (
     SELECT sale_order_date AS order_date, item_name, invoice_no, user_id, qty, sales_amount, shipping_cost FROM ecommerce_rows
