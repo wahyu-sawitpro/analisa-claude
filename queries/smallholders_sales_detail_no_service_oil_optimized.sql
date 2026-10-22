@@ -1,14 +1,33 @@
-SELECT
-	result.*,
-	-- user_type: larkbase leads first, fallback to datamart_user.user_role, else 'Unidentified'
-	coalesce(
-		nullIf(trimBoth(ifNull(toString(lsl.lead_user_type), '')), ''),
-		nullIf(trimBoth(ifNull(toString(du.du_user_role), '')), ''),
-		'Unidentified'
-	) AS user_type
-FROM (
+-- =====================================================================
+-- Detail sales Smallholders (dates >= 2025-01-01), TANPA item layanan
+-- & minyak — versi optimasi.
+-- Pola Smallholders sama dengan file *_optimized.sql lain:
+--   * hanya tabel lark Smallholders yang dibaca (7 tabel lark tim lain
+--     dihapus) -> pic_teams selalu 'Smallholders';
+--   * invoice yang juga di-claim tim lain IKUT ditampilkan;
+--   * filter Smallholders (semi-join `invoice_no IN sh_keys`), item &
+--     tanggal didorong ke tabel sumber sebelum join berat;
+--   * sisi kanan join berat (shopify_orders, flatten_eventapp_raw,
+--     shopify_campaign_sales, sale_order, user, account_move,
+--     datamart_ecommerce) dipre-filter ke key yang relevan saja;
+--   * TANPA pembungkus `SELECT ... FROM (...) AS result` — lookup
+--     user_type jadi CTE biasa.
+--
+-- Kolom yang jadi konstan karena hanya Smallholders (logika lama dibuang):
+--   pic_teams = 'Smallholders', assisted_order = 'YES',
+--   b2b_b2c = 'B2B' hanya untuk order_source MITRA, selain itu 'B2C'.
+--
+-- Item yang dikecualikan: nama item / kategori / product_type cocok
+-- regex excluded_item_regex (minyak, layanan, jasa, Dokter Sawit).
+--
+-- first_order_date (NEW/REPEAT) tetap dari SEMUA order customer sejak
+-- 2025 (tim mana pun), dibatasi ke customer yang punya order Smallholders.
+-- =====================================================================
 WITH
--- === [GEO] Geo Equalizer — Province (sumber: geo.sql / geo_equalizer_province.csv) ===
+    toDateTime('2025-01-01 00:00:00', 'Asia/Jakarta') AS start_ts,
+    '(?i)minyak|layanan|jasa|dokter sawit' AS excluded_item_regex,
+
+-- === [GEO] Geo Equalizer — Province (idealnya jadi tabel/dictionary) ===
 geo_province AS (
     SELECT
         upper(trimBoth(province_raw)) AS geo_key,
@@ -139,107 +158,32 @@ geo_province AS (
     GROUP BY geo_key
 ),
 
--- === [OPT] parameter tanggal mulai & filter item, ditulis sekali ===
--- tanggal mulai dalam waktu Jakarta (setara dengan filter lama dates >= '2025-01-01')
-toDateTime('2025-01-01 00:00:00', 'Asia/Jakarta') AS start_ts,
--- [FILTER] item layanan & minyak dikecualikan (cek nama item + kategori + tipe produk)
-'(?i)minyak|layanan|jasa|dokter sawit' AS excluded_item_regex,
-
+-- ------------------------------------------------------------------
+-- (A) Claim Smallholders dari larkbase
+-- ------------------------------------------------------------------
 invoice_lark AS (
     SELECT
-        upper(trimBoth(replace(replace(invoice_lark, 'INV#',''),'#',''))) AS invoice_lark,
-        invoice_lark AS invoice_inputted,
+        upper(trimBoth(replace(replace(invoice_lark, 'INV#', ''), '#', ''))) AS invoice_lark,
         order_lark,
-        notes, name_lark, team, pic_name,
-        CAST(min(created_dt) AS Nullable(DateTime)) AS min_created_dt
+        trimBoth(pic_name) AS pic_name,
+        min(created_dt) AS min_created_dt
     FROM (
-        -- [OPT] toFloat64 (bukan Float32): epoch ms di Float32 kehilangan presisi beberapa menit -> urutan seqno bisa salah
         SELECT
             multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice) AS invoice_lark,
             order_no AS order_lark,
-            multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice') AS notes,
-            trimBoth(customer_name) AS name_lark, 'Sales' AS team, trimBoth(assignee) AS pic_name,
+            assignee AS pic_name,
             toDateTime(toFloat64OrNull(created_date) / 1000, 'Asia/Jakarta') AS created_dt
-        FROM default.larkbase_salesopportunities_salesteam
-        WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-
-        UNION ALL
-        SELECT
-            multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-            order_no,
-            multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-            trimBoth(customer_name), 'Mills', trimBoth(assignee),
-            toDateTime(toFloat64OrNull(date_created) / 1000, 'Asia/Jakarta')
-        FROM default.larkbase_salesopportunities_millsteam
-        WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-
-        UNION ALL
-        SELECT
-            multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-            order_no,
-            multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-            trimBoth(assignee), 'Suppliers', trimBoth(assignee),
-            toDateTime(toFloat64OrNull(created_date) / 1000, 'Asia/Jakarta')
-        FROM default.larkbase_salesopportunities_suppliersteam
-        WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-
-        UNION ALL
-        SELECT
-            multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-            order_no,
-            multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-            trimBoth(assignee), 'Smallholders', trimBoth(assignee),
-            toDateTime(toFloat64OrNull(created_date) / 1000, 'Asia/Jakarta')
         FROM default.larkbase_salesopportunities_smallholdersteam
         WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-
-        UNION ALL
-        SELECT
-            multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-            order_no,
-            multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-            trimBoth(assignee), 'DG', trimBoth(assignee),
-            toDateTime(toFloat64OrNull(created_date) / 1000, 'Asia/Jakarta')
-        FROM default.larkbase_salesopportunities_dg
-        WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-
-        UNION ALL
-        SELECT
-            multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-            order_no,
-            multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-            trimBoth(assignee), 'Agronomist', trimBoth(assignee),
-            toDateTime(toFloat64OrNull(created_date) / 1000, 'Asia/Jakarta')
-        FROM default.larkbase_salesopportunities_plantation
-        WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-
-        UNION ALL
-        SELECT
-            multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-            order_no,
-            multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-            trimBoth(assignee), 'Finance FFB BD', trimBoth(assignee),
-            toDateTime(toFloat64OrNull(date_created) / 1000, 'Asia/Jakarta')
-        FROM default.larkbase_salesopportunities_bdffb
-        WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
-
-        UNION ALL
-        SELECT
-            multiIf(parent_invoice != '', parent_invoice, invoice_no != '', invoice_no, order_no != '', order_no, parent_invoice),
-            order_no,
-            multiIf(parent_invoice != '', 'parent_invoice', invoice_no != '', 'invoice_no', order_no != '', 'order_no', 'parent_invoice'),
-            trimBoth(assignee), 'Product Experiment', trimBoth(assignee),
-            toDateTime(toFloat64OrNull(created_date) / 1000, 'Asia/Jakarta')
-        FROM default.larkbase_salesopportunities_aspekpir
-        WHERE (parent_invoice != '') OR (invoice_no != '') OR (order_no != '')
+        -- tim lain tidak dipakai (fokus Smallholders): salesteam, millsteam,
+        -- suppliersteam, dg, plantation, bdffb, aspekpir
     ) AS a
     WHERE invoice_lark NOT IN ('INV/20250501/SEED/114629','INV/20250506/SEED/114777','INV/20250103/RIZ04/100545','INV/20250111/SUZ45/100057')
-    GROUP BY 1,2,3,4,5,6,7
+    GROUP BY 1, 2, 3
 ),
 lark_keys AS (
     SELECT DISTINCT invoice_lark FROM invoice_lark
 ),
--- [OPT] tabel kanan di-prefilter ke key larkbase saja, bukan full table hash join
 summary AS (
     SELECT
         multiIf(de.invoice_no != '', de.invoice_no,
@@ -247,8 +191,7 @@ summary AS (
                 so1.name != '', concat('INV/', replaceAll(so1.name, '#', ''), '/SHPFY'),
                 so2.name != '', concat('INV/', replaceAll(so2.name, '#', ''), '/SHPFY'),
                 NULL) AS invoice_no,
-        il.team,
-        trimBoth(il.pic_name) AS pic_name,
+        il.pic_name AS pic_name,
         row_number() OVER (PARTITION BY il.invoice_lark ORDER BY il.min_created_dt DESC) AS seqno
     FROM invoice_lark AS il
     ANY LEFT JOIN (
@@ -279,55 +222,52 @@ summary AS (
     ) AS so1 ON upper(so1.name) = upper(am.ref)
     WHERE (de.order_no != '') OR (so.name != '') OR (am.name != '') OR (so2.name != '')
 ),
+-- PIC Smallholders per invoice
 data_order_pic AS (
     SELECT
         invoice_no,
-        arrayStringConcat(arraySort(groupUniqArray(team)), ';') AS pic_teams,
-        arrayStringConcat(arraySort(groupUniqArray(trimBoth(pic_name))), ';') AS pic_names,
-        arrayStringConcat(arraySort(groupUniqArray(multiIf(seqno = 1, team, NULL))), ';') AS pic_teams_last,
-        arrayStringConcat(arraySort(groupUniqArray(multiIf(seqno = 1, trimBoth(pic_name), NULL))), ';') AS pic_names_last
+        arrayStringConcat(arraySort(groupUniqArray(pic_name)), ';') AS pic_names,
+        arrayStringConcat(arraySort(groupUniqArray(multiIf(seqno = 1, pic_name, NULL))), ';') AS pic_names_last
     FROM summary
-    GROUP BY 1
+    WHERE invoice_no IS NOT NULL
+    GROUP BY invoice_no
 ),
--- [OPT] fallback via order_no, sudah di-dedup (1 baris per order_no) -> tidak ada duplikasi baris lagi
+-- fallback via order_no (1 baris per order_no)
 pic_by_order AS (
-    SELECT order_no, t.1 AS pic_teams, t.2 AS pic_names, t.3 AS pic_teams_last, t.4 AS pic_names_last
-    FROM (
-        SELECT il.order_lark AS order_no,
-               any((dp.pic_teams, dp.pic_names, dp.pic_teams_last, dp.pic_names_last)) AS t
-        FROM invoice_lark AS il
-        INNER JOIN data_order_pic AS dp ON il.invoice_lark = dp.invoice_no
-        WHERE il.order_lark != ''
-        GROUP BY il.order_lark
-    )
+    SELECT il.order_lark AS order_no,
+           any(dp.pic_names) AS pic_names,
+           any(dp.pic_names_last) AS pic_names_last
+    FROM invoice_lark AS il
+    INNER JOIN data_order_pic AS dp ON il.invoice_lark = dp.invoice_no
+    WHERE il.order_lark != ''
+    GROUP BY il.order_lark
 ),
--- key yang (mungkin) milik Smallholders -> dipakai untuk prefilter shopify_orders
 sh_keys AS (
-    SELECT invoice_no AS k FROM data_order_pic WHERE has(splitByChar(';', pic_teams), 'Smallholders')
+    SELECT invoice_no AS k FROM data_order_pic
     UNION ALL
-    SELECT order_no FROM pic_by_order WHERE has(splitByChar(';', pic_teams), 'Smallholders')
+    SELECT order_no FROM pic_by_order
 ),
 
--- === [OPT] Branch Shopify: filter Smallholders + item + tanggal DI AWAL, sebelum join berat ===
+-- ------------------------------------------------------------------
+-- (B) Branch Shopify — hanya invoice Smallholders, tanpa layanan/minyak
+-- ------------------------------------------------------------------
 d_src AS (
     SELECT
         d.*,
-        coalesce(nullIf(p_inv.pic_teams, ''),      nullIf(p_ord.pic_teams, ''))      AS sh_pic_teams,
         coalesce(nullIf(p_inv.pic_names, ''),      nullIf(p_ord.pic_names, ''))      AS sh_pic_names,
-        coalesce(nullIf(p_inv.pic_teams_last, ''), nullIf(p_ord.pic_teams_last, '')) AS sh_pic_teams_last,
         coalesce(nullIf(p_inv.pic_names_last, ''), nullIf(p_ord.pic_names_last, '')) AS sh_pic_names_last,
-        p_inv.pic_names AS sh_pic_names_inv   -- = dop1.pic_names di query lama (dipakai app_type_prev)
+        p_inv.pic_names AS sh_pic_names_inv
     FROM sawitpro_datamart.fct_new_sale_order_shopify AS d
     ANY LEFT JOIN data_order_pic AS p_inv ON p_inv.invoice_no = d.invoice_no
     ANY LEFT JOIN pic_by_order   AS p_ord ON p_ord.order_no   = d.invoice_no
-    WHERE d.sale_order_created_time >= start_ts
+    WHERE d.invoice_no IN (SELECT k FROM sh_keys)
+      AND d.sale_order_created_time >= start_ts
       AND NOT match(concat(ifNull(d.item, ''), '|', ifNull(d.product_category, ''), '|', ifNull(d.product_type, '')), excluded_item_regex)
-      AND has(splitByChar(';', ifNull(sh_pic_teams, '')), 'Smallholders')
 ),
 so_f AS (
     SELECT
         concat('INV/', replaceAll(name, '#', ''), '/SHPFY') AS inv_key,
-        id, name, line_items, landing_site, tags, note_attributes, discount_codes,
+        id, line_items, landing_site, tags, note_attributes, discount_codes,
         shipping_address_province, billing_address_province, customer_default_address_province,
         shipping_address_zip, billing_address_zip, customer_default_address_zip,
         shipping_address_city, shipping_address_longitude, shipping_address_latitude,
@@ -335,7 +275,6 @@ so_f AS (
     FROM default.shopify_orders
     WHERE concat('INV/', replaceAll(name, '#', ''), '/SHPFY') IN (SELECT k FROM sh_keys)
 ),
--- [OPT] window row_number + GROUP BY 3 kolom diganti argMax, dan hanya transaksi yang relevan
 tt_f AS (
     SELECT app_type, transaction_id, argMax(app_type_tokosawit, event_time) AS app_type_tokosawit
     FROM default.flatten_eventapp_raw
@@ -365,37 +304,42 @@ sku_line AS (
     )
 ),
 
--- === [OPT] Branch ProApp (datamart_ecommerce): filter yang sama di awal ===
+-- ------------------------------------------------------------------
+-- (C) Branch ProApp (datamart_ecommerce) — filter yang sama
+-- ------------------------------------------------------------------
 e_src AS (
     SELECT
         e.*,
-        coalesce(nullIf(p_inv.pic_teams, ''),      nullIf(p_ord.pic_teams, ''))      AS sh_pic_teams,
         coalesce(nullIf(p_inv.pic_names, ''),      nullIf(p_ord.pic_names, ''))      AS sh_pic_names,
-        coalesce(nullIf(p_inv.pic_teams_last, ''), nullIf(p_ord.pic_teams_last, '')) AS sh_pic_teams_last,
         coalesce(nullIf(p_inv.pic_names_last, ''), nullIf(p_ord.pic_names_last, '')) AS sh_pic_names_last
     FROM sawitpro_datamart.datamart_ecommerce AS e
     ANY LEFT JOIN data_order_pic AS p_inv ON p_inv.invoice_no = e.invoice_no
     ANY LEFT JOIN pic_by_order   AS p_ord ON p_ord.order_no   = e.order_no
-    WHERE ((e.invoice_status = 'PAID') OR (toString(e.sale_order_status) IN ('COMPLETED', '32')))
+    WHERE (e.invoice_no IN (SELECT k FROM sh_keys) OR e.order_no IN (SELECT k FROM sh_keys))
+      AND ((e.invoice_status = 'PAID') OR (toString(e.sale_order_status) IN ('COMPLETED', '32')))
       AND e.sale_order_created_time >= start_ts
       AND NOT match(concat(ifNull(e.item, ''), '|', ifNull(e.product_cat, '')), excluded_item_regex)
-      AND has(splitByChar(';', ifNull(sh_pic_teams, '')), 'Smallholders')
       AND e.invoice_no NOT IN (SELECT invoice_no FROM sawitpro_datamart.fct_new_sale_order_shopify)
 ),
-
--- [OPT] first_order_date dihitung dari SEMUA order user (bukan hanya yang lolos filter Smallholders),
--- supaya NEW/REPEAT tetap sama dengan definisi lama. Hanya 2 kolom -> murah.
+target_users AS (
+    SELECT user_id FROM d_src
+    UNION ALL
+    SELECT user_id FROM e_src
+),
+-- order pertama customer dari SEMUA order sejak 2025 (tim mana pun)
 user_first_order AS (
     SELECT user_id, min(dt) AS first_order_date
     FROM (
         SELECT user_id, toDate(toTimeZone(sale_order_created_time, 'Asia/Jakarta')) AS dt
         FROM sawitpro_datamart.fct_new_sale_order_shopify
         WHERE sale_order_created_time >= start_ts
+          AND user_id IN (SELECT user_id FROM target_users)
         UNION ALL
         SELECT user_id, toDate(toTimeZone(sale_order_created_time, 'Asia/Jakarta'))
         FROM sawitpro_datamart.datamart_ecommerce
         WHERE ((invoice_status = 'PAID') OR (toString(sale_order_status) IN ('COMPLETED', '32')))
           AND sale_order_created_time >= start_ts
+          AND user_id IN (SELECT user_id FROM target_users)
           AND invoice_no NOT IN (SELECT invoice_no FROM sawitpro_datamart.fct_new_sale_order_shopify)
     )
     GROUP BY user_id
@@ -405,9 +349,7 @@ data_ecommerce_base AS (
     SELECT
         CAST(toDate(toTimeZone(d.sale_order_created_time, 'Asia/Jakarta')) AS Nullable(Date)) AS dates,
         d.store_name AS app_type,
-        d.sh_pic_teams AS pic_teams,
         d.sh_pic_names AS pic_names,
-        d.sh_pic_teams_last AS pic_teams_last,
         d.sh_pic_names_last AS pic_names_last,
         d.user_id AS user_id,
         d.item AS item,
@@ -415,7 +357,7 @@ data_ecommerce_base AS (
         d.invoice_status AS invoice_status,
         toString(d.sale_order_status) AS sale_order_status,
         CAST(d.potential_gmv AS Nullable(Float64)) AS potential_gmvs,
-		CAST(d.original_gmv AS Nullable(Float64)) AS original_gmv,
+        CAST(d.original_gmv AS Nullable(Float64)) AS original_gmv,
         CAST(multiIf(toString(d.sale_order_status) IN ('COMPLETED', '32'), d.potential_gmv, NULL) AS Nullable(Float64)) AS gmv,
         CAST(d.paid_with_bank_idr AS Nullable(Float64)) AS revenue,
         CAST(ifNull(d.total_price, 0) AS Nullable(Float64)) AS sales_amount,
@@ -424,38 +366,30 @@ data_ecommerce_base AS (
         CAST(ifNull(toFloat64OrNull(toString(d.discount_amount_in_idr)), 0) AS Nullable(Float64)) AS discount_amount,
         d.source_name AS source_name,
         multiIf(so.shipping_address_province != '', so.shipping_address_province, so.billing_address_province != '', so.billing_address_province, so.customer_default_address_province) AS province_raw,
-		multiIf(so.shipping_address_zip != '', so.shipping_address_zip, so.billing_address_zip != '', so.billing_address_zip, so.customer_default_address_zip) AS zip_raw,
+        multiIf(so.shipping_address_zip != '', so.shipping_address_zip, so.billing_address_zip != '', so.billing_address_zip, so.customer_default_address_zip) AS zip_raw,
         CAST(multiIf(match(d.item, '(?i)herb'), 'Herbisida', d.product_category) AS Nullable(String)) AS prod_cat,
         multiIf(d.source_name = 'shopify_draft_order', 'DRAFT ORDER', d.sh_pic_names_inv != '', 'DRAFT ORDER', cs.utm_medium != '', replaceAll(UPPER(cs.utm_medium), 'PROAPP', ''), tt.app_type_tokosawit = 'MEMBER', 'AGEN', tt.app_type_tokosawit != '', tt.app_type_tokosawit, 'WEB') AS app_type_prev,
-		multiIf(cs.utm_medium != '', replaceAll(UPPER(cs.utm_medium), 'PROAPP', ''), tt.app_type_tokosawit = 'MEMBER', 'AGEN', tt.app_type_tokosawit != '', tt.app_type_tokosawit, 'WEB') AS application_type,
-		extractURLParameter(so.landing_site, 'utm_source') AS utm_source,
+        multiIf(cs.utm_medium != '', replaceAll(UPPER(cs.utm_medium), 'PROAPP', ''), tt.app_type_tokosawit = 'MEMBER', 'AGEN', tt.app_type_tokosawit != '', tt.app_type_tokosawit, 'WEB') AS application_type,
+        extractURLParameter(so.landing_site, 'utm_source') AS utm_source,
         d.customer_email AS customer_email,
         d.customer_phone_number AS customer_phone_number,
         trimBoth(d.name) AS customer_name,
         so.shipping_address_city AS shipping_address_city,
-        so.shipping_address_province AS shipping_address_province,
-        (so.shipping_address_longitude) AS shipping_address_longitude,
-        (so.shipping_address_latitude) AS shipping_address_latitude,
         so.customer_default_address_address1 AS customer_default_address_address1,
-        so.customer_default_address_address2 AS customer_default_address_address2,
         so.customer_default_address_city AS customer_default_address_city,
-        so.customer_default_address_province AS customer_default_address_province,
         so.tags AS tags,
-		so.note_attributes AS note_attributes,
+        so.note_attributes AS note_attributes,
         JSONExtractString(so.discount_codes, '0', 'code') AS discount_code,
         toFloat64OrNull(JSONExtractString(so.discount_codes, '0', 'amount')) AS discount_amount_code,
-		CAST(
-			COALESCE(
-				toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.paid_with_bank_time)), 'Asia/Jakarta'))),
-				toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.max_payment_at)), 'Asia/Jakarta')))
-			) AS Nullable(Date)
-		) AS payment_date,
-		CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.min_payment_at)), 'Asia/Jakarta'))) AS Nullable(Date)) AS dp_payment_date,
-		CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.max_payment_at)), 'Asia/Jakarta'))) AS Nullable(Date)) AS full_payment_date,
-		CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.completed_at)), 'Asia/Jakarta'))) AS Nullable(Date)) AS completion_date,
-        concat(so.customer_default_address_address1, so.customer_default_address_address2) AS delivery_address,
-        so.shipping_address_city AS city,
-        so.shipping_address_province AS province,
+        CAST(
+            COALESCE(
+                toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.paid_with_bank_time)), 'Asia/Jakarta'))),
+                toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.max_payment_at)), 'Asia/Jakarta')))
+            ) AS Nullable(Date)
+        ) AS payment_date,
+        CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.min_payment_at)), 'Asia/Jakarta'))) AS Nullable(Date)) AS dp_payment_date,
+        CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.max_payment_at)), 'Asia/Jakarta'))) AS Nullable(Date)) AS full_payment_date,
+        CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(d.completed_at)), 'Asia/Jakarta'))) AS Nullable(Date)) AS completion_date,
         CASE
             WHEN ifNull(toFloat64OrNull(toString(d.dp_paid_amount)), 0) = ifNull(toFloat64OrNull(toString(d.current_total_price)), 0) THEN 'TOD'
             WHEN ifNull(toFloat64OrNull(toString(d.dp_paid_amount)), 0) < ifNull(toFloat64OrNull(toString(d.current_total_price)), 0) THEN 'DP'
@@ -465,7 +399,7 @@ data_ecommerce_base AS (
         CASE WHEN ifNull(toFloat64OrNull(toString(d.shipping_cost)), 0) = 0 THEN 'Pickup' ELSE 'Delivery' END AS delivery_type,
         CAST(ifNull(toFloat64OrNull(toString(d.point_redemption_point_idr)), 0) AS Nullable(Float64)) AS point_redemption_idr,
         CAST(ifNull(toFloat64OrNull(toString(d.discount_amount_in_idr)), 0) AS Nullable(Float64)) AS discount_amount_in_idr,
-        JSONExtractUInt(sl.li, 'grams')/1000 AS sku_kg,
+        JSONExtractUInt(sl.li, 'grams') / 1000 AS sku_kg,
         JSONExtractUInt(sl.li, 'product_id') AS product_id,
         JSONExtractString(sl.li, 'sku') AS sku,
         d.order_line_state AS order_line_state,
@@ -476,7 +410,6 @@ data_ecommerce_base AS (
         CAST(parseDateTimeBestEffortOrNull(toString(d.max_schedule_date)) AS Nullable(DateTime)) AS delivery_completed_scheduled_at,
         CAST(parseDateTimeBestEffortOrNull(toString(d.cancelled_at)) AS Nullable(DateTime)) AS cancelled_at,
         CAST(parseDateTimeBestEffortOrNull(toString(d.ready_at)) AS Nullable(DateTime)) AS ready_at,
-        CAST(parseDateTimeBestEffortOrNull(toString(d.pickup_estimated)) AS Nullable(DateTime)) AS pickup_estimated,
         CAST(parseDateTimeBestEffortOrNull(toString(d.invoice_expired_time)) AS Nullable(DateTime)) AS invoice_expired_time,
         coalesce(nullif(d.payment_method_1, ''), nullif(d.payment_method_2, '')) AS payment_channel_raw,
         multiIf(
@@ -486,12 +419,7 @@ data_ecommerce_base AS (
             payment_channel_raw ILIKE '%xendit%', 'Xendit',
             payment_channel_raw = '', 'No Payment Recorded',
             'Others'
-        ) AS payment_origin,
-        multiIf(
-            d.product_category IN ('Dokter Sawit'), 0,
-            d.product_type IN ('Dokter Sawit'), 0,
-            1
-        ) AS requires_physical_delivery
+        ) AS payment_origin
 
     FROM d_src AS d
     ANY LEFT JOIN sku_line AS sl ON (sl.invoice_no = d.invoice_no) AND (sl.item = d.item)
@@ -504,9 +432,7 @@ data_ecommerce_base AS (
     SELECT
         CAST(toTimeZone(e.sale_order_created_time, 'Asia/Jakarta') AS Nullable(Date)) AS dates,
         so_main.app_type AS app_type,
-        e.sh_pic_teams AS pic_teams,
         e.sh_pic_names AS pic_names,
-        e.sh_pic_teams_last AS pic_teams_last,
         e.sh_pic_names_last AS pic_names_last,
         e.user_id AS user_id,
         e.item AS item,
@@ -514,7 +440,7 @@ data_ecommerce_base AS (
         e.invoice_status AS invoice_status,
         toString(e.sale_order_status) AS sale_order_status,
         CAST(e.potential_gmv AS Nullable(Float64)) AS potential_gmvs,
-		CAST(e.potential_gmv AS Nullable(Float64))-CAST(ifNull(toFloat64OrNull(toString(e.point_redemption_idr)), 0) AS Nullable(Float64))-CAST(ifNull(toFloat64OrNull(toString(e.discount)), 0) AS Nullable(Float64)) AS original_gmv,
+        CAST(e.potential_gmv AS Nullable(Float64)) - CAST(ifNull(toFloat64OrNull(toString(e.point_redemption_idr)), 0) AS Nullable(Float64)) - CAST(ifNull(toFloat64OrNull(toString(e.discount)), 0) AS Nullable(Float64)) AS original_gmv,
         CAST(multiIf(toString(e.sale_order_status) IN ('COMPLETED', '32'), e.potential_gmv, NULL) AS Nullable(Float64)) AS gmv,
         CAST(e.paid_with_bank AS Nullable(Float64)) AS revenue,
         CAST(ifNull(e.total_price_idr, 0) AS Nullable(Float64)) AS sales_amount,
@@ -523,44 +449,36 @@ data_ecommerce_base AS (
         CAST(ifNull(toFloat64OrNull(toString(e.point_redemption_idr)), 0) AS Nullable(Float64)) AS discount_amount,
         multiIf(so_main.app_type = 'ADMIN_WEB', 'shopify_draft_order', 'PRO-APP') AS source_name,
         substring(e.invoice_no, 14, 3) AS province_raw,
-		NULL AS zip_raw,
+        NULL AS zip_raw,
         CAST(multiIf(match(e.item, '(?i)herb'), 'Herbisida', e.product_cat) AS Nullable(String)) AS prod_cat,
         multiIf(so_main.app_type = '', 'OTHERS', so_main.app_type = 'ADMIN_WEB', 'DRAFT ORDER', so_main.app_type = 'MEMBER', 'AGEN', so_main.app_type) AS app_type_prev,
-		multiIf(so_main.app_type = '', 'OTHERS', so_main.app_type = 'MEMBER', 'AGEN', so_main.app_type) AS application_type,
-		NULL AS utm_soruce,
+        multiIf(so_main.app_type = '', 'OTHERS', so_main.app_type = 'MEMBER', 'AGEN', so_main.app_type) AS application_type,
+        NULL AS utm_source,
         u_e.email AS customer_email,
         u_e.phone_no AS customer_phone_number,
         trimBoth(e.name) AS customer_name,
         NULL AS shipping_address_city,
-        NULL AS shipping_address_province,
-        NULL AS shipping_address_longitude,
-        NULL AS shipping_address_latitude,
         NULL AS customer_default_address_address1,
-        NULL AS customer_default_address_address2,
         NULL AS customer_default_address_city,
-        NULL AS customer_default_address_province,
         NULL AS tags,
-		NULL AS note_attributes,
+        NULL AS note_attributes,
         NULL AS discount_code,
         NULL AS discount_amount_code,
-		CAST(
-			COALESCE(
-				toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.dp_paid_at)), 'Asia/Jakarta'))),
-				toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.paid_with_bank_time)), 'Asia/Jakarta')))
-			) AS Nullable(Date)
-		) AS payment_date,
-		CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.dp_paid_at)), 'Asia/Jakarta'))) AS Nullable(Date)) AS dp_payment_date,
-		CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.paid_with_bank_time)), 'Asia/Jakarta'))) AS Nullable(Date)) AS full_payment_date,
-		CAST(
-			multiIf(
-				toString(e.sale_order_status) IN ('COMPLETED', '32'),
-				toDate(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.completed_at)), 'Asia/Jakarta')),
-				NULL
-			) AS Nullable(Date)
-		) AS completion_date,
-        CAST(NULL AS Nullable(String)) AS delivery_address,
-        CAST(NULL AS Nullable(String)) AS city,
-        CAST(NULL AS Nullable(String)) AS province,
+        CAST(
+            COALESCE(
+                toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.dp_paid_at)), 'Asia/Jakarta'))),
+                toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.paid_with_bank_time)), 'Asia/Jakarta')))
+            ) AS Nullable(Date)
+        ) AS payment_date,
+        CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.dp_paid_at)), 'Asia/Jakarta'))) AS Nullable(Date)) AS dp_payment_date,
+        CAST(toDateOrNull(toString(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.paid_with_bank_time)), 'Asia/Jakarta'))) AS Nullable(Date)) AS full_payment_date,
+        CAST(
+            multiIf(
+                toString(e.sale_order_status) IN ('COMPLETED', '32'),
+                toDate(toTimeZone(parseDateTimeBestEffortOrNull(toString(e.completed_at)), 'Asia/Jakarta')),
+                NULL
+            ) AS Nullable(Date)
+        ) AS completion_date,
         CASE
             WHEN e.dp_paid_amount IS NULL OR toString(e.dp_paid_amount) = '' OR toString(e.dp_paid_amount) = '0' THEN 'TOD'
             ELSE 'DP'
@@ -580,11 +498,9 @@ data_ecommerce_base AS (
         CAST(NULL AS Nullable(DateTime)) AS delivery_completed_scheduled_at,
         CAST(NULL AS Nullable(DateTime)) AS cancelled_at,
         CAST(NULL AS Nullable(DateTime)) AS ready_at,
-        CAST(NULL AS Nullable(DateTime)) AS pickup_estimated,
         CAST(NULL AS Nullable(DateTime)) AS invoice_expired_time,
         CAST(NULL AS Nullable(String)) AS payment_channel_raw,
-        CAST('Others' AS String) AS payment_origin,
-        multiIf(e.product_cat IN ('Dokter Sawit'), 0, 1) AS requires_physical_delivery
+        CAST('Others' AS String) AS payment_origin
 
     FROM e_src AS e
     INNER JOIN (
@@ -601,56 +517,28 @@ data_ecommerce AS (
         b.*,
         b.sku_kg * b.qty AS total_kg,
         ufo.first_order_date AS first_order_date,
-		-- zip: kandidat zip_raw, atau segmen terakhir alamat untuk marketplace
-		trimBoth(upper(ifNull(if(zip_raw IS NOT NULL, zip_raw,
-			if(source_name IN ('shopee', 'tiktok', 'tokopedia'),
-			   trimBoth(splitByChar(',', ifNull(customer_default_address_address1, ''))[-1]),
-			   zip_raw)), ''))) AS zip_cand,
-		multiIf(
-			position(zip_cand, '*') > 0, 'Unidentified',
-			zip_cand = '', 'Unidentified',
-			NOT match(zip_cand, '^[0-9]+$'), 'Unidentified',
-			zip_cand
-		) AS customer_zip,
-		arrayFirst(x -> x != '' AND position(x, '*') = 0, [
-			trimBoth(ifNull(province_raw, '')),
-			if(source_name IN ('shopee', 'tiktok', 'tokopedia'),
-			   trimBoth(splitByChar(',', ifNull(customer_default_address_address1, ''))[-3]),
-			   '')
-		]) AS province_src,
-		trimBoth(replaceRegexpAll(upper(province_src), '\\s+', ' ')) AS province_key
+        trimBoth(upper(ifNull(if(zip_raw IS NOT NULL, zip_raw,
+            if(source_name IN ('shopee', 'tiktok', 'tokopedia'),
+               trimBoth(splitByChar(',', ifNull(customer_default_address_address1, ''))[-1]),
+               zip_raw)), ''))) AS zip_cand,
+        multiIf(
+            position(zip_cand, '*') > 0, 'Unidentified',
+            zip_cand = '', 'Unidentified',
+            NOT match(zip_cand, '^[0-9]+$'), 'Unidentified',
+            zip_cand
+        ) AS customer_zip,
+        arrayFirst(x -> x != '' AND position(x, '*') = 0, [
+            trimBoth(ifNull(province_raw, '')),
+            if(source_name IN ('shopee', 'tiktok', 'tokopedia'),
+               trimBoth(splitByChar(',', ifNull(customer_default_address_address1, ''))[-3]),
+               '')
+        ]) AS province_src,
+        trimBoth(replaceRegexpAll(upper(province_src), '\\s+', ' ')) AS province_key
     FROM data_ecommerce_base AS b
     ANY LEFT JOIN user_first_order AS ufo ON ufo.user_id = b.user_id
 ),
-finale AS (
-SELECT
-    de.*,
-	area.level_3 as district_raw,
-	coalesce(nullIf(gp.geo_province_std, ''), 'UNMAPPED') AS province_std,
-    trimBoth(cc.notes) AS user_groups,
-    trimBoth(cc.u_name) AS u_name,
-    cc.u_email,
-    cc.u_phone_no,
-    multiIf(
-        de.pic_teams LIKE '%Smallholders%' OR de.pic_teams LIKE '%DG%' OR de.pic_teams LIKE '%Agronomist%' OR de.pic_teams LIKE '%Product Experiment%', 'B2C',
-        de.pic_teams LIKE '%mallholder%', 'B2C',
-        (de.pic_teams NOT LIKE '%mallholder%') AND (de.pic_teams != ''), 'B2B',
-        (de.app_type IN ('MEMBER', 'TOKOTANI', 'ESTATE')) OR (de.app_type IS NULL) OR (de.app_type = ''), 'B2B',
-        de.app_type IN ('PETANI', 'DUTA', 'WORKER', 'KUD'), 'B2C',
-        de.app_type = 'ADMIN_WEB', 'B2B',
-        'B2C'
-    ) AS b2b_b2c,
-    multiIf(de.dates = de.first_order_date, 'NEW', 'REPEAT') AS order_retention_status,
-    trimBoth(cc.duta_name) AS duta_name,
-    cc.duta_phone_no
-FROM data_ecommerce AS de
-ANY LEFT JOIN (
-    SELECT zip_code, any(level_3) AS level_3
-    FROM default.area
-    GROUP BY zip_code
-) AS area ON de.customer_zip = area.zip_code
-ANY LEFT JOIN geo_province AS gp ON de.province_key = gp.geo_key
-ANY LEFT JOIN (
+-- lookup tambahan hanya untuk user / zip / phone yang ada di hasil
+cc AS (
     SELECT
         u.id AS u_id,
         trimBoth(u.name) AS u_name,
@@ -664,134 +552,146 @@ ANY LEFT JOIN (
     ANY LEFT JOIN default.ambassador_kyc AS ak ON al.ambassador_user_id = ak.user_id
     ANY LEFT JOIN default.user AS u2 ON ak.user_id = u2.id
     WHERE u.fraud_flag != 5
-) AS cc ON cc.u_id = de.user_id
+      AND u.id IN (SELECT user_id FROM target_users)
+),
+area_f AS (
+    SELECT zip_code, any(level_3) AS level_3
+    FROM default.area
+    GROUP BY zip_code
+),
+lsl AS (
+    SELECT phone_normalized AS lead_phone, any(user_type) AS lead_user_type
+    FROM default.larkbase_salesopportunities_leads
+    WHERE ifNull(phone_normalized, '') != '' AND trimBoth(ifNull(toString(user_type), '')) != ''
+      AND phone_normalized IN (SELECT u_phone_no FROM cc)
+    GROUP BY phone_normalized
+),
+du AS (
+    SELECT
+        phone_no AS du_phone_no,
+        any(multiIf(
+            user_role = 'AMBASSADOR' AND user_role_group = 'COOPERATIVE', 'KUD',
+            user_role = 'OWNER' AND user_role_group = 'MERCHANT', 'TOKO TANI',
+            user_role
+        )) AS du_user_role
+    FROM sawitpro_datamart.datamart_user
+    WHERE ifNull(phone_no, '') != '' AND trimBoth(ifNull(toString(user_role), '')) != ''
+      AND phone_no IN (SELECT u_phone_no FROM cc)
+    GROUP BY phone_no
 )
 
 SELECT
-	if(concat('#', splitByChar('/', ifnull(invoice_no,''))[2]) like '%B2B%' AND app_type_prev ilike '%Draft%' AND pic_names IS NULL OR order_source = 'MITRA', 'B2B', b2b_b2c) as b2b_b2c,
-	concat('#', splitByChar('/', ifnull(invoice_no,''))[2]) AS customer_ref,
-	if(source_name IN ('shopee', 'tiktok', 'tokopedia'), 'Marketplace', 'Non-Marketplace') as Sales_App,
-	if(source_name IN ('shopee', 'tiktok', 'tokopedia'), upper(source_name), upper(app_type_prev)) as order_source,
-	trimBoth(extract(ifNull(tags, ''), 'event_code:([^,]+)')) AS event_code,
-	UPPER(coalesce(
-    nullif(trimBoth(extract(ifNull(tags, ''), 'sales_code:([^,]+)')), ''),
-    nullif(trimBoth(JSONExtractString(ifNull(note_attributes, '[]'), 1, 'value')), '')
-	)) AS sales_code,
-	multiIf(
-		ifNull(pic_names, '') != '', 'YES',
-		(concat('#', splitByChar('/', ifnull(invoice_no,''))[2]) like '%B2B%' AND app_type_prev ilike '%Draft%' AND pic_names IS NULL) OR order_source = 'MITRA', 'Probably',
-		'NO'
-		) AS assisted_order,
-	province_std AS customer_province,
-	upper(coalesce(shipping_address_city, customer_default_address_city)) as customer_city,
-	case
-		when district_raw is null or district_raw = '' then trimBoth(upper(splitByChar(',', ifNull(customer_default_address_address1,''))[-4]))
-		else district_raw
-	end as customer_district,
-	customer_zip,
-	dates,
-	MonthName(dates) as month_name,
-	toYear(dates) as year_num,
-	if(concat('#', splitByChar('/', ifnull(invoice_no,''))[2]) like '%B2B%' AND (app_type_prev ilike '%Draft%' OR order_source = 'MITRA') AND pic_names IS NULL, 'Unclaimed', pic_teams) as pic_teams,
-	pic_names,
-	user_id,
-	item,
-	case
-		when item ilike ('Benih Sawit Topaz 1-3 Seri 4 (100 butir)%') then 'Benih'
-		when customer_ref in ('#B2B1940') then 'Benih'
-		else prod_cat
-	end as product_category,
-	invoice_no,
-	invoice_status,
-	sale_order_status,
-	potential_gmvs,
-	gmv,
-	revenue,
-	sales_amount,
-	shipping_cost,
-	discount_amount,
-	discount_code,
-	discount_amount_code,
-	sales_amount + shipping_cost - discount_amount as net_sales,
-	original_gmv,
-	qty,
-	payment_date,
-	dp_payment_date,
-	full_payment_date,
-	completion_date,
-	first_order_date,
-	order_retention_status,
-	payment_type,
-	dp_paid_amount,
-	delivery_type,
-	point_redemption_idr,
-	discount_amount_in_idr,
-	sku_kg,
-	product_id,
-	sku, total_kg,
-	app_type_prev,
-	application_type,
-	utm_source,
-	customer_email,
-	customer_phone_number as phone_no,
-	customer_name,
-	user_groups,
-	u_name,
-	u_email,
-	u_phone_no,
-	duta_name,
-	duta_phone_no,
-    payment_channel_raw,
-    payment_origin,
+    if(order_source = 'MITRA', 'B2B', 'B2C') AS b2b_b2c,
+    concat('#', splitByChar('/', ifNull(de.invoice_no, ''))[2]) AS customer_ref,
+    if(de.source_name IN ('shopee', 'tiktok', 'tokopedia'), 'Marketplace', 'Non-Marketplace') AS Sales_App,
+    if(de.source_name IN ('shopee', 'tiktok', 'tokopedia'), upper(de.source_name), upper(de.app_type_prev)) AS order_source,
+    trimBoth(extract(ifNull(de.tags, ''), 'event_code:([^,]+)')) AS event_code,
+    UPPER(coalesce(
+        nullif(trimBoth(extract(ifNull(de.tags, ''), 'sales_code:([^,]+)')), ''),
+        nullif(trimBoth(JSONExtractString(ifNull(de.note_attributes, '[]'), 1, 'value')), '')
+    )) AS sales_code,
+    'YES' AS assisted_order,
+    coalesce(nullIf(gp.geo_province_std, ''), 'UNMAPPED') AS customer_province,
+    upper(coalesce(de.shipping_address_city, de.customer_default_address_city)) AS customer_city,
+    if(ifNull(area_f.level_3, '') = '',
+       trimBoth(upper(splitByChar(',', ifNull(de.customer_default_address_address1, ''))[-4])),
+       area_f.level_3) AS customer_district,
+    de.customer_zip AS customer_zip,
+    de.dates AS dates,
+    MonthName(de.dates) AS month_name,
+    toYear(de.dates) AS year_num,
+    'Smallholders' AS pic_teams,
+    de.pic_names AS pic_names,
+    de.user_id AS user_id,
+    de.item AS item,
     multiIf(
-        order_line_state = 'cancel', 'CANCELLED',
-        toString(sale_order_status) IN ('COMPLETED', '32'), 'COMPLETED',
-        toString(sale_order_status) = 'NEW', 'IN PROGRESS',
-        toString(sale_order_status)
+        de.item ILIKE 'Benih Sawit Topaz 1-3 Seri 4 (100 butir)%', 'Benih',
+        customer_ref = '#B2B1940', 'Benih',
+        de.prod_cat
+    ) AS product_category,
+    de.invoice_no AS invoice_no,
+    de.invoice_status AS invoice_status,
+    de.sale_order_status AS sale_order_status,
+    de.potential_gmvs AS potential_gmvs,
+    de.gmv AS gmv,
+    de.revenue AS revenue,
+    de.sales_amount AS sales_amount,
+    de.shipping_cost AS shipping_cost,
+    de.discount_amount AS discount_amount,
+    de.discount_code AS discount_code,
+    de.discount_amount_code AS discount_amount_code,
+    de.sales_amount + de.shipping_cost - de.discount_amount AS net_sales,
+    de.original_gmv AS original_gmv,
+    de.qty AS qty,
+    de.payment_date AS payment_date,
+    de.dp_payment_date AS dp_payment_date,
+    de.full_payment_date AS full_payment_date,
+    de.completion_date AS completion_date,
+    de.first_order_date AS first_order_date,
+    if(de.dates = de.first_order_date, 'NEW', 'REPEAT') AS order_retention_status,
+    de.payment_type AS payment_type,
+    de.dp_paid_amount AS dp_paid_amount,
+    de.delivery_type AS delivery_type,
+    de.point_redemption_idr AS point_redemption_idr,
+    de.discount_amount_in_idr AS discount_amount_in_idr,
+    de.sku_kg AS sku_kg,
+    de.product_id AS product_id,
+    de.sku AS sku,
+    de.total_kg AS total_kg,
+    de.app_type_prev AS app_type_prev,
+    de.application_type AS application_type,
+    de.utm_source AS utm_source,
+    de.customer_email AS customer_email,
+    de.customer_phone_number AS phone_no,
+    de.customer_name AS customer_name,
+    trimBoth(cc.notes) AS user_groups,
+    cc.u_name AS u_name,
+    cc.u_email AS u_email,
+    cc.u_phone_no AS u_phone_no,
+    cc.duta_name AS duta_name,
+    cc.duta_phone_no AS duta_phone_no,
+    de.payment_channel_raw AS payment_channel_raw,
+    de.payment_origin AS payment_origin,
+    multiIf(
+        de.order_line_state = 'cancel', 'CANCELLED',
+        de.sale_order_status IN ('COMPLETED', '32'), 'COMPLETED',
+        de.sale_order_status = 'NEW', 'IN PROGRESS',
+        de.sale_order_status
     ) AS sales_status,
+    -- item layanan (Dokter Sawit) sudah dikecualikan -> semua butuh pengiriman fisik
     multiIf(
-        requires_physical_delivery = 0, 'N/A - DIGITAL/JASA',
-        odoo_delivery_status = 'full', 'DELIVERED',
-        odoo_delivery_status = 'pending', 'IN TRANSIT',
-        odoo_delivery_status = '0' AND num_of_deliveries > 0, 'DELIVERED',
-        odoo_delivery_status = '0', 'NOT YET SHIPPED',
-        odoo_delivery_status IS NULL, 'NOT YET SHIPPED',
-        odoo_delivery_status
+        de.odoo_delivery_status = 'full', 'DELIVERED',
+        de.odoo_delivery_status = 'pending', 'IN TRANSIT',
+        de.odoo_delivery_status = '0' AND de.num_of_deliveries > 0, 'DELIVERED',
+        de.odoo_delivery_status = '0', 'NOT YET SHIPPED',
+        de.odoo_delivery_status IS NULL, 'NOT YET SHIPPED',
+        de.odoo_delivery_status
     ) AS delivery_status,
-    order_line_state,
-    odoo_delivery_status,
-    num_of_deliveries,
-    pickup_delivery_no,
-    delivery_scheduled_at,
-    delivery_completed_scheduled_at,
-    cancelled_at,
-    ready_at,
-    invoice_expired_time,
-    dateDiff('day', toDate(dates), payment_date) AS sla_creation_to_payment,
-    dateDiff('day', toDate(dates), if(payment_date IS NULL, today(), payment_date)) AS sla_creation_to_payment_running,
-    dateDiff('day', payment_date, completion_date) AS sla_payment_to_delivery,
-    dateDiff('day', coalesce(payment_date, toDate(dates)), if(completion_date IS NULL, today(), completion_date)) AS sla_payment_to_delivery_running,
-    dateDiff('day', toDate(dates), completion_date) AS total_SLA,
-    dateDiff('day', toDate(dates), if(completion_date IS NULL, today(), completion_date)) AS total_SLA_running,
-	dateDiff('day', toDate(dates), today()) AS Aging
-FROM finale
-) AS result
-ANY LEFT JOIN (
-	SELECT phone_normalized AS lead_phone, any(user_type) AS lead_user_type
-	FROM default.larkbase_salesopportunities_leads
-	WHERE ifNull(phone_normalized, '') != '' AND trimBoth(ifNull(toString(user_type), '')) != ''
-	GROUP BY phone_normalized
-) AS lsl ON result.u_phone_no = lsl.lead_phone
-ANY LEFT JOIN (
-	SELECT
-	phone_no AS du_phone_no,
-	any(case
-			when user_role='AMBASSADOR' and user_role_group = 'COOPERATIVE' then 'KUD'
-			when user_role='OWNER' and user_role_group = 'MERCHANT' then 'TOKO TANI'
-			else user_role
-		end) AS du_user_role
-	FROM sawitpro_datamart.datamart_user
-	WHERE ifNull(phone_no, '') != '' AND trimBoth(ifNull(toString(user_role), '')) != ''
-	GROUP BY phone_no
-) AS du ON result.u_phone_no = du.du_phone_no
+    de.order_line_state AS order_line_state,
+    de.odoo_delivery_status AS odoo_delivery_status,
+    de.num_of_deliveries AS num_of_deliveries,
+    de.pickup_delivery_no AS pickup_delivery_no,
+    de.delivery_scheduled_at AS delivery_scheduled_at,
+    de.delivery_completed_scheduled_at AS delivery_completed_scheduled_at,
+    de.cancelled_at AS cancelled_at,
+    de.ready_at AS ready_at,
+    de.invoice_expired_time AS invoice_expired_time,
+    dateDiff('day', toDate(de.dates), de.payment_date) AS sla_creation_to_payment,
+    dateDiff('day', toDate(de.dates), ifNull(de.payment_date, today())) AS sla_creation_to_payment_running,
+    dateDiff('day', de.payment_date, de.completion_date) AS sla_payment_to_delivery,
+    dateDiff('day', coalesce(de.payment_date, toDate(de.dates)), ifNull(de.completion_date, today())) AS sla_payment_to_delivery_running,
+    dateDiff('day', toDate(de.dates), de.completion_date) AS total_SLA,
+    dateDiff('day', toDate(de.dates), ifNull(de.completion_date, today())) AS total_SLA_running,
+    dateDiff('day', toDate(de.dates), today()) AS Aging,
+    coalesce(
+        nullIf(trimBoth(ifNull(toString(lsl.lead_user_type), '')), ''),
+        nullIf(trimBoth(ifNull(toString(du.du_user_role), '')), ''),
+        'Unidentified'
+    ) AS user_type
+FROM data_ecommerce AS de
+ANY LEFT JOIN area_f ON de.customer_zip = area_f.zip_code
+ANY LEFT JOIN geo_province AS gp ON de.province_key = gp.geo_key
+ANY LEFT JOIN cc ON cc.u_id = de.user_id
+ANY LEFT JOIN lsl ON cc.u_phone_no = lsl.lead_phone
+ANY LEFT JOIN du ON cc.u_phone_no = du.du_phone_no
 ORDER BY dates DESC;
