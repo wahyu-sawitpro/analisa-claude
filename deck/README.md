@@ -148,7 +148,7 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
-- `src/sample-data.json`: the six weekly exports for 12–18 Oct (sales and CRM, both teams), with phone numbers and names replaced by anonymous tokens
+- `src/sample-data.json`: the six weekly exports for 19–25 Oct (sales and CRM, both teams), with phone numbers and names replaced by anonymous tokens
 - Built PPTX files, `audit.csv` and `DECISIONS.md` for the forecast, acquisition, DO pipeline and Jul–Sep reviews are on branch `claude/pensive-ritchie-9d38qh` under `deck/output/`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`
 
@@ -169,7 +169,18 @@ Months the data covers in full form the trend; a partial month is left out. The 
   “Rejection reasons · potential loss” slide with the biggest leads at stake and any competitor price in the notes.
 - **Overdue prospects.** Prospects whose estimated closing date has passed by the end of the week become an action.
 
-## Findings for the week of 12–18 Oct 2026 (sample data)
+## Week of 19–25 Oct 2026 (sample data)
+The sample is the six weekly exports for 19–25 Oct (sales last two weeks, rejection reasons and success stories for
+both teams). Slides say "sales", never "GMV".
+- Smallholder sales Rp515M (+37%), but one wholesale KCL order is 52% of it; without each week's largest order, −7%.
+- Success stories: all 5 Smallholder stories are in sales (Rp82.2M, mobile-shop sales logged at checkout); 6 orders
+  (Rp432M) have no CRM record. Plantation: 1 of 5 matched, PSEN-2153 is on the CRM but sales are not reflected yet,
+  3 are prospects. Two identical Rp47.5M Topaz orders are flagged as a possible duplicate.
+- Rejections: 218 of 284 Smallholder entries are TikTok live viewers (account name, no phone) and are left out. Of 58
+  real leads, 2 logged Rp111M of potential sales and 5 stated ~35.5 t of need plus 300 Topaz seeds; the table shows
+  the value or need exactly as logged. All 96 Plantation entries are one template with no potential or need.
+
+## Findings for the week of 12–18 Oct 2026 (earlier sample)
 The sample is the six exports in the repo for this week: Smallholder and Plantation sales (last two weeks), and the
 rejection-reason and success-story CRM exports for both teams.
 

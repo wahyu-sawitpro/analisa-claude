@@ -87,7 +87,7 @@ function buildPptx(T,DX){
 
   // Teams at a glance
   if(DX.multi&&!DX.trend){ const sl=content("Teams at a glance",DX.cmpTitle), tot=T.reduce((s,t)=>s+t.A.gmv,0), TC=["274E13","D9A21B","6E8F5A","5B7F95"];
-    if(tot){ box(sl,80,180,1080,96); heading(sl,100,192,600,"Share of GMV");
+    if(tot){ box(sl,80,180,1080,96); heading(sl,100,192,600,"Share of sales");
       let x=100; T.forEach((t,i)=>{ const w=Math.max(4,1040*t.A.gmv/tot); sl.addShape(pres.shapes.RECTANGLE,{x:X(x),y:X(222),w:X(w-2),h:X(38),fill:{color:TC[i]},line:{color:TC[i],width:0}});
         if(t.A.gmv/tot>.12) txt(sl,`${t.name} · ${rp(t.A.gmv)} (${pct(t.A.gmv,tot)}%)`,{x:X(x+10),y:X(222),w:X(w-20),h:X(38),fontSize:11,bold:true,color:"FFFFFF",valign:"middle"});
         else txt(sl,`${t.name} ${pct(t.A.gmv,tot)}%`,{x:X(x-150),y:X(262),w:X(150+w),h:X(14),fontSize:8.5,color:"535353",align:"right"});

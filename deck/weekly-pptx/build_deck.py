@@ -82,7 +82,7 @@ def session(t):
     return "Other live"
 LIVE = LIVE.assign(sess=LIVE["Detail Pembahasan"].map(session))
 
-# Leads with a logged potential GMV or a stated need (read from the CRM fields and the discussion notes, as logged)
+# Leads with a logged potential sales or a stated need (read from the CRM fields and the discussion notes, as logged)
 NEED = {  # engagement id -> (product asked, need as stated, extra context) ; verified against the export
     "SMEN-42378": ("NPK Pak Tani 7-6-35", "10 t every 6 months", "Total quoted incl. shipping to Aceh Singkil"),
     "SMEN-42734": ("NPK Yaramila 16-16-16", "4 sacks", "Stock confirmed ready; pick-up at warehouse"),
@@ -162,10 +162,10 @@ def box(sl, x, y, w, h, fill, rounded=True, line=None, name=None):
     if name: s.name = name
     return s
 NOTES = {
-    "Executive summary": "Weeks run Monday to Sunday: 12-18 Oct vs 19-25 Oct (last order 24 Oct). GMV is the gmv column of the sales exports. 'Matching CRM success story' = success-story engagements found in the sales export by phone (Smallholder) or by lead name and region (Plantation).",
+    "Executive summary": "Weeks run Monday to Sunday: 12-18 Oct vs 19-25 Oct (last order 24 Oct). Sales = the gmv column of the sales exports. 'Matching CRM success story' = success-story engagements found in the sales export by phone (Smallholder) or by lead name and region (Plantation).",
     "Smallholder · success story": "Each success-story engagement was matched to a sales order by phone number and the product it logged. Orders without any engagement in the success-story or rejection export are listed on the right.",
     "Smallholder · rejection reasons": "TikTok live viewers = entries whose notes say the account joined a TikTok live; none has a phone number. Customers asking about an order = status 'Menanyakan Status Pesanan'. The barrier for real leads is read from the reason field first, then the discussion notes.",
-    "Smallholder · rejection reasons · potential": "Potential GMV is the CRM field as logged. Needs are taken from the 'Fertilizer needs (kg)' field or the quantity the lead stated in the notes. Nothing is priced or estimated.",
+    "Smallholder · rejection reasons · potential": "Potential sales is the CRM's potential field as logged. Needs are taken from the 'Fertilizer needs (kg)' field or the quantity the lead stated in the notes. Nothing is priced or estimated.",
     "Plantation · success story": "PSEN-2293 matches order #B2C26748 by lead name and region (the phone in the CRM differs from the sales export). PSEN-2153 has no matching order in the sales export.",
 }
 def new_slide(title, kicker):
@@ -268,15 +268,15 @@ crm_seen = sum(r["gmv"] or 0 for r in SH_STORY) + 6.12e6
 tot2, tot1 = sh2["gmv"] + pl2["gmv"], sh1["gmv"] + pl1["gmv"]
 top_sh = sho2.iloc[0]; grosir = SH[(SH.wk == "W2") & (SH.product_cat == "Pupuk Grosir")].gmv.sum()
 sl = new_slide(f"{rp(tot2)} in sales (+{pct(tot2-tot1, tot1)}%), carried by a few big orders", "Executive summary")
-kpi(sl, 0.42, 1.08, 2.18, 0.86, rp(tot2), f"Total GMV, 19–25 Oct ({chg(tot2, tot1)} from {rp(tot1)})", hot=True)
+kpi(sl, 0.42, 1.08, 2.18, 0.86, rp(tot2), f"Total sales, 19–25 Oct ({chg(tot2, tot1)} from {rp(tot1)})", hot=True)
 kpi(sl, 2.72, 1.08, 2.18, 0.86, rp(sh2["gmv"]), f"Smallholder, {sh2['orders']} orders ({chg(sh2['gmv'], sh1['gmv'])})")
 kpi(sl, 5.02, 1.08, 2.18, 0.86, rp(pl2["gmv"]), f"Plantation, {pl2['orders']} orders ({chg(pl2['gmv'], pl1['gmv'])})")
-kpi(sl, 7.32, 1.08, 2.18, 0.86, f"{pct(crm_seen, tot2)}%", "of GMV has a matching CRM success story")
+kpi(sl, 7.32, 1.08, 2.18, 0.86, f"{pct(crm_seen, tot2)}%", "of sales has a matching CRM success story")
 ins = [
-    ("Smallholder rode on two wholesale KCL orders.", f"{rp(grosir)} of {rp(sh2['gmv'])} ({pct(grosir, sh2['gmv'])}%); orders fell {sh1['orders']} → {sh2['orders']}. Without each week's largest order, GMV is down 7%."),
+    ("Smallholder rode on two wholesale KCL orders.", f"{rp(grosir)} of {rp(sh2['gmv'])} ({pct(grosir, sh2['gmv'])}%); orders fell {sh1['orders']} → {sh2['orders']}. Without each week's largest order, sales are down 7%."),
     ("77% of Smallholder “rejections” are TikTok live viewers.", f"{len(LIVE)} of {len(shr)} entries are accounts that joined a live, with no phone number. {len(LEADS)} are real leads."),
-    ("Real leads named Rp111M and ~36 t of demand.", f"2 leads logged a potential GMV; 5 stated a volume. Payment terms, mobile-shop routes and shipping cost hold them back."),
-    ("Plantation: Topaz seeds are 83% of GMV; CRM can't explain it.", f"One buyer placed two identical Rp47.5M orders. All {len(plr)} rejection entries carry one templated reason and no potential."),
+    ("Real leads named Rp111M and ~36 t of demand.", f"2 leads logged a potential sales value; 5 stated a volume. Payment terms, mobile-shop routes and shipping cost hold them back."),
+    ("Plantation: Topaz seeds are 83% of sales; CRM can't explain it.", f"One buyer placed two identical Rp47.5M orders. All {len(plr)} rejection entries carry one templated reason and no potential."),
 ]
 y = 2.1
 for b, t in ins:
@@ -292,15 +292,15 @@ text(sl, 6.65, 3.95, 2.7, 0.9, f"Collect {rp(179.1e6)} still unpaid on 3 Smallho
 cd = cat_delta(SH)
 sl = new_slide(f"Smallholder {chg(sh2['gmv'], sh1['gmv'])} to {rp(sh2['gmv'])}; one order is {pct(top_sh.gmv, sh2['gmv'])}% of it", "Smallholder · sales vs the week before")
 y0 = card(sl, 0.42, 1.08, 4.6, 2.75, "Week of 19 Oct vs week of 12 Oct", "Each pair scaled on its own")
-pairbars(sl, 0.6, y0 + 0.02, 4.25, 2.1, [("GMV", sh1["gmv"], sh2["gmv"]), ("Orders", sh1["orders"], sh2["orders"]), ("Customers", sh1["cust"], sh2["cust"]), ("Tonnes", sh1["kg"] / 1000, sh2["kg"] / 1000)],
+pairbars(sl, 0.6, y0 + 0.02, 4.25, 2.1, [("Sales", sh1["gmv"], sh2["gmv"]), ("Orders", sh1["orders"], sh2["orders"]), ("Customers", sh1["cust"], sh2["cust"]), ("Tonnes", sh1["kg"] / 1000, sh2["kg"] / 1000)],
          [rp, lambda v: str(int(v)), lambda v: str(int(v)), lambda v: f"{v:.0f} t"])
-y0 = card(sl, 5.17, 1.08, 4.33, 2.75, "What moved GMV", "Change by product category")
+y0 = card(sl, 5.17, 1.08, 4.33, 2.75, "What moved sales", "Change by product category")
 diverge(sl, 5.31, y0 + 0.02, 4.05, [(k, v) for k, v in cd["d"].items() if abs(v) >= 1e6][::-1][:6], row=0.36, labw=1.15)
 ex2, ex1 = sh2["gmv"] - top_sh.gmv, sh1["gmv"] - SHO[SHO.wk == "W1"].gmv.max()
 c1, c2 = set(SHO[SHO.wk == "W1"].cust), set(SHO[SHO.wk == "W2"].cust); exp = round((ex2 - ex1) / ex1 * 100)
 notes(sl, 0.42, 3.95, 9.08, 1.05, [
     ("Bigger orders, fewer of them:", f"average order {rp(sh1['aov'])} → {rp(sh2['aov'])}; volume {sh1['kg']/1000:.0f} t → {sh2['kg']/1000:.0f} t."),
-    ("One order changes the picture:", f"{top_sh.main_order_no} ({rp(top_sh.gmv)}, 622 sacks KCL Mentari, {top_sh.pic}). Without each week's largest order, GMV is {rp(ex1)} → {rp(ex2)} ({'+' if exp >= 0 else '−'}{abs(exp)}%)."),
+    ("One order changes the picture:", f"{top_sh.main_order_no} ({rp(top_sh.gmv)}, 622 sacks KCL Mentari, {top_sh.pic}). Without each week's largest order, sales are {rp(ex1)} → {rp(ex2)} ({'+' if exp >= 0 else '−'}{abs(exp)}%)."),
     ("Khusus Petani almost disappeared:", f"{rp(cd.loc['Khusus Petani','W1'])} → {rp(cd.loc['Khusus Petani','W2'])}; last week's Rp110M Bungo group order did not repeat, and {len(c1 - c2)} of last week's {len(c1)} customers did not reorder."),
 ])
 
@@ -311,11 +311,11 @@ for _, o in sho2.iterrows():
     prods = ", ".join(dict.fromkeys(short(i) for i in o["items"])); q = int(sum(o.qty)); u = unit(o["items"][0])
     rows.append([o.main_order_no, o.pic, prods if len(prods) < 34 else prods[:32] + "…", f"{q} {u if q != 1 else u[:-1]}", rp(o.gmv), "Partly paid" if o.inv != "PAID" else "Paid",
                  "Completed" if o.so == "COMPLETED" else "Open", "Yes" if o.main_order_no in SH_MATCHED else "No"])
-table(sl, 0.42, 1.08, 6.55, rows, ["Order", "PIC", "Products", "Qty", "GMV", "Payment", "Status", "In CRM"], [1.05, 1.55, 1.9, 0.75, 0.7, 0.75, 0.7, 0.55],
+table(sl, 0.42, 1.08, 6.55, rows, ["Order", "PIC", "Products", "Qty", "Sales", "Payment", "Status", "In CRM"], [1.05, 1.55, 1.9, 0.75, 0.7, 0.75, 0.7, 0.55],
       size=7, row_h=0.27, align="lllrrlll", hl=lambda i, j: j == 7 and rows[i][7] == "No")
-kpi(sl, 7.12, 1.08, 2.38, 0.9, rp(179.1e6), "still to collect on 3 partly paid orders (Rp333M GMV)", hot=True)
+kpi(sl, 7.12, 1.08, 2.38, 0.9, rp(179.1e6), "still to collect on 3 partly paid orders (Rp333M sales)", hot=True)
 kpi(sl, 7.12, 2.08, 2.38, 0.9, f"{(sho2.so != 'COMPLETED').sum()}/{len(sho2)}", "orders still open (not completed)")
-kpi(sl, 7.12, 3.08, 2.38, 0.9, f"{pct(grosir, sh2['gmv'])}%", "of GMV is Pupuk Grosir (2 wholesale KCL orders)")
+kpi(sl, 7.12, 3.08, 2.38, 0.9, f"{pct(grosir, sh2['gmv'])}%", "of sales is Pupuk Grosir (2 wholesale KCL orders)")
 text(sl, 7.12, 4.1, 2.38, 0.9, "Wholesale, Topaz and the Mandailing Natal NPK order came from PICs who logged nothing in the CRM this week.", size=8, color=MUTED)
 
 # 5 Smallholder success story
@@ -323,12 +323,12 @@ sm = sum(r["gmv"] or 0 for r in SH_STORY)
 sl = new_slide(f"CRM covers {rp(sm)} of sales; {rp(SH_NOCRM.gmv.sum())} has no record", "Smallholder · success story")
 y0 = card(sl, 0.42, 1.08, 4.48, 2.8, f"CRM success stories ({len(SH_STORY)})", "Checked against the sales export by phone and product")
 table(sl, 0.56, y0 + 0.02, 4.2, [[r["id"], r["prod"], r["order"], rp(r["gmv"]) if r["gmv"] else "–", r["note"]] for r in SH_STORY],
-      ["CRM ID", "Logged", "Order", "GMV", "Note"], [0.9, 1.25, 0.85, 0.55, 1.15], size=7, row_h=0.3, align="lllrl")
+      ["CRM ID", "Logged", "Order", "Sales", "Note"], [0.9, 1.25, 0.85, 0.55, 1.15], size=7, row_h=0.3, align="lllrl")
 y0 = card(sl, 5.02, 1.08, 4.48, 2.8, f"In sales, not in the CRM ({len(SH_NOCRM)})", "Sales recorded; no CRM engagement logged")
 table(sl, 5.16, y0 + 0.02, 4.2, [[o.main_order_no, o.pic, short(o["items"][0]), rp(o.gmv)] for _, o in SH_NOCRM.iterrows()],
-      ["Order", "PIC", "Product", "GMV"], [0.95, 1.55, 1.2, 0.6], size=7, row_h=0.3, align="lllr")
+      ["Order", "PIC", "Product", "Sales"], [0.95, 1.55, 1.2, 0.6], size=7, row_h=0.3, align="lllr")
 notes(sl, 0.42, 4.0, 9.08, 1.0, [
-    ("The CRM sees 16% of GMV:", f"{rp(sm)} of {rp(sh2['gmv'])}. All 5 stories are Rudi Nirwana's mobile-shop (toko keliling) sales, logged on the day of the sale."),
+    ("The CRM sees 16% of sales:", f"{rp(sm)} of {rp(sh2['gmv'])}. All 5 stories are Rudi Nirwana's mobile-shop (toko keliling) sales, logged on the day of the sale."),
     ("The big orders are invisible:", f"{rp(SH_NOCRM[SH_NOCRM.pic != 'Rudi Nirwana'].gmv.sum())} of it comes from Muhammad Abdul Wahab, Simon Sutrado Simanjuntak and Joko Prestiwo, who logged no engagement, so we can't see how these customers were won or when they will reorder."),
 ])
 
@@ -348,15 +348,15 @@ notes(sl, 0.42, 4.15, 9.08, 0.85, [
 ])
 
 # 7 Smallholder rejection potential
-sl = new_slide(f"Real leads logged {rp(pot_total)} of potential GMV and named ~{named_t:.0f} t more", "Smallholder · rejection reasons · potential")
-kpi(sl, 0.42, 1.08, 2.18, 0.86, rp(pot_total), "potential GMV logged in the CRM (2 leads)", hot=True)
+sl = new_slide(f"Real leads logged {rp(pot_total)} of potential sales and named ~{named_t:.0f} t more", "Smallholder · rejection reasons · potential")
+kpi(sl, 0.42, 1.08, 2.18, 0.86, rp(pot_total), "potential sales logged in the CRM (2 leads)", hot=True)
 kpi(sl, 2.72, 1.08, 2.18, 0.86, f"~{named_t:.0f} t", "fertilizer need stated by 5 more leads")
 kpi(sl, 5.02, 1.08, 2.18, 0.86, "300", "Topaz seeds requested by 1 lead")
-kpi(sl, 7.32, 1.08, 2.18, 0.86, f"{len(LEADS) - len(need_rows)}/{len(LEADS)}", "real leads with no GMV or quantity logged")
+kpi(sl, 7.32, 1.08, 2.18, 0.86, f"{len(LEADS) - len(need_rows)}/{len(LEADS)}", "real leads with no potential or quantity logged")
 table(sl, 0.42, 2.08, 9.08, [[x["id"], x["pic"], x["prod"], rp(x["pot"]) if x["pot"] else "–", x["need"], x["b"], x["ctx"]] for x in need_rows],
-      ["CRM ID", "PIC", "Product asked", "Potential GMV", "Need (as stated)", "What holds it back", "Context"], [0.8, 1.15, 1.45, 0.8, 1.2, 1.55, 2.1],
+      ["CRM ID", "PIC", "Product asked", "Potential sales", "Need (as stated)", "What holds it back", "Context"], [0.8, 1.15, 1.45, 0.8, 1.2, 1.55, 2.1],
       size=7, row_h=0.31, align="lllrlll")
-text(sl, 0.42, 4.65, 9.08, 0.35, "Potential GMV is shown only where the PIC logged it; otherwise the need is shown as the lead stated it (sacks, kg, tonnes or seeds). No value is estimated.", size=7.5, color=MUTED)
+text(sl, 0.42, 4.65, 9.08, 0.35, "Potential sales are shown only where the PIC logged it; otherwise the need is shown as the lead stated it (sacks, kg, tonnes or seeds). No value is estimated.", size=7.5, color=MUTED)
 
 # 8 What would unlock them
 sl = new_slide("Payment terms, routes and shipping cost hold real leads back", "Smallholder · what would unlock the leads")
@@ -382,8 +382,8 @@ notes(sl, 0.42, 4.1, 9.08, 0.9, [
 pd_ = cat_delta(PL); eko = PL[(PL.wk == "W2") & (PL.pic_name == "Eko Prastyo")].gmv.sum(); topaz = PL[(PL.wk == "W2") & (PL.product_cat == "Benih")].gmv.sum()
 sl = new_slide(f"Plantation {chg(pl2['gmv'], pl1['gmv'])} to {rp(pl2['gmv'])}; one Topaz buyer is {rp(eko)}", "Plantation · sales vs the week before")
 y0 = card(sl, 0.42, 1.08, 4.6, 2.75, "Week of 19 Oct vs week of 12 Oct", "Each pair scaled on its own")
-pairbars(sl, 0.6, y0 + 0.02, 4.25, 2.1, [("GMV", pl1["gmv"], pl2["gmv"]), ("Orders", pl1["orders"], pl2["orders"]), ("Customers", pl1["cust"], pl2["cust"])], [rp, lambda v: str(int(v)), lambda v: str(int(v))])
-y0 = card(sl, 5.17, 1.08, 4.33, 2.75, "What moved GMV", "Change by product category")
+pairbars(sl, 0.6, y0 + 0.02, 4.25, 2.1, [("Sales", pl1["gmv"], pl2["gmv"]), ("Orders", pl1["orders"], pl2["orders"]), ("Customers", pl1["cust"], pl2["cust"])], [rp, lambda v: str(int(v)), lambda v: str(int(v))])
+y0 = card(sl, 5.17, 1.08, 4.33, 2.75, "What moved sales", "Change by product category")
 diverge(sl, 5.31, y0 + 0.02, 4.05, [(k, v) for k, v in pd_["d"].items() if abs(v) > 0][::-1], row=0.4, labw=1.15)
 notes(sl, 0.42, 3.95, 9.08, 1.05, [
     ("Check a possible duplicate:", "#B2C26771 and #B2C26772 are the same customer, same day, 50 Topaz packs each (Rp47.5M each) by Eko Prastyo."),
@@ -399,10 +399,10 @@ table(sl, 0.56, y0 + 0.02, 5.07, [[r["id"], r["what"], rp(r["val"]) if r["val"] 
       hl=lambda i, j: j == 4 and "not reflected" in PL_STORY[i]["note"])
 y0 = card(sl, 5.9, 1.08, 3.6, 2.8, f"In sales, not in the CRM ({len(PL_NOCRM)})", "Sales recorded; no CRM engagement logged")
 table(sl, 6.04, y0 + 0.02, 3.32, [[o.main_order_no, o.pic.split(" ")[0], short(o["items"][0]), rp(o.gmv)] for _, o in PL_NOCRM.iterrows()],
-      ["Order", "PIC", "Product", "GMV"], [0.9, 0.7, 1.05, 0.6], size=7, row_h=0.24, align="lllr")
+      ["Order", "PIC", "Product", "Sales"], [0.9, 0.7, 1.05, 0.6], size=7, row_h=0.24, align="lllr")
 notes(sl, 0.42, 4.0, 9.08, 1.0, [
     ("PSEN-2153 (4 leaf + 4 soil tests, Rp6.4M):", "team put on CRM however sales not reflected yet. Enter the order or correct the CRM."),
-    ("The CRM sees 4% of Plantation GMV:", f"{rp(PL_NOCRM.gmv.sum())} of {rp(pl2['gmv'])} has no engagement, including Eko Prastyo's {rp(eko)} Topaz buyer. KebunPRO prospects worth Rp32.8M are dated to close by 31 Dec."),
+    ("The CRM sees 4% of Plantation sales:", f"{rp(PL_NOCRM.gmv.sum())} of {rp(pl2['gmv'])} has no engagement, including Eko Prastyo's {rp(eko)} Topaz buyer. KebunPRO prospects worth Rp32.8M are dated to close by 31 Dec."),
 ])
 
 # 11 Plantation rejection
@@ -418,8 +418,8 @@ hbars(sl, 5.09, y0 + 0.02, 4.27, [(f"{p} · {s}", int(v)) for (p, s), v in pc.so
 pu = plr['Tujuan Melakukan Engagement'].value_counts()
 text(sl, 5.09, y0 + 1.35, 4.27, 0.8, [[("Offered: ", {"bold": True}), (", ".join(f"{k} {v}" for k, v in pu.items()) + ". About 10 entries per PIC per day.", {})]], size=7.8, color=MUTED)
 notes(sl, 0.42, 4.05, 9.08, 0.95, [
-    ("Potential can't be shown:", "no entry has a potential GMV, an FFB volume or a stated need, so the size of what was lost is unknown."),
-    ("Yet Topaz sells:", f"Topaz is {pct(topaz, pl2['gmv'])}% of Plantation GMV this week, while 51 Topaz ad leads are logged as not interested. Devi Mariana Naibaho sold a Rp9.5M Topaz order that has no CRM entry."),
+    ("Potential can't be shown:", "no entry has a potential sales value, an FFB volume or a stated need, so the size of what was lost is unknown."),
+    ("Yet Topaz sells:", f"Topaz is {pct(topaz, pl2['gmv'])}% of Plantation sales this week, while 51 Topaz ad leads are logged as not interested. Devi Mariana Naibaho sold a Rp9.5M Topaz order that has no CRM entry."),
 ])
 
 # 12 Next steps
