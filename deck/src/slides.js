@@ -505,26 +505,27 @@ function acqSpecs(Q,pre){
     [{v:"Total farmers",bold:true},P?{v:nf.format(P.total),bold:true}:"–",{v:nf.format(L.total),bold:true},P?{v:sg(d),bold:true}:"–",P?{v:spc(L.total,P.total),bold:true}:"–","100%"]];
   const rowsD=D.slice(0,12).map(x=>[{v:x.k,bold:!!x.l},x.internal?"Internal team":"External",P?(x.p?nf.format(x.p):"–"):"–",x.l?{v:nf.format(x.l),bold:true}:"–",nf.format(x.tot)]);
   S.push({kicker:pre+"Acquisition · Duta vs non-Duta",
-    title:P?`Dutas brought ${nf.format(L.under)} farmers last week (${sg(du)}), ${(L.under/L.total*100).toFixed(1)}% of ${nf.format(L.total)}; non-Duta ${nf.format(L.non)} (${sg(dn)})`:`Dutas brought ${nf.format(L.under)} of ${nf.format(L.total)} farmers in the week of ${L.label}`,
+    title:P?`${L.under?`Dutas brought ${nf.format(L.under)} farmers last week (${sg(du)}), ${(L.under/L.total*100).toFixed(1)}% of ${nf.format(L.total)}`:`No farmer came through a Duta last week (${P.under} the week before)`}; non-Duta ${nf.format(L.non)} (${sg(dn)})`:`Dutas brought ${nf.format(L.under)} of ${nf.format(L.total)} farmers in the week of ${L.label}`,
     rows:[
       {cards:[
         {w:1.1,title:"Duta vs non-Duta, last week vs the week before",sub:P?`${P.label} vs ${L.label}`:L.label,table:{colW:[30,13,13,12,11,13],head:["Farmers",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change","Change %","Share last week"],align:["l","r","r","r","r","r"],rows:rowsT}},
         {w:1,title:"Farmers by Duta",sub:`Last week first; ${W.length} weeks = ${W[0].short} – ${L.short}`,table:{colW:[32,24,15,15,14],head:["Duta","Type",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,`${W.length} weeks`],align:["l","l","r","r","r"],rows:rowsD}}]}],
     notes:[
-      `<b>Dutas:</b> ${L.under} farmers last week came through ${act.length} Duta${act.length===1?"":"s"} (${act.map(x=>`${x.k} ${x.l}`).join(", ")||"none"}), all ${L.real?"":"from "}${L.real?`${L.test} internal team, ${L.real} external`:"internal-team Dutas"}. ${intN} of the ${D.length} Dutas with farmers in ${W.length} weeks are internal team; external Dutas brought ${Q.weeks.reduce((s,x)=>s+x.real,0)}.`,
+      `<b>Dutas:</b> ${!L.under?`no farmer came through a Duta last week`:""}${L.under?`${L.under} farmers last week came through ${act.length} Duta${act.length===1?"":"s"} (${act.map(x=>`${x.k} ${x.l}`).join(", ")||"none"}), all ${L.real?"":"from "}${L.real?`${L.test} internal team, ${L.real} external`:"internal-team Dutas"}`:""}. ${intN} of the ${D.length} Dutas with farmers in ${W.length} weeks are internal team; external Dutas brought ${Q.weeks.reduce((s,x)=>s+x.real,0)}.`,
       Q.dropped&&`<b>Week left out:</b> the week of ${fds(new Date(Q.dropped.w))} (${nf.format(Q.dropped.n)} farmers to ${fds(Q.dropped.to)}) is still in progress, so last week is ${L.label}.`].filter(Boolean)});
+  if(Q.profile) S.push(...acqProfileSpecs(Q,pre));
   // 2. What moved the total
   if(P){ const steps=[{k:`Week before\n${P.short}`,v:P.total,total:true},...Q.dSrc.filter(x=>x.d).sort((a,b)=>a.d-b.d).map(x=>({k:x.k,v:x.d})),{k:`Last week\n${L.short}`,v:L.total,total:true,color:CAT[0]}];
     const cm=Q.camps.filter(x=>x.d), cItems=[...cm.slice(0,5),...cm.slice(-3).reverse()].filter((x,i,a)=>a.indexOf(x)===i).sort((a,b)=>a.d-b.d).map(x=>({k:x.k,v:x.d,tip:`${x.p} → ${x.l}`}));
-    const topC=Q.camps[0];
+    const rise=d>=0, mv=rise?ups[0]:top, mvC=rise?[...Q.camps].reverse().find(x=>x.d>0):Q.camps.find(x=>x.d<0), against=rise?drops:ups;
     S.push({kicker:pre+"Acquisition · what moved the total",
-      title:top?`${top.k} explains ${pct(-top.d,-d>0?-d:1)}% of the drop (${sg(top.d)}); ${ups.length?`${ups.map(x=>`${x.k} ${sg(x.d)}`).join(", ")} grew`:"no channel grew"}`:`Farmers ${sg(d)} on the week before`,
+      title:mv?`${mv.k} explains ${pct(Math.abs(mv.d),Math.max(1,Math.abs(d)))}% of the ${rise?"rise":"drop"} (${sg(mv.d)}); ${against.length?`${against.map(x=>`${x.k} ${sg(x.d)}`).join(", ")} ${rise?"fell":"grew"}`:`no channel ${rise?"fell":"grew"}`}`:`Farmers ${sg(d)} on the week before`,
       rows:[{cards:[
         {w:1,title:"From the week before to last week, by channel",sub:"Farmers registered, by acquisition channel",chart:{type:"waterfall",steps,lblH:36}},
         {w:1,title:"Largest moves by campaign, non-Duta",sub:"Change in farmers; hover for week before → last week",chart:{type:"diverge",items:cItems}}]}],
       notes:[
-        top&&`<b>${top.k} fell from ${nf.format(top.p)} to ${nf.format(top.l)}</b>${topC&&topC.d<0?`; inside it the largest single drop is “${topC.k}” (${nf.format(topC.p)} → ${nf.format(topC.l)}).`:"."}`,
-        ups.length&&`<b>Paid acquisition held up:</b> ${ups.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}${Q.camps.filter(x=>x.d>0).length?`; the largest campaign gain is “${Q.camps[Q.camps.length-1].k}” (${sg(Q.camps[Q.camps.length-1].d)}).`:"."}`].filter(Boolean)}); }
+        mv&&`<b>${mv.k} went from ${nf.format(mv.p)} to ${nf.format(mv.l)}</b>${mvC?`; the largest campaign ${rise?"gain":"drop"} is “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)}).`:"."}`,
+        against.length&&`<b>${rise?"Fell":"Grew"} against the trend:</b> ${against.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}.`].filter(Boolean)}); }
   // 3. Weekly trend and the days of the week
   const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   S.push({kicker:pre+`Acquisition · ${W.length}-week trend`,
@@ -534,7 +535,7 @@ function acqSpecs(Q,pre){
         series:Q.srcs.map((k,i)=>({name:k,color:srcC(k,i),values:W.map(x=>x.src.get(k)||0)})),lblH:24}},
       P&&{w:1,title:"Farmers per day, last week vs the week before",sub:"By join date",chart:{type:"line",cats:DAYS,show:"all",max:Math.ceil(Math.max(...P.days,...L.days)*1.15/10)*10,axisFmt:v=>nf.format(Math.round(v)),
         series:[{name:`Week before (${P.short})`,color:"#9AA592",values:P.days,show:[P.days.indexOf(Math.max(...P.days))]},{name:`Last week (${L.short})`,color:CAT[0],values:L.days}]}}].filter(Boolean)}],
-    notes:[P&&`<b>The week before had a mid-week spike:</b> ${Math.max(...P.days)} farmers on ${DAYS[P.days.indexOf(Math.max(...P.days))]}, against a high of ${Math.max(...L.days)} on any day last week. Last week's days were flatter (${Math.min(...L.days)}–${Math.max(...L.days)} a day).`,
+    notes:[P&&(Math.max(...L.days)>=Math.max(...P.days)?`<b>Last week had a spike:</b> ${Math.max(...L.days)} farmers on ${DAYS[L.days.indexOf(Math.max(...L.days))]}, against a high of ${Math.max(...P.days)} on any day the week before; the other days ran ${Math.min(...L.days)}–${[...L.days].sort((a,b)=>b-a)[1]} a day.`:`<b>The week before had a mid-week spike:</b> ${Math.max(...P.days)} farmers on ${DAYS[P.days.indexOf(Math.max(...P.days))]}, against a high of ${Math.max(...L.days)} on any day last week. Last week's days were flatter (${Math.min(...L.days)}–${Math.max(...L.days)} a day).`),
       `<b>Days:</b> the file's weeks run from Monday morning to the next Monday morning; registrations before the cut on the next Monday are counted as Monday, so each day is a full 24 hours.`].filter(Boolean)});
   // 4. Channel and campaign detail
   const base=Q.weeks.slice(Math.max(0,W.length-5),-1), av=k=>base.length?base.reduce((s,x)=>s+(x.src.get(k)||0),0)/base.length:0;
@@ -553,6 +554,51 @@ function acqSpecs(Q,pre){
     notes:[`<b>Phone numbers:</b> ${nf.format(ph)} of ${nf.format(L.total)} farmers last week (${pct(ph,L.total)}%)${pp!=null?` and ${nf.format(pp)} of ${nf.format(P.total)} the week before`:""} registered without a phone number, so sales and Dutas cannot follow them up.`]});
   return S;
 }
+// Who registered: farmers vs estate owners, whether they added a farm, where they are, and users above 100 ha.
+const ROLES=["Farmer","Estate owner"], ROLE_C={"Farmer":CAT[0],"Estate owner":CAT[3]};
+// a farm far out of line: 5,000 ha or more, or far bigger than the same user's other farms (counted, not labelled)
+const farmFlag=(f,r)=>f.ha>=5000||((r.farmList||[]).length>1&&f.ha>=100&&f.ha>20*median(r.farmList.map(x=>x.ha)));
+const userOdd=r=>r.ha>=5000||(r.farmList||[]).some(f=>farmFlag(f,r));
+const haF=v=>v>=100?nf.format(Math.round(v)):(Math.round(v*10)/10).toLocaleString("en-US");
+function acqProfileSpecs(Q,pre){
+  const S=[], L=Q.L, P=Q.P, W=Q.weeks, g=(w,k)=>w?w.roles.get(k)||0:0, row=(lab,l,p,bold,share)=>[bold?{v:lab,bold:true}:lab,P?nf.format(p):"–",bold?{v:nf.format(l),bold:true}:nf.format(l),P?sg(l-p):"–",P?spc(l,p):"–",share!=null?share:`${pct(l,L.total)}%`];
+  const own=g(L,"Estate owner"), ownP=g(P,"Estate owner"), ownAll=W.reduce((t,w)=>t+g(w,"Estate owner"),0);
+  const rows=[row("Farmers",g(L,"Farmer"),g(P,"Farmer"),true),
+    row("Estate owners",own,ownP,true),row("Added a farm",L.withFarm,P?P.withFarm:0,true),row("   No farm yet",L.total-L.withFarm,P?P.total-P.withFarm:0),
+    [{v:"Median farm size",bold:true},P&&P.haMed!=null?`${haF(P.haMed)} ha`:"–",{v:L.haMed!=null?`${haF(L.haMed)} ha`:"–",bold:true},"","",""]];
+  S.push({kicker:pre+"Registrations · farmers vs estate owners",
+    title:`${nf.format(g(L,"Farmer"))} farmers and ${own} estate owner${own===1?"":"s"} last week${P?` (${nf.format(g(P,"Farmer"))} and ${ownP} the week before)`:""}; ${pct(L.withFarm,L.total)}% added a farm`,
+    rows:[{cards:[
+      {w:1.15,title:"By user role, last week vs the week before",sub:P?`${P.label} vs ${L.label}`:L.label,table:{colW:[31,13,13,12,11,10],head:["Users",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change","Change %","Share"],align:["l","r","r","r","r","r"],rows}},
+      {w:1,title:"Registrations by role, per week",sub:"Estate owner = the ESTATE_OWNER role; every other role is a farmer",chart:{type:"column",stacked:true,cats:W.map(w=>w.short),series:ROLES.map(k=>({name:k,color:ROLE_C[k],values:W.map(w=>g(w,k))})),lblH:24}}]}],
+    notes:[`<b>Estate owners are rare:</b> ${ownAll} in ${W.length} weeks (${own} last week, ${ownP} the week before); almost every registration is a farmer. Farmer includes every other role (farmer & agent, farmer & owner, ...).`,
+      `<b>Farm details:</b> ${nf.format(L.total-L.withFarm)} of ${nf.format(L.total)} (${pct(L.total-L.withFarm,L.total)}%) registered without a farm, so their location and hectares are unknown${P?` (week before ${pct(P.total-P.withFarm,P.total)}%)`:""}.`]});
+  // where they are (users who added a farm)
+  const provs=[...new Set([...L.prov.keys(),...(P?P.prov.keys():[])])].filter(Boolean).map(k=>({k,l:L.prov.get(k)||0,p:P?P.prov.get(k)||0:0})).sort((a,b)=>b.l-a.l||b.p-a.p);
+  const regs=[...L.regency].filter(([k])=>k).slice(0,10).map(([k,v])=>{ const [r,pv]=k.split("|"); const pp=P?P.regency.get(k)||0:0; return [{v:r,bold:true},pv||"–",P?nf.format(pp):"–",{v:nf.format(v),bold:true},P?sg(v-pp):"–"]; });
+  const kal=provs.filter(x=>/kalimantan/i.test(x.k)), kl=kal.reduce((t,x)=>t+x.l,0), kp=kal.reduce((t,x)=>t+x.p,0);
+  S.push({kicker:pre+"Registrations · where users are",
+    title:`${provs[0]?`${provs[0].k} leads with ${provs[0].l} users who added a farm`:"No locations yet"}${kal.length?`; Kalimantan ${kp} → ${kl}`:""}`,
+    rows:[{cards:[
+      {w:1,title:"Users with a farm, by province",sub:P?`Last week; week before in grey`:"Last week",chart:{type:"hbar",items:provs.slice(0,9).map(x=>({k:x.k,v:x.l,r:P?`was ${x.p}`:""})),rowH:36}},
+      {w:1.05,title:"Top regencies last week",sub:"Users who added a farm",table:{colW:[30,30,14,14,12],head:["Regency","Province",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change"],align:["l","l","r","r","r"],rows:regs}}]}],
+    notes:[`<b>Location is known only for users who added a farm:</b> ${nf.format(L.withFarm)} of ${nf.format(L.total)} last week; ${nf.format(L.total-L.withFarm)} more have no location yet.`]});
+  // users above 100 ha: one row per farm, so multi-farm users show their breakdown; one slide per week
+  const allBig=W.reduce((t,w)=>t+w.big.length,0), flag=farmFlag;
+  [[L,"last week"],...(P?[[P,"the week before"]]:[])].forEach(([w,lab],wi)=>{
+    const us=[...w.big].sort((a,b)=>b.ha-a.ha), rowsB=[];
+    us.forEach(r=>{ const fs=r.farmList.length?r.farmList:[{ha:r.ha,district:null,regency:r.regency,prov:r.prov}];
+      fs.forEach((f,k)=>rowsB.push(k?["","","","",f.name||`Farm ${k+1}`,{v:haF(f.ha)},f.district||"–",f.regency||"–",f.prov||"–"]
+        :[{v:r.name||"–",bold:true},r.contact||"–",r.role||"–",{v:`${haF(r.ha)}`,bold:true},fs[0].name||(fs.length>1?"Farm 1":"–"),{v:haF(f.ha)},f.district||"–",f.regency||"–",f.prov||"–"])); });
+    const odd=us.filter(userOdd), multi=us.filter(r=>r.farmList.length>1);
+    const chunks=[]; for(let k=0;k<rowsB.length;k+=12) chunks.push(rowsB.slice(k,k+12));
+    (chunks.length?chunks:[[]]).forEach((ch,ci)=>S.push({kicker:pre+`Registrations · users above 100 ha, ${lab}${chunks.length>1?` (${ci+1}/${chunks.length})`:""}`,
+      title:wi===0?`${us.length} users above 100 ha last week${P?`, ${sg(us.length-P.big.length)} on the week before (${P.big.length})`:""}`
+        :`${us.length} users above 100 ha the week before (${w.label})`,
+      rows:[{cards:[{table:{colW:[17,12,7,8,14,8,11,11,12],head:["Name","Contact","Role","Total ha","Farm name","Farm ha","District","Regency","Province"],align:["l","l","l","r","l","r","l","l","l"],rows:ch.length?ch:[["No users above 100 ha","","","","","","","",""]]}}]}],
+      notes:ci?[]:[`<b>${us.length} users, ${haF(us.reduce((t,r)=>t+r.ha,0))} ha${multi.length?`; ${multi.length} with several farms, one row per farm`:""}.</b> Contact = phone number, or email when there is no phone.`,`<b>Note:</b> hectares are the area each user entered in the app; they have not yet been validated and need to be confirmed with the user.`]})); });
+  return S;
+}
 function acqNarrative(T){
   const Q=T[0].A.acq, L=Q.L, P=Q.P, d=P?L.total-P.total:0, top=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0], ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), extAll=Q.weeks.reduce((s,x)=>s+x.real,0);
   const D=Q.dutas, act=D.filter(x=>x.l), intD=D.filter(x=>x.internal), extD=D.filter(x=>!x.internal), lead=[...D].sort((a,b)=>b.tot-a.tot)[0];
@@ -563,74 +609,91 @@ function acqNarrative(T){
     {v:nf.format(L.non),u:"",l:`non-Duta${P?`: ${sg(L.non-P.non)} (${spc(L.non,P.non)}) on the week before`:""}`},
     {v:nf.format(L.under),u:"",l:`under a Duta${P?`: ${sg(L.under-P.under)} (${spc(L.under,P.under)}) on the week before`:""}`},
     {v:String(act.length),u:`/${D.length}`,l:`Dutas registered a farmer last week (${act.map(x=>x.k).join(", ")||"none"})`}];
+  if(Q.profile&&L.big) X.kpis[3]={v:String(L.big.length),u:"",l:`users above 100 ha${P?` (${P.big.length} the week before)`:""}; ${pct(L.withFarm,L.total)}% added a farm`};
+  const rise=d>=0, mv=rise?ups[0]:top, mvC=rise?[...Q.camps].reverse().find(x=>x.d>0):Q.camps.find(x=>x.d<0), mvC2=rise?[...Q.camps].reverse().filter(x=>x.d>0)[1]:null;
+  const own=L.roles?.get("Estate owner")||0, ag=L.roles?.get("Farmer & agent")||0, agP=P?.roles?.get("Farmer & agent")||0, odd=L.big?L.big.filter(userOdd).length:0;
+  const provs=L.prov?[...L.prov].filter(([k])=>k):[], kal=k=>[...(k||new Map())].filter(([x])=>/kalimantan/i.test(x||"")).reduce((t,[,v])=>t+v,0);
+  if(Q.profile) X.title=`Farmer Registrations, ${L.label}`;
   X.findings=[
-    top&&[`${top.k} drove the drop`,`${top.k} fell from ${nf.format(top.p)} to ${nf.format(top.l)} (${sg(top.d)}), ${pct(-top.d,Math.max(1,-d))}% of the ${nf.format(Math.abs(d))} fewer farmers.${topC&&topC.d<0?` The “${topC.k}” campaign alone went ${nf.format(topC.p)} → ${nf.format(topC.l)}.`:""}`],
-    P&&[`Dutas halved, from a small base`,`${nf.format(P.under)} → ${nf.format(L.under)} farmers (${(L.under/L.total*100).toFixed(1)}% of all). ${act.length} of ${D.length} Dutas registered a farmer last week; ${lead?`${lead.k} leads with ${lead.tot} in ${Q.weeks.length} weeks`:""}. ${intD.length} of the ${D.length} are internal team, external Dutas brought ${extAll}.`],
-    ups.length&&[`Paid channels held up`,`${ups.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}; “${gainC.k}” added ${sg(gainC.d)} farmers.`],
-    P&&[`The week before was a peak`,`${nf.format(P.total)} farmers with ${Math.max(...P.days)} on one day; last week is ${Q.avg?`${spc(L.total,Q.avg)} on the ${Q.avgN}-week average of ${nf.format(Math.round(Q.avg))}`:""}, still ${spc(L.total,Q.weeks[0].total)} on the week of ${Q.weeks[0].short}.`]].filter(Boolean).slice(0,4);
-  X.bottom={p:`Non-Duta channels bring ${pct(L.non,L.total)}% of farmers. Win back ${top?top.k.toLowerCase():"organic"} registrations, and get every Duta registering farmers each week.`,
-    s:`Farmers counted by the week they registered.${Q.dropped?` The week of ${fds(new Date(Q.dropped.w))} is in progress and left out.`:""} Duta covers internal-team and external Dutas alike.`};
+    mv&&[`${mv.k} drove the ${rise?"rise":"drop"}`,`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)} (${sg(mv.d)}), ${pct(Math.abs(mv.d),Math.max(1,Math.abs(d)))}% of the ${nf.format(Math.abs(d))} ${rise?"more":"fewer"} farmers.${mvC?` “${mvC.k}” ${nf.format(mvC.p)} → ${nf.format(mvC.l)}${mvC2?`, “${mvC2.k}” ${nf.format(mvC2.p)} → ${nf.format(mvC2.l)}`:""}.`:""}`],
+    P&&[L.under?`Dutas brought ${L.under}`:`No farmer came through a Duta`,`${nf.format(P.under)} → ${nf.format(L.under)} under a Duta (${(L.under/L.total*100).toFixed(1)}% of all). ${act.length} of ${D.length} Dutas registered a farmer last week${lead?`; ${lead.k} leads with ${lead.tot} in ${Q.weeks.length} weeks`:""}. ${intD.length} of the ${D.length} are internal team.`],
+    Q.profile&&[`All farmers, ${own} estate owner${own===1?"":"s"}`,`${nf.format(L.total-own)} farmers${P?` (${nf.format(P.total-(P.roles?.get("Estate owner")||0))} the week before)`:""}; every role other than estate owner counts as a farmer. ${pct(L.withFarm,L.total)}% added a farm (median ${L.haMed!=null?haF(L.haMed):"–"} ha); ${nf.format(L.total-L.withFarm)} have no farm or location yet.`],
+    Q.profile&&[`${L.big.length} users above 100 ha; Kalimantan grows`.replace("; Kalimantan grows",kal(L.prov)>kal(P?.prov)?"; Kalimantan grows":""),`${P?`${P.big.length} the week before (${sg(L.big.length-P.big.length)}). `:""}${provs.slice(0,2).map(([k,v])=>`${k} ${v}`).join(", ")} lead on location${kal(L.prov)?`; Kalimantan ${kal(P?.prov)} → ${kal(L.prov)}`:""}. Hectares are as entered by users, not yet validated.`],
+    !Q.profile&&!rise&&ups.length&&[`Paid channels held up`,`${ups.map(x=>`${x.k} ${nf.format(x.p)} → ${nf.format(x.l)}`).join(", ")}; “${gainC.k}” added ${sg(gainC.d)} farmers.`],
+    !Q.profile&&P&&[rise?`Last week is a new high`:`The week before was a peak`,`${nf.format(L.total)} farmers last week; ${Q.avg?`${spc(L.total,Q.avg)} on the ${Q.avgN}-week average of ${nf.format(Math.round(Q.avg))}`:""}, ${spc(L.total,Q.weeks[0].total)} on the week of ${Q.weeks[0].short}.`]].filter(Boolean).slice(0,4);
+  X.bottom={p:rise?`${mv?mv.k:"Non-Duta"} carried the week: find what drove it and repeat it. Then get new users to add a farm, and get every Duta registering farmers each week.`:`Non-Duta channels bring ${pct(L.non,L.total)}% of farmers. Win back ${mv?mv.k.toLowerCase():"organic"} registrations, and get every Duta registering farmers each week.`,
+    s:`Farmers counted by the week they registered.${Q.dropped?` The week of ${fds(new Date(Q.dropped.w))} is in progress and left out.`:""} Duta covers internal-team and external Dutas alike${Q.profile?"; estate owner = the ESTATE_OWNER role, every other role is a farmer; location = the user's first farm":""}.`};
   const idle=D.filter(x=>!x.l);
   X.actions=[
-    top&&{t:`Find out why ${top.k} fell ${sg(top.d)}`,d:`${top.k} went ${nf.format(top.p)} → ${nf.format(top.l)}${topC&&topC.d<0?`, mostly “${topC.k}” (${nf.format(topC.p)} → ${nf.format(topC.l)})`:""}. Check what drove the ${P?P.short:""} peak (a broadcast, a post, an app release) and repeat it.`,o:"",w:""},
+    mv&&(rise?{t:`Find out what drove ${mv.k} ${sg(mv.d)} and repeat it`,d:`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)}${mvC?`, mostly “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)})`:""}. Check what happened that week (a broadcast, a post, an app release, a field event) and plan it again.`,o:"",w:""}
+      :{t:`Find out why ${mv.k} fell ${sg(mv.d)}`,d:`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)}${mvC?`, mostly “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)})`:""}. Check what drove the ${P?P.short:""} peak (a broadcast, a post, an app release) and repeat it.`,o:"",w:""}),
+    Q.profile&&L.big.length&&{t:`Verify and call the ${L.big.length} users above 100 ha`,d:`They declared ${haF(L.big.reduce((t,r)=>t+r.ha,0))} ha between them; the area is as entered by the user and not yet validated. Confirm it on the call, then hand real estates to the plantation team.`,o:"",w:""},
+    Q.profile&&{t:`Get ${nf.format(L.total-L.withFarm)} new users to add a farm`,d:`${pct(L.total-L.withFarm,L.total)}% of last week's users have no farm, so location and hectares are unknown. Prompt them in the app and on the first call.`,o:"",w:""},
     {t:"Set a weekly farmer target per Duta",d:`Dutas brought ${nf.format(L.under)} farmers last week${P?` (${nf.format(P.under)} the week before)`:""}. ${idle.length?`${idle.map(x=>x.k).join(", ")} registered none last week.`:""} Agree a weekly number per Duta and track it in this deck.`,o:"",w:""},
-    {t:"Grow the external Duta network",d:`${intD.length} of the ${D.length} Dutas with farmers are internal team; external Dutas brought ${extAll} farmer${extAll===1?"":"s"} in ${Q.weeks.length} weeks${extD.length?` (${extD.map(x=>x.k).join(", ")})`:""}. Recruit and activate external Dutas in the main areas.`,o:"",w:""},
-    gainC&&gainC.d>0&&{t:`Keep funding “${gainC.k}”`,d:`It added ${sg(gainC.d)} farmers (${nf.format(gainC.p)} → ${nf.format(gainC.l)}). Compare its cost per farmer with the other campaigns before shifting budget.`,o:"",w:""},
-    {t:"Make the phone number required at registration",d:`${pct(L.noPhone,L.total)}% of last week's farmers (${nf.format(L.noPhone)}) have no phone number, so they cannot be followed up by sales or a Duta.`,o:"",w:""}].filter(Boolean);
+    !Q.profile&&{t:"Grow the external Duta network",d:`${intD.length} of the ${D.length} Dutas with farmers are internal team; external Dutas brought ${extAll} farmer${extAll===1?"":"s"} in ${Q.weeks.length} weeks. Recruit and activate external Dutas in the main areas.`,o:"",w:""},
+    {t:"Make the phone number required at registration",d:`${pct(L.noPhone,L.total)}% of last week's farmers (${nf.format(L.noPhone)}) have no phone number, so they cannot be followed up by sales or a Duta.`,o:"",w:""}].filter(Boolean).slice(0,6);
   return X;
 }
-// Stock forecast: what the history says, the plan by month and area, and the plan by SKU.
+// Stock forecast: what the history says, the weekly plan, the weekly plan by SKU, where the stock goes and the plan by month and area.
+const fcSpan=F=>`${fds(F.start)} – ${fds(F.end)} ${F.end.getFullYear()}`;
 function forecastSpecs(F,pre){
-  const S=[], H=F.hist, M=F.months, tgt=F.target, avgMt=M.reduce((s,m)=>s+m.mt,0)/M.length, kgBest=F.bestKg;
-  const mult=F.best?tgt/F.best.gmv:null, gB=v=>v>=1e9?`${(v/1e9).toFixed(1)}B`:`${Math.round(v/1e6)}M`;
-  const histLab=h=>h.partial?`${h.label}\n(to ${fds(F.lastDate)})`:h.label;
+  const S=[], H=F.hist, M=F.months, W=F.weeks, tgt=F.target, kgBest=F.bestKg, totMt=M.reduce((s,m)=>s+m.mt,0);
+  const full=M.filter(m=>!m.partial), mMt=(full.length?full:M).reduce((s,m)=>s+m.mtMonth,0)/(full.length||M.length), wkMt=totMt/W.reduce((s,w)=>s+w.days,0)*7;
+  const gB=v=>v>=1e9?`${(v/1e9).toFixed(1)}B`:`${Math.round(v/1e6)}M`, ord=F.hasOrderNo?"orders":"order lines";
+  const histLab=h=>h.partial?`${h.label}\nto ${F.lastDate.getDate()}`:h.label, planLab=m=>m.partial?`${MON[m.m%12]}\n${m.range.split(" ")[0]}`:m.label.replace(" ","\n");
+  const mixNote=M.some(m=>!m.seasonal)?`the last 4 months (${F.recentLabel})`:"", seaNote=M.some(m=>m.seasonal)?`the same month last season (${M.filter(m=>m.seasonal).map(m=>m.winLabel).join(", ")})`:"";
   // 1. What the target asks for
   S.push({kicker:pre+`Forecast · ${rp(tgt)} a month`,
-    title:`${rp(tgt)} a month needs about ${mt0(avgMt)} t of fertilizer, ${kgBest?`${(avgMt*1000/kgBest.kg).toFixed(1)}× our best month (${mt0(kgBest.kg/1000)} t in ${kgBest.label})`:""}`,
+    title:`${rp(tgt)} a month needs about ${mt0(mMt)} t of fertilizer a month${kgBest?`, ${(mMt*1000/kgBest.kg).toFixed(1)}× our best month (${mt0(kgBest.kg/1000)} t in ${kgBest.label})`:""}`,
     rows:[{h:84,cards:[{kpiRow:[
       {v:rpParts(tgt)[0],u:rpParts(tgt)[1],l:`monthly sales target used for the plan`,hot:true},
-      {v:rpParts(F.best.gmv)[0],u:rpParts(F.best.gmv)[1],l:`best month so far (${F.best.label}${F.bestRecent&&F.bestRecent!==F.best?`; best of the last ${F.avgN} months ${rp(F.bestRecent.gmv)} in ${F.bestRecent.label}`:""})`},
+      {v:rpParts(F.best.gmv)[0],u:rpParts(F.best.gmv)[1],l:`best month in this data (${F.best.label}); target is ${(tgt/F.best.gmv).toFixed(1)}×`},
       {v:rpParts(F.avg)[0],u:rpParts(F.avg)[1],l:`average month, last ${F.avgN} full months; target is ${(tgt/F.avg).toFixed(1)}×`},
-      {v:mt0(F.ordersNeeded),u:"",l:`fertilizer orders a month at the ${F.recentLabel} average order of ${rp(F.aov)} (${F.recentFullLabel}: ${Math.round(F.ordersPerMonth)} a month)`}]}]},
+      {v:mt0(F.ordersNeeded),u:"",l:`${ord} a month at the ${F.recentLabel} average of ${rp(F.aov)} (${F.recentFullLabel}: ${Math.round(F.ordersPerMonth)} a month)`}]}]},
       {cards:[
-        {w:1,title:"Sales by month vs the target",sub:`All products; ${histLab(H[H.length-1]).replace("\n"," ")} is partial`,chart:{type:"column",cats:[...H.map(histLab),"Target"],
+        {w:1,title:"Sales by month vs the target",sub:`${F.fertShare<.999?"All products":"Fertilizer sales"}; ${histLab(H[H.length-1]).replace("\n"," ")} is partial`,chart:{type:"column",cats:[...H.map(histLab),"Target"],
           series:[{name:"Sales",values:[...H.map(h=>h.gmv),tgt],colors:[...H.map(h=>h.partial?"#B3BBAB":CAT[0]),CAT[1]]}],fmt:gB,lblH:30}},
-        {w:1,title:"Fertilizer tonnes: history and the plan",sub:"Tonnes sold per month; plan months in yellow",chart:{type:"column",cats:[...H.map(histLab),...M.map(m=>m.label.replace(" ","\n"))],
+        {w:1,title:"Fertilizer tonnes: history and the plan",sub:"Tonnes per month; plan in yellow",chart:{type:"column",cats:[...H.map(histLab),...M.map(planLab)],
           series:[{name:"Tonnes",values:[...H.map(h=>h.kg/1000),...M.map(m=>m.mt)],colors:[...H.map(h=>h.partial?"#B3BBAB":CAT[0]),...M.map(()=>CAT[1])]}],fmt:v=>mt0(v),lblH:30}}]}],
     notes:[
-      `<b>Method:</b> the ${rp(tgt)} target is split by each area's share of fertilizer sales (${F.areas.map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")}); ${pct(F.fertShare,1)}% of sales is fertilizer and ${(F.shipShare*100).toFixed(1)}% is shipping. The rest is turned into kg at the prices in “${esc(F.priceLabel.replace(/\.csv$/i,""))}”, with each area's product and price-tier mix from ${M.some(m=>!m.seasonal)?`the last 4 months (${F.recentLabel})`:""}${M.some(m=>m.seasonal)?`${M.some(m=>!m.seasonal)?"; January uses ":""}the same month last season (${M.filter(m=>m.seasonal).map(m=>m.winLabel).join(", ")})`:""}.`,
+      `<b>Method:</b> the ${rp(tgt)} target is split by each area's share of fertilizer sales (${F.areas.map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")})${F.fertShare<.999?`; ${pct(F.fertShare,1)}% of sales is fertilizer`:""}${F.shipShare?` and ${(F.shipShare*100).toFixed(1)}% is shipping`:""}. Rupiah is turned into kg at the prices in “${esc(F.priceLabel.replace(/\.csv$/i,""))}”, with each area's product and price-tier mix from ${[mixNote,seaNote].filter(Boolean).join("; ")}. Part months are pro rata by day.`,
       F.priceMoves.length&&`<b>Prices today vs what we sold at (${F.recentLabel}):</b> ${esc(F.priceMoves.slice(0,4).map(x=>`${skuShort(x.name)} ${rp(x.was)} → ${rp(x.now)} a bag (${x.now>=x.was?"+":"−"}${Math.abs(Math.round((x.now/x.was-1)*100))}%)`).join("; "))}.`,
-      (F.inf.n||F.unpriced.length)&&`<b>Data:</b> ${F.inf.n?`${F.inf.n} lines (${rp(F.inf.gmv)}) had no province and took the customer's province from other orders${F.inf.byPic?` (${F.inf.byPic} from the PIC's main area)`:""}. `:""}${F.unpriced.length?`${F.unpriced.length} SKUs are not on the price list and use their last selling price (${esc(F.unpriced.slice(0,3).map(skuShort).join(", "))}${F.unpriced.length>3?"…":""}).`:""}`
+      (F.inf.n||F.unpriced.length)&&`<b>Data:</b> ${F.inf.n?`${F.inf.n} lines (${rp(F.inf.gmv)}) had no province and took the customer's province from other orders. `:""}${F.unpriced.length?`${F.unpriced.length} SKU${F.unpriced.length===1?" is":"s are"} not on the price list and use${F.unpriced.length===1?"s":""} the last selling price (${esc(F.unpriced.slice(0,3).map(skuShort).join(", "))}${F.unpriced.length>3?"…":""}).`:""}`
     ].filter(Boolean)});
-  // 2. Where the stock goes: tonnes by area per month, and the largest SKUs over the 3 months
-  const ARC=[CAT[0],CAT[1],CAT[2]], skT=new Map(); M.forEach(m=>m.rows.forEach(r=>r.skus.forEach(x=>skT.set(x.name,(skT.get(x.name)||0)+x.mt))));
-  const topSk=[...skT].sort((a,b)=>b[1]-a[1]).slice(0,8), totMt=M.reduce((s,m)=>s+m.mt,0), r0=M[0].rows[0], rJ=M[M.length-1].rows[0];
-  S.push({kicker:pre+"Forecast · where the stock goes",title:`${F.areas[0]} needs ${pct(M[0].rows[0].mt,M[0].mt)}% of the stock; ${skuShort(topSk[0][0])} and ${skuShort(topSk[1][0])} are ${pct(topSk[0][1]+topSk[1][1],totMt)}% of the tonnes`,
+  // 2. Weekly plan (the table asked for)
+  const byOrd=(a,b)=>(b.ord||0)-(a.ord||0)||b.mt-a.mt;
+  const skT=new Map(); W.forEach(w=>w.skus.forEach(x=>{ const o=skT.get(x.k)||{name:x.name,pack:x.pack,mt:0,bags:0,ord:x.ord}; o.mt+=x.mt; o.bags+=x.bags; skT.set(x.k,o); }));
+  const topAll=[...skT.values()].sort((a,b)=>b.mt-a.mt);
+  const wrows=W.map(w=>[{v:`W${w.n}`,bold:true},`${w.label}${w.days<7?` (${w.days} days)`:""}`,rp(w.target),{v:mt1(w.mt),bold:true},nf.format(w.skus.reduce((s,x)=>s+x.bags,0)),[...w.skus].sort(byOrd).slice(0,3).map(x=>`${skuShort(x.name)} ${nf.format(x.bags)}`).join(" · ")]);
+  wrows.push([{v:"Total",bold:true},fcSpan(F),{v:rp(W.reduce((s,w)=>s+w.target,0)),bold:true},{v:mt1(W.reduce((s,w)=>s+w.mt,0)),bold:true},{v:nf.format(W.reduce((s,w)=>s+w.skus.reduce((a,x)=>a+x.bags,0),0)),bold:true},""]);
+  S.push({kicker:pre+"Forecast · weekly stock plan",title:`${mt0(totMt)} MT from ${fds(F.start)} to ${fds(F.end)}: about ${mt0(wkMt)} MT a week for ${rp(tgt)} a month`,
+    rows:[{cards:[{foot:`Weeks run Monday to Sunday; each month's plan is spread evenly over its days, so a short week needs less. Bags are rounded per week; the 3 most-ordered SKUs shown, in bags.`,
+      table:{colW:[5,15,11,10,8,51],head:["Week","Dates","Target sales (IDR)","Stock (MT)","Bags","Most-ordered SKUs (bags)"],align:["l","l","r","r","r","l"],rows:wrows}}]}]});
+  // 3. Weekly plan by SKU
+  const ranked=[...topAll].sort(byOrd), topW=ranked.slice(0,12), topMt=topW.reduce((s,o)=>s+o.mt,0), wk=f=>W.map(w=>{ const v=w.skus.filter(f).reduce((s,x)=>s+x.mt,0); return v?mt1(v):"–"; });
+  const srows=topW.map(o=>[skuShort(o.name),nf.format(o.ord||0),...wk(x=>x.name===o.name),{v:mt1(o.mt),bold:true},nf.format(o.bags)]);
+  srows.push([{v:`Top ${topW.length} total`,bold:true},"",...W.map(w=>({v:mt1(w.skus.filter(x=>topW.some(o=>o.name===x.name)).reduce((s,x)=>s+x.mt,0)),bold:true})),{v:mt1(topMt),bold:true},{v:nf.format(topW.reduce((s,o)=>s+o.bags,0)),bold:true}]);
+  S.push({kicker:pre+"Forecast · weekly plan by SKU",title:`The ${topW.length} most-ordered SKUs need ${mt0(topMt)} MT to ${fds(F.end)}, ${pct(topMt,totMt)}% of the plan; ${skuShort(topW[0].name)} leads with ${nf.format(topW[0].ord)} orders`,
+    rows:[{cards:[{foot:`Ranked by number of ${F.hasOrderNo?"orders":"order lines"} for each SKU, ${F.hist[0].label}–${F.hist[F.hist.length-1].label}. MT per week, by Monday start date. The full plan is ${mt1(totMt)} MT over ${topAll.length} fertilizer SKUs.`,
+      table:{colW:[22,6,...W.map(()=>5.6),7,7],head:["SKU",F.hasOrderNo?"Orders":"Lines",...W.map(w=>w.short),"Total MT","Bags"],align:["l","r",...W.map(()=>"r"),"r","r"],rows:srows}}]}]});
+  // 4. Where the stock goes: tonnes by area per week, and the largest SKUs over the plan
+  const ARC=[CAT[0],CAT[1],CAT[2]], topSk=ranked.slice(0,8), r0=M[M.length-1].rows[0];
+  S.push({kicker:pre+"Forecast · where the stock goes",title:`${F.areas[0]} needs ${pct(F.share[F.areas[0]],1)}% of the stock; ${skuShort(topSk[0].name)}, the most-ordered SKU, is ${pct(topSk[0].mt,totMt)}% of the tonnes`,
     rows:[{cards:[
-      {w:1,title:"Stock required by area (MT)",sub:"Tonnes per month to reach the target",chart:{type:"column",stacked:true,cats:M.map(m=>m.label),
-        series:F.areas.map((a,i)=>({name:a,color:ARC[i],values:M.map(m=>m.rows.find(r=>r.area===a)?.mt||0)})),fmt:v=>mt0(v),lblH:28}},
-      {w:1.1,title:"Largest SKUs, Nov–Jan (MT)",sub:"Tonnes over the 3 months; bags in grey",chart:{type:"hbar",items:topSk.map(([n,v])=>({k:skuShort(n),v,r:`${nf.format(Math.round(v*1000/(packKg(n)||50)))} bags`})),fmt:v=>mt1(v)}}]}],
+      {w:1.2,title:"Stock required by area, per week (MT)",sub:"Week starting Monday",chart:{type:"column",stacked:true,cats:W.map(w=>w.short),
+        series:F.areas.map((a,i)=>({name:a,color:ARC[i],values:W.map(w=>w.areas[a]||0)})),fmt:v=>mt0(v),lblH:24}},
+      {w:1,title:`Most-ordered SKUs: stock to ${fds(F.end)} (MT)`,sub:`By number of ${F.hasOrderNo?"orders":"order lines"}; orders in grey`,chart:{type:"hbar",items:topSk.map(o=>({k:skuShort(o.name),v:o.mt,r:`${nf.format(o.ord||0)} orders`})),fmt:v=>mt1(v)}}]}],
     notes:[
-      `<b>${M[0].label.split(" ")[0]} and ${M[1].label.split(" ")[0]} lean on rock phosphate and KCL</b> (the ${F.recentLabel} mix), so they need more tonnes at a lower ${rp(r0.vpk)}/kg in ${F.areas[0]}.`,
-      `<b>${M[M.length-1].label.split(" ")[0]} follows last season</b> (${M[M.length-1].winLabel}): more KCL and NPK at ${rp(rJ.vpk)}/kg, so the same rupiah needs fewer tonnes (${mt0(M[M.length-1].mt)} MT).`,
-      `<b>Sumatera Selatan is small and thin:</b> ${M[0].rows.find(r=>r.area==="Sumatera Selatan")?`${mt1(M[0].rows.find(r=>r.area==="Sumatera Selatan").mt)} MT a month from ${M[0].rows.find(r=>r.area==="Sumatera Selatan").orders} orders of history`:"no history"}, so its mix can swing with one or two customers.`].filter(Boolean)});
-  // 3. Stock plan by month and area (the table management asked for)
-  const rows=[]; M.forEach(m=>m.rows.forEach((r,i)=>{ const top=r.skus.slice(0,3).map(x=>`${skuShort(x.name)} ${mt1(x.mt)}`).join(" · "), rest=r.skus.length-3;
-    rows.push([i?"":{v:m.label,bold:true},`${r.area}${r.note?"*":""}`,{v:`${mt1(r.mt)} MT: ${top}`},
-      `${rp(r.target)}\n(fertilizer ${rp(r.fertGmv)})`,
-      `${r.thin?`Full-history mix (too few orders in ${m.winLabel.split(" ")[0]})`:`${m.winLabel.split(" ")[0]} mix, ${r.orders} orders`} · ${rp(r.vpk)}/kg${r.best&&r.best.mt?` · ${(r.mt/r.best.mt).toFixed(1)}× best month (${mt0(r.best.mt)} t, ${r.best.label.split(" ")[0]})`:""}`]); }));
+      M.some(m=>!m.seasonal)&&`<b>${andList(M.filter(m=>!m.seasonal).map(m=>MON[m.m%12]))} use the ${F.recentLabel} mix</b>${M.some(m=>m.seasonal)?"":" (the data has no same month last season)"}: ${rp(r0.vpk)}/kg in ${F.areas[0]}, so each Rp1B needs about ${mt0(1e9*F.fertShare*(1-F.shipShare)/r0.vpk/1000)} t.`,
+      M.some(m=>m.seasonal)&&`<b>${andList(M.filter(m=>m.seasonal).map(m=>MON[m.m%12]))} follow last season</b> (${M.filter(m=>m.seasonal).map(m=>m.winLabel).join(", ")}).`,
+      F.areas.slice(1).some(a=>F.share[a]<.05)&&`<b>Small areas are thin:</b> ${F.areas.filter(a=>F.share[a]<.05).map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")} of fertilizer sales, so their mix can swing with one or two customers.`].filter(Boolean)});
+  // 5. Plan by month and area
+  const rows=[]; M.forEach(m=>m.rows.forEach((r,i)=>{ const top=[...r.skus].sort((a,b)=>(b.ord||0)-(a.ord||0)).slice(0,2).map(x=>`${skuShort(x.name)} ${mt1(x.mt)}`).join(" · ");
+    rows.push([i?"":{v:m.partial?`${m.range}`:m.label,bold:true},`${r.area}${r.note?"*":""}`,{v:`${mt1(r.mt)} MT: ${top}`},`${rp(r.target)}`,
+      `${r.thin?"Full-history mix":`${m.winLabel.split(" ")[0]} mix, ${r.orders} lines`} · ${rp(r.vpk)}/kg${r.best&&r.best.mt?` · ${(r.mt/m.frac/r.best.mt).toFixed(1)}× best month`:""}`]); }));
   const notes=M[0].rows.filter(r=>r.note).map(r=>`*${r.area} ${r.note}.`);
-  S.push({kicker:pre+"Forecast · stock plan by month and area",title:`Stock needed for ${rp(tgt)} a month: ${M.map(m=>`${mt0(m.mt)} MT in ${m.label.split(" ")[0]}`).join(", ")}`,
-    rows:[{cards:[{foot:`${notes.join(" ")} Stock required = tonnes to sell at 14 Oct prices, rounded to whole bags; top 3 SKUs shown (all SKUs on the next slide).`,table:{colW:[7,12,40,12,29],head:["Month","Area (province)","Stock required (MT)","Target sales (IDR)","Description"],align:["l","l","l","l","l"],rows}}]}]});
-  // 3. Stock plan by SKU
-  const sk=new Map(); M.forEach((m,mi)=>m.rows.forEach(r=>r.skus.forEach(x=>{ const o=sk.get(x.k)||{name:x.name,pack:x.pack,mt:M.map(()=>0),val:0,kg:0,areas:new Map()}; o.mt[mi]+=x.mt; o.val+=x.ppk*x.mt*1000; o.kg+=x.mt*1000; o.areas.set(r.area,(o.areas.get(r.area)||0)+x.mt); sk.set(x.k,o); })));
-  const all=[...sk.values()].map(o=>({...o,tot:o.mt.reduce((a,b)=>a+b,0)})).sort((a,b)=>b.tot-a.tot), top=all.slice(0,13), oth=all.slice(13);
-  const line=(name,mt,tot,bags,ppb,ar)=>[name,...mt.map(v=>v?mt1(v):"–"),{v:mt1(tot),bold:true},bags,ppb,ar];
-  const srows=top.map(o=>line(skuShort(o.name),o.mt,o.tot,nf.format(Math.round(o.tot*1000/o.pack)),rp(o.val/o.kg*o.pack),[...o.areas].sort((a,b)=>b[1]-a[1]).map(([a,v])=>`${a.replace("Sumatera ","Sum")} ${pct(v,o.tot)}%`).slice(0,2).join(", ")));
-  if(oth.length) srows.push(line(`Other ${oth.length} SKUs`,M.map((_,i)=>oth.reduce((s,o)=>s+o.mt[i],0)),oth.reduce((s,o)=>s+o.tot,0),"–","–","–"));
-  srows.push(line({v:"Total",bold:true},M.map(m=>m.mt),M.reduce((s,m)=>s+m.mt,0),"–","–","–").map((c,i)=>i===0?c:typeof c==="object"?c:{v:c,bold:true}));
-  S.push({kicker:pre+"Forecast · stock plan by SKU",title:`${all.slice(0,3).map(o=>skuShort(o.name)).join(", ")} are ${pct(all.slice(0,3).reduce((s,o)=>s+o.tot,0),all.reduce((s,o)=>s+o.tot,0))}% of the tonnes to stock`,
-    rows:[{cards:[{table:{colW:[30,9,9,9,10,9,12,18],head:["SKU",...M.map(m=>`${m.label} (MT)`),"3 months (MT)","Bags","Avg price / bag","Main areas"],align:["l","r","r","r","r","r","r","l"],rows:srows}}]}]});
+  S.push({kicker:pre+"Forecast · stock plan by month and area",title:`Stock needed for ${rp(tgt)} a month: ${M.map(m=>`${mt0(m.mt)} MT in ${m.partial?m.range:MON[m.m%12]}`).join(", ")}`,
+    rows:[{cards:[{foot:`${notes.join(" ")} Stock required = tonnes to sell at today's list prices, rounded to whole bags; part months pro rata by day.`,table:{colW:[9,12,40,11,28],head:["Month","Area (province)","Stock required (MT)","Target sales (IDR)","Description"],align:["l","l","l","l","l"],rows}}]}]});
   return S;
 }
 function teamSpecs(A,N,pre){
@@ -874,41 +937,41 @@ function basisOf(T,X){
   if(T[0].A.acq){ const Q=T[0].A.acq; return `Farmers by registration week${Q.P?` · last week vs the week before`:""} · data to ${fds(Q.lastDate)} ${Q.lastDate.getFullYear()}`; }
   const tr=T.find(t=>t.A.trend)?.A.trend, sales=T.some(t=>t.A.has.sales), fc=T.find(t=>t.A.forecast)?.A.forecast, last=fc?fc.lastDate:X.dates[X.dates.length-1];
   const asOf=last?`data to ${fds(last)} ${last.getFullYear()}`:"";
-  return [sales&&"Sales incl. shipping, before discount",fc?`target ${rp(fc.target)} a month at ${fc.priceLabel.replace(/^price (per )?/i,"prices of ").replace(/\.csv$/i,"")}`:tr?`${tr.Z.label} vs ${tr.F.label}`:T.some(t=>t.A.wow)?"last week vs the week before":null,asOf].filter(Boolean).join(" · ")||"SAWITPRO PROPRIETARY";
+  return [sales&&(fc&&!fc.shipShare?"Sales amount":"Sales incl. shipping, before discount"),fc?`target ${rp(fc.target)} a month · plan ${fcSpan(fc)}`:tr?`${tr.Z.label} vs ${tr.F.label}`:T.some(t=>t.A.wow)?"last week vs the week before":null,asOf].filter(Boolean).join(" · ")||"SAWITPRO PROPRIETARY";
 }
 function deckNarrative(T){
   if(T[0].A.dop){ const X=doNarrative(T); X.actions=draftActs(X.actions); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X; }
   if(T[0].A.acq){ const X=acqNarrative(T); X.actions=draftActs(X.actions); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X; }
   const X=deckNarrative0(T), fa=[];
-  T.filter(t=>t.A.forecast).forEach(t=>{ const F=t.A.forecast, m0=F.months[0], top=new Map();
-    m0.rows.forEach(r=>r.skus.forEach(x=>top.set(x.name,(top.get(x.name)||0)+x.mt)));
-    const tops=[...top].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,v])=>`${skuShort(n)} ${mt0(v)} MT`).join(", ");
-    fa.push({t:`Secure ${mt0(m0.mt)} MT for ${m0.label}`,d:`${tops} are the largest lines. Check stock on hand and supplier lead time against the plan by area (${m0.rows.map(r=>`${r.area} ${mt0(r.mt)} MT`).join(", ")}).`,o:"",w:"",team:X.multi?t.name:null});
-    fa.push({t:`Plan ${mt0(F.ordersNeeded)} fertilizer orders a month`,d:`${rp(F.target)} a month at the ${F.recentLabel} average order of ${rp(F.aov)} needs ${mt0(F.ordersNeeded)} orders; the team closed ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}. Split the gap by PIC and area.`,o:"",w:"",team:X.multi?t.name:null}); });
-  T.filter(t=>t.A.forecast).forEach(t=>{ const F=t.A.forecast, mJ=F.months[F.months.length-1], m0=F.months[0];
-    const kcl=[...new Map(mJ.rows.flatMap(r=>r.skus).map(x=>[x.name,0])).keys()].map(n=>[n,mJ.rows.reduce((s,r)=>s+(r.skus.find(x=>x.name===n)?.mt||0),0)]).sort((a,b)=>b[1]-a[1])[0];
-    if(kcl) fa.push({t:`Book ${mt0(kcl[1])} MT of ${skuShort(kcl[0])} for ${mJ.label.split(" ")[0]}`,d:`${mJ.label.split(" ")[0]} shifts to last season's mix (${mJ.winLabel}); ${skuShort(kcl[0])} is the largest line at ${mt0(kcl[1])} MT, against ${mt0(m0.rows.reduce((s,r)=>s+(r.skus.find(x=>x.name===kcl[0])?.mt||0),0))} MT in ${m0.label.split(" ")[0]}. Confirm supplier allocation before December.`,o:"",w:"",team:X.multi?t.name:null});
-    if(F.unpriced.length) fa.push({t:`Add ${F.unpriced.length} SKUs to the price list`,d:`${F.unpriced.slice(0,4).map(skuShort).join(", ")}${F.unpriced.length>4?" and others":""} sell but are not on the 14 Oct price list, so the plan uses their last selling price.`,o:"",w:"",team:X.multi?t.name:null});
-    if(F.inf.n) fa.push({t:`Fill the province on ${F.inf.n} order lines`,d:`${rp(F.inf.gmv)} of sales had no province (mostly Jan–Feb); the plan took it from the customer's other orders. Fix it at the source so the area split stays right.`,o:"",w:"",team:X.multi?t.name:null}); });
+  T.filter(t=>t.A.forecast).forEach(t=>{ const F=t.A.forecast, W=F.weeks, M=F.months, two=W.slice(0,2), ord=F.hasOrderNo?"orders":"order lines", team=X.multi?t.name:null;
+    const sk=new Map(); two.forEach(w=>w.skus.forEach(x=>sk.set(x.name,(sk.get(x.name)||0)+x.bags))); const tops=[...sk].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n,v])=>`${skuShort(n)} ${nf.format(v)} bags`).join(", ");
+    const tw=two.reduce((s,w)=>s+w.mt,0);
+    fa.push({t:`Stock ${mt0(tw)} MT for the first two weeks (${fds(two[0].a)} – ${fds(two[two.length-1].b)})`,d:`${tops} are the largest lines. Check stock on hand and supplier lead time against the weekly plan, then confirm the following weeks every Monday.`,o:"",w:"",team});
+    fa.push({t:`Plan ${mt0(F.ordersNeeded)} ${ord} a month`,d:`${rp(F.target)} a month at the ${F.recentLabel} average of ${rp(F.aov)} needs ${mt0(F.ordersNeeded)} ${ord}; the team closed ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}. Split the gap by week and area.`,o:"",w:"",team});
+    const tot=new Map(); W.forEach(w=>w.skus.forEach(x=>tot.set(x.name,(tot.get(x.name)||0)+x.mt))); const big=[...tot].sort((a,b)=>b[1]-a[1])[0];
+    if(big) fa.push({t:`Book ${mt0(big[1])} MT of ${skuShort(big[0])} to ${fds(F.end)}`,d:`The largest line in the plan (${pct(big[1],W.reduce((s,w)=>s+w.mt,0))}% of the tonnes). Confirm supplier allocation for ${andList(M.map(m=>MON[m.m%12]))} now, at about ${mt0(big[1]/W.length)} MT a week.`,o:"",w:"",team});
+    if(F.unpriced.length) fa.push({t:`Add ${F.unpriced.length} SKU${F.unpriced.length===1?"":"s"} to the price list`,d:`${F.unpriced.slice(0,4).map(skuShort).join(", ")}${F.unpriced.length>4?" and others":""} ${F.unpriced.length===1?"sells but is":"sell but are"} not on the price list, so the plan uses their last selling price.`,o:"",w:"",team});
+    if(F.inf.n) fa.push({t:`Fill the province on ${F.inf.n} order lines`,d:`${rp(F.inf.gmv)} of sales had no province; the plan took it from the customer's other orders. Fix it at the source so the area split stays right.`,o:"",w:"",team}); });
   if(fa.length) X.actions=fa.slice(0,6);
   // the cover says the deck carries a stock plan
   const fc0=T.find(t=>t.A.forecast)?.A.forecast;
-  if(fc0){ const F=fc0, m=F.months, tg=F.target, avgMt=m.reduce((s,x)=>s+x.mt,0)/m.length, name=T.find(t=>t.A.forecast).name;
-    const skT=new Map(); m.forEach(x=>x.rows.forEach(r=>r.skus.forEach(k=>skT.set(k.name,(skT.get(k.name)||0)+k.mt)))); const top=[...skT].sort((a,b)=>b[1]-a[1]);
-    X.forecast=true; X.gaps=[]; X.eyebrow="Stock Forecast"; X.title=`${name} · ${m[0].label} – ${m[m.length-1].label}`;
-    X.period=`Sales history ${fds(F.hist[0]&&new Date(Math.floor(F.hist[0].m/12),F.hist[0].m%12,1))} – ${fds(F.lastDate)} ${F.lastDate.getFullYear()}`; X.meta=`target ${rp(tg)} a month`;
-    X.headline=`${rp(tg)} a month needs ${m.map(x=>`${mt0(x.mt)} MT in ${x.label.split(" ")[0]}`).join(", ")}: about ${(avgMt*1000/F.bestKg.kg).toFixed(1)}× our best month`;
-    X.kpis=[{v:mt0(m[0].mt),u:" MT",l:`stock for ${m[0].label} (${m.slice(1).map(x=>`${x.label.split(" ")[0]} ${mt0(x.mt)} MT`).join(", ")})`,hot:true},
-      {v:rpParts(tg)[0],u:rpParts(tg)[1],l:`target a month: ${(tg/F.best.gmv).toFixed(1)}× the best month (${rp(F.best.gmv)}, ${F.best.label}), ${(tg/F.avg).toFixed(1)}× the ${F.avgN}-month average`},
-      {v:mt0(F.ordersNeeded),u:"",l:`fertilizer orders a month needed, vs ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}`},
-      {v:String(pct(F.share[F.areas[0]],1)),u:"%",l:`of the target and stock in ${F.areas[0]}; ${F.areas.slice(1).map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")}`}];
+  if(fc0){ const F=fc0, m=F.months, W=F.weeks, tg=F.target, totMt=m.reduce((s,x)=>s+x.mt,0), name=T.find(t=>t.A.forecast).name, ord=F.hasOrderNo?"orders":"order lines";
+    const full=m.filter(x=>!x.partial), mMt=(full.length?full:m).reduce((s,x)=>s+x.mtMonth,0)/(full.length||m.length), wkMt=totMt/W.reduce((s,w)=>s+w.days,0)*7;
+    const skT=new Map(); W.forEach(w=>w.skus.forEach(k=>skT.set(k.name,(skT.get(k.name)||0)+k.mt))); const top=[...skT].sort((a,b)=>b[1]-a[1]);
+    X.forecast=true; X.gaps=[]; X.eyebrow="Stock Forecast"; X.title=`${name} · ${fcSpan(F)}`;
+    X.period=`Sales history ${fds(F.hist[0]&&new Date(Math.floor(F.hist[0].m/12),F.hist[0].m%12,1))} – ${fds(F.lastDate)} ${F.lastDate.getFullYear()}`; X.meta=`target ${rp(tg)} a month · ${W.length} weeks`;
+    X.headline=`${rp(tg)} a month needs ${mt0(totMt)} MT from ${fds(F.start)} to ${fds(F.end)}: about ${mt0(wkMt)} MT a week, ${(mMt*1000/F.bestKg.kg).toFixed(1)}× our best month`;
+    X.kpis=[{v:mt0(totMt),u:" MT",l:`stock for ${fcSpan(F)} (${m.map(x=>`${x.partial?x.range:MON[x.m%12]} ${mt0(x.mt)}`).join(", ")})`,hot:true},
+      {v:mt0(wkMt),u:" MT",l:`a week on average over ${W.length} weeks; the first full week ${mt0((W.find(w=>w.days===7)||W[0]).mt)} MT`},
+      {v:rpParts(tg)[0],u:rpParts(tg)[1],l:`target a month: ${(tg/F.best.gmv).toFixed(1)}× the best month in this data (${rp(F.best.gmv)}, ${F.best.label})`},
+      {v:mt0(F.ordersNeeded),u:"",l:`${ord} a month needed, vs ${Math.round(F.ordersPerMonth)} a month in ${F.recentFullLabel}`}];
     X.findings=[
-      [`Rp4B is a step up, not a stretch of today`.replace("Rp4B",rp(tg)),`The best month so far was ${rp(F.best.gmv)} (${F.best.label}); the last ${F.avgN} full months averaged ${rp(F.avg)}. The plan needs ${mt0(avgMt)} MT a month against a record of ${mt0(F.bestKg.kg/1000)} t (${F.bestKg.label}).`],
-      [`Two SKUs carry the plan`,`${top.slice(0,3).map(([n,v])=>`${skuShort(n)} ${mt0(v)} MT`).join(", ")} over the 3 months (${pct(top.slice(0,3).reduce((s,x)=>s+x[1],0),top.reduce((s,x)=>s+x[1],0))}% of the tonnes). A stock-out of either stops the plan.`],
-      [`January is a different mix`,`Last season's Jan–Feb sold more KCL and NPK, so January needs ${mt0(m[m.length-1].mt)} MT for the same ${rp(tg)}, against ${mt0(m[0].mt)} MT in ${m[0].label.split(" ")[0]}.`],
-      [`The gap is orders, not price`,`At the ${F.recentLabel} average order of ${rp(F.aov)}, ${rp(tg)} needs ${mt0(F.ordersNeeded)} orders a month; the team closed ${Math.round(F.ordersPerMonth)}. Today's prices are within ${Math.max(...F.priceMoves.map(x=>Math.abs(Math.round((x.now/x.was-1)*100))),0)}% of what the top SKUs sold for.`]];
-    X.bottom={p:`Stock ${top.slice(0,2).map(([n])=>skuShort(n)).join(" and ")} first, and plan ${mt0(F.ordersNeeded)} orders a month by PIC and area.`,
-      s:`Stock required is the tonnage to sell at 14 Oct prices; stock on hand and supplier lead times are not in the data.`}; }
+      [`${rp(tg)} is a step up from this data`,`The best month in the file was ${rp(F.best.gmv)} (${F.best.label}); the last ${F.avgN} full months averaged ${rp(F.avg)}. The plan needs ${mt0(mMt)} MT a month against a record of ${mt0(F.bestKg.kg/1000)} t (${F.bestKg.label}).`],
+      [`A few SKUs carry the plan`,`${top.slice(0,3).map(([n,v])=>`${skuShort(n)} ${mt0(v)} MT`).join(", ")} to ${fds(F.end)} (${pct(top.slice(0,3).reduce((s,x)=>s+x[1],0),totMt)}% of the tonnes). A stock-out of any of them stops the plan.`],
+      [`${F.areas[0]} takes ${pct(F.share[F.areas[0]],1)}% of the stock`,`${F.areas.map(a=>`${a} ${pct(F.share[a],1)}%`).join(", ")} of fertilizer sales; ${W.length} weekly deliveries of about ${mt0(wkMt*F.share[F.areas[0]])} MT to ${F.areas[0]}.`],
+      [`The gap is volume, not price`,`At the ${F.recentLabel} average of ${rp(F.aov)}, ${rp(tg)} needs ${mt0(F.ordersNeeded)} ${ord} a month; the team closed ${Math.round(F.ordersPerMonth)}.${F.priceMoves.length?` Today's prices are within ${Math.max(...F.priceMoves.map(x=>Math.abs(Math.round((x.now/x.was-1)*100))),0)}% of what the top SKUs sold for.`:""}`]];
+    X.bottom={p:`Stock ${top.slice(0,2).map(([n])=>skuShort(n)).join(" and ")} first, about ${mt0(wkMt)} MT a week, and plan ${mt0(F.ordersNeeded)} ${ord} a month.`,
+      s:`Stock required is the tonnage to sell at today's list prices; stock on hand and supplier lead times are not in the data.`}; }
   X.actions=draftActs(X.actions||[]); X.basis=basisOf(T,X); FOOT_BASIS=X.basis; return X;
 }
 function deckNarrative0(T){
