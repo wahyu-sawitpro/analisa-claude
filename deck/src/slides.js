@@ -129,7 +129,7 @@ function narrative(A){
   // Funnel and PIC scorecard
   const FU=A.funnel, steps=FU.slice(1).map((f,i)=>({from:FU[i],to:f,rate:FU[i][1]?f[1]/FU[i][1]:1})).filter(x=>x.from[1]>=5&&(won||x.to[0]!=="Ordered"));
   const drop=steps.slice().sort((a,b)=>a.rate-b.rate)[0];
-  const NL=A.notLogging, nlG=NL.reduce((s,g)=>s+g.gmv,0), nlO=NL.reduce((s,g)=>s+g.orders,0);
+  const NL=[], nlG=NL.reduce((s,g)=>s+g.gmv,0), nlO=NL.reduce((s,g)=>s+g.orders,0);
   const conv=A.picCard.filter(g=>g.leadEng>=3&&!A.templated.some(t=>t.p===g.p)).map(g=>({...g,eng:g.leadEng,won:g.leadWon})).sort((a,b)=>b.won/b.eng-a.won/a.eng||b.eng-a.eng), cHi=conv[0], cLo=conv[conv.length-1];
   N.pf=A.has.crm&&(n>=5||A.picCard.length>=2);
   N.pfTitle=[n>=8&&drop&&`Only ${drop.to[1]} of ${drop.from[1]} ${drop.from[0]==="Engagements logged"?"engagements":lc(drop.from[0]).replace(/^reached the lead$/,"reached leads").replace(/^showed interest$/,"interested leads")} ${drop.to[0]==="Reached the lead"?"were reached":drop.to[0]==="Showed interest"?"showed interest":"ordered"}`,
@@ -326,15 +326,15 @@ function narrative(A){
     `${tTop.lost} of ${lost} “not interested” leads${tTop.t==="Locked in elsewhere"?" already buy from a shop, KUD or agent":` cite ${lc(tTop.t)}`}${sig("credit").lost?`; ${sig("credit").lost} buy on credit`:""}${sig("season").lost?`; ${sig("season").lost} already fertilized this season`:""}.`]);
   if(A.intentWarm.length>=2) F.push(["Warm leads are asking how to buy",`${A.intentWarm.length} of ${warm} leads in play asked about the warehouse, delivery or prices${A.unreachable?`; ${A.unreachable} could not be reached by phone`:""}.`]);
   if(A.has.sales&&A.outstanding>=A.gmv*.1) F.push([`${rp(A.outstanding)} of last week's sales is still unpaid`,`${A.partial.length} partially paid order${A.partial.length>1?"s":""} worth ${rp(A.partial.reduce((s,o)=>s+o.gmv,0))}; ${A.openOrders.length} of ${A.orders.length} orders are still open.`]);
-  if(A.has.sales&&A.noCrm.length/A.orders.length>=.3) F.push(["The CRM misses most of the sales story",`${A.noCrm.length} of ${A.orders.length} orders (${rp(A.noCrm.reduce((s,o)=>s+o.gmv,0))}) have no CRM engagement${A.notLogging.length?`; ${A.notLogging.length} seller${A.notLogging.length>1?"s":""} logged none at all`:A.crmMap.potential?", and CRM wins carry no sales":""}.`]);
+  if(false) F.push(["The CRM misses most of the sales story",`${A.noCrm.length} of ${A.orders.length} orders (${rp(A.noCrm.reduce((s,o)=>s+o.gmv,0))}) have no CRM engagement${A.notLogging.length?`; ${A.notLogging.length} seller${A.notLogging.length>1?"s":""} logged none at all`:A.crmMap.potential?", and CRM wins carry no sales":""}.`]);
   if(A.stockRows.length>=2) F.push(["Stock-outs cost real orders",`${A.stockRows.length} leads stalled because the product wasn't available or delivery was too slow.`]);
   if(!A.has.sales&&!won&&nw){ const ca=A.notWon.filter(r=>r.theme==="Just asking").length; if(ca/nw>=.5) F.push(["We don't know why leads say no",`${pct(ca,nw)}% of reasons are a catch-all, so the team can't fix the pitch.`]); }
-  if(won&&A.has.sales) F.push([`${A.wonLinked.length} of ${won} CRM wins confirmed in sales`,`They became ${A.linkedOrders.length} order${A.linkedOrders.length===1?"":"s"} worth ${rp(A.linkedGmv)}${A.matchCounts.find(m=>m[0]==="value and date")?"; one is matched only by value and date":""}.`]);
+  if(won&&A.has.sales&&false) F.push([`${A.wonLinked.length} of ${won} CRM wins confirmed in sales`,`They became ${A.linkedOrders.length} order${A.linkedOrders.length===1?"":"s"} worth ${rp(A.linkedGmv)}${A.matchCounts.find(m=>m[0]==="value and date")?"; one is matched only by value and date":""}.`]);
   if(A.has.sales&&A.byFamily[0]) F.push([`${A.byFamily[0].k} is ${pct(A.byFamily[0].gmv,A.gmv)}% of sales`,`${rp(A.gmv)} from ${A.orders.length} orders${A.topOrderShare>=.5?`; one order alone is ${pct(A.orders[0].gmv,A.gmv)}% of sales`:""}.`]);
   if(A.missingRefs.length) F.splice(1,0,[`${A.missingRefs.length} CRM closing${A.missingRefs.length>1?"s":""}${A.missingVal?` (${rp(A.missingVal)})`:""} missing from sales`,`Their order numbers (${A.missingRefs.slice(0,3).map(x=>x.ref).join(", ")}${A.missingRefs.length>3?", …":""}) are not in the sales export.`]);
   if(A.wonFromNotes.length) F.push(["Closed deals are not marked as orders",`${A.wonFromNotes.length} win${A.wonFromNotes.length>1?"s are":" is"} still “${A.wonFromNotes[0].statusLogged||"blank"}” in the CRM although the notes say closing.`]);
   if(A.wow){ const W=A.wow; F.unshift([W.flat?"Sales flat vs the week before":`Sales ${W.up?"up":"down"} ${W.pc!=null?W.pc+"%":""} vs the week before`,`${rp(W.p.gmv)} → ${rp(W.c.gmv)}, mostly from ${W.drv}${W.lead?`; ${W.lead.k} moved most`:""}.`]); }
-  if(won&&(A.wonPos.length+A.wonAfter.length)/won>=.5) F.splice(1,0,["Most CRM “wins” are logged after the sale",`${N.kindNote.replace(/^./,c=>c.toUpperCase())} So the CRM can't yet show what turns a lead into an order.`]);
+  if(false) F.splice(1,0,["Most CRM “wins” are logged after the sale",`${N.kindNote.replace(/^./,c=>c.toUpperCase())} So the CRM can't yet show what turns a lead into an order.`]);
   if(PL&&PL.total>=Math.max(1e7,(A.gmv||0)*.1)) F.splice(1,0,[`${rp(PL.total)} of named demand didn't convert`,`${PL.valued.length} leads said what they needed but didn't order${PL.fix?`; ${rp(PL.fix)} of it was blocked on our side (stock-outs, payment terms)`:""}. ${PL.unval} more leads have no quantity logged.`]);
   if(ND&&(ND.nPot||ND.nNeed)) F.splice(1,0,[[ND.nPot&&`${rp(ND.pot)} of potential sales`,ND.kg&&`~${tons(ND.kg)} of need`].filter(Boolean).join(" and ")+" didn't convert",`${ND.nPot+ND.nNeed} of ${ND.leads.length} leads logged a value or a quantity${ND.barriers.filter(([b])=>!/just asking/i.test(b))[0]?`; the most common blocker is ${lc(ND.barriers.filter(([b])=>!/just asking/i.test(b))[0][0])}`:""}.`]);
   if(VW.length>=20) F.splice(2,0,[`${VW.length} “rejections” are TikTok live viewers`,`Logged as leads with an account name and no phone number; ${A.notWon.length} real leads remain.`]);
@@ -361,7 +361,7 @@ function narrative(A){
   if(tTop&&tTop.t==="Locked in elsewhere"&&tTop.lost>=5) act.push({t:"Stop competing head-on with KUDs and shops",d:`${tTop.lost} rejections are tied to an existing shop, KUD or agent${sig("credit").lost?`, ${sig("credit").lost} of them buying on credit`:""}. Test a KUD partnership or payment terms, and drop these numbers from this season's call lists.`,o:"Sales lead",w:"Next 2 weeks"});
   if(A.stockRows.length>=2){ const pr=productsIn(A.stockRows).slice(0,3); act.push({t:"Restock what leads asked for",d:`${A.stockRows.length} leads stalled on availability or a 7–14 day delivery${pr.length?`: ${andList(pr)}`:""}. Confirm stock before promising, and offer warehouse pickup.`,o:"Supply & ops",w:"This week"}); }
   if(A.has.sales&&A.outstanding>=A.gmv*.05) act.push({t:`Collect ${rp(A.outstanding)} still unpaid`,d:`${A.partial.length} order${A.partial.length>1?"s are":" is"} only partially paid. Confirm payment dates before the next delivery to these customers.`,o:"Finance + order PIC",w:"This week"});
-  if(A.has.sales&&A.noCrm.length/A.orders.length>=.3) act.push({t:"Log every order in the CRM",d:`${A.noCrm.length} of ${A.orders.length} orders have no engagement record${A.notLogging.length?`, including every order from ${andList(A.notLogging.map(g=>g.p))}`:""}. Log engagements on the same day and add the order number, so wins carry their sales.`,o:"Sales ops",w:"Next form update"});
+  if(false) act.push({t:"Log every order in the CRM",d:`${A.noCrm.length} of ${A.orders.length} orders have no engagement record${A.notLogging.length?`, including every order from ${andList(A.notLogging.map(g=>g.p))}`:""}. Log engagements on the same day and add the order number, so wins carry their sales.`,o:"Sales ops",w:"Next form update"});
   if(warm&&!A.intentWarm.length) act.push({t:`Book dated follow-ups for ${warm} leads in play`,d:"Agree a concrete next step with each lead and log a follow-up date.",o:warmPic||"Lead PIC",w:"This week"});
   if(nw&&A.notWon.filter(r=>r.theme==="Just asking").length/nw>=.3) act.push({t:"Replace the catch-all reason",d:"Make the reason a required dropdown: price, no need yet (with a revisit month), has a supplier, tied to KUD, out of stock, unreachable. Drop “just asking”.",o:"Sales ops",w:"Next form update"});
   const tests=A.byFamily?.find(f=>/test/i.test(f.k));
@@ -408,7 +408,7 @@ function narrative(A){
   if(A.wonFromNotes.length) g.push(`${A.wonFromNotes.length} closed deal${A.wonFromNotes.length>1?"s":""} still marked “${A.wonFromNotes[0].statusLogged||"blank"}”`);
   if(A.dupRows) g.unshift(`${A.dupRows} engagement${A.dupRows>1?"s":""} entered twice`);
   if(A.service.length) g.unshift(`${A.service.length} order-status question${A.service.length>1?"s":""} logged as leads`);
-  if(won&&A.wonLead.length<won) g.unshift(`${won-A.wonLead.length} checkout sale${won-A.wonLead.length>1?"s":""} logged as wins`);
+  if(false) g.unshift(`${won-A.wonLead.length} checkout sale${won-A.wonLead.length>1?"s":""} logged as wins`);
   N.gaps=n?g:[];
   return N;
 }
@@ -423,9 +423,9 @@ function hbars(items,{fmt=v=>nf.format(v),right,max,color="#4A653B",scale}={}){
 const legendOf=pairs=>`<div class="legend">${pairs.map(([k,c])=>`<span><i style="background:${c}"></i>${esc(k)}</span>`).join("")}</div>`;
 const kpiHtml=k=>`<div class="kpi${k.hot?" hot":""}"><div class="v">${esc(k.v)}<small>${esc(k.u)}</small></div><div class="l">${esc(k.l)}</div></div>`;
 function contentSlide(n,kicker,title,body){
-  return `<div class="slide content"><div class="panel"></div><div class="ybar"></div><img class="palm" src="${IMG.palm}" alt=""><img class="logo" src="${IMG.logo}" alt="SawitPRO">
-  <div class="kicker">${esc(kicker)}</div><h2>${esc(title)}</h2><div class="body">${body}</div>
-  <div class="foot"><span>${esc(FOOT_BASIS)}</span><span class="pg">${n}</span><span>Do not use or distribute without permission from SawitPRO</span></div></div>`;
+  return `<div class="slide content"><img class="frame26" src="${IMG.frame}" alt="">
+  <h2>${esc(title)}</h2><div class="kicker">${esc(kicker)}</div>${FOOT_BASIS?`<div class="basis">${esc(FOOT_BASIS)}</div>`:""}<div class="body">${body}</div>
+  <div class="pgno">${n}</div></div>`;
 }
 const appName=k=>({WEB:"Web",PETANI:"Petani app","SAWITPRO-RETAIL":"SawitPRO retail","SAWITPRO-BISNIS":"SawitPRO bisnis"}[String(k).toUpperCase()]||k);
 const roleName=k=>String(k).toLowerCase().replace(/_/g," ").replace(/^./,c=>c.toUpperCase());
@@ -703,36 +703,38 @@ function teamSpecs(A,N,pre){
   if(A.forecast) return forecastSpecs(A.forecast,pre);  // a price list makes this a forecast deck: forecast slides only
   const NI={name:"Not interested",color:OUTC.lost}, WM={name:"Considering / prospect",color:OUTC.warm}, NS={name:"No status",color:OUTC.none};
 
-  // Success story: each CRM story checked against sales; orders with no CRM record
-  const ST=A.stories||[], stM=ST.filter(x=>x.state==="matched"), stX=ST.filter(x=>x.state==="missing"), nc=A.noCrm||[], ncS=nc.reduce((s,o)=>s+o.gmv,0);
-  if(ST.length&&A.has.sales){
-    const note=x=>x.state==="matched"?(x.r.matchBy==="phone"||x.r.matchBy==="order number"?"Matched in sales":`Matched in sales (by ${x.r.matchBy})`)
-      :x.state==="missing"?"Team put on CRM however sales not reflected yet":`Prospect${x.r.closing?`, closing est. ${fds(x.r.closing)}`:""}; not a sale yet`;
-    const logged=r=>r.product?prodShort(r.product)+(String(r.product).split(/,(?![^(]*\))/).length>1?` +${String(r.product).split(/,(?![^(]*\))/).length-1}`:""):r.purpose||productsIn([r]).slice(0,2).join(", ")||"–";
-    const rows=ST.slice().sort((a,b)=>["missing","matched","prospect"].indexOf(a.state)-["missing","matched","prospect"].indexOf(b.state)).slice(0,7);
-    const mS=stM.reduce((s,x)=>s+x.sales,0);
-    S.push({kicker:pre+"Success story",title:N.storyTitle,rows:[
-      {cards:[{w:1.35,title:`CRM success stories (${ST.length})`,sub:`${stM.length} found in sales (${rp(stM.reduce((s,x)=>s+x.sales,0))}, ${pct(stM.reduce((s,x)=>s+x.sales,0),A.gmv)}% of sales); checked by ${andList(A.matchCounts.map(m=>m[0]))||"phone, order number and name"}`,
-          table:{colW:[11,13,14,8,12,9,30],head:["CRM ID","PIC","Logged","CRM value","Order","Sales","Note"],align:["l","l","l","r","l","r","l"],
-            rows:rows.map(x=>[x.r.id||"–",x.r.pic||"–",logged(x.r),x.r.potential?rp(x.r.potential):"–",x.orders.map(o=>o.no).join(", ")||"–",x.sales?rp(x.sales):"–",x.state==="missing"?{v:note(x),bold:true}:note(x)])},
-          foot:N.kindNote?`Of the ${A.won.length} wins, ${N.kindNote}`:null},
-        {w:1,title:`In sales, not in the CRM (${nc.length} of ${A.orders.length})`,sub:`${rp(ncS)} of sales recorded with no CRM engagement`,
-          table:{colW:[12,14,16,9],head:["Order","PIC","Product","Sales"],align:["l","l","l","r"],rows:nc.slice(0,7).map(o=>[o.no,o.pic||"–",prodShort(o.items[0])||"–",rp(o.gmv)])},
-          foot:nc.length>7?`Top 7 of ${nc.length} by sales.`:null}]}]});
-  }
-
-  // Success story: what the wins are worth
-  if(N.wwNotes){
-    const cats=[[`CRM wins\n${pl(A.linkedOrders.length,"order")}`,A.aovWin,OUTC.won],A.noCrm.length&&[`No CRM record\n${pl(A.noCrm.length,"order")}`,A.aovNoCrm,"#8E9C84"],[`All orders\n${O.length}`,A.aovAll,"#86AD6C"]].filter(Boolean);
-    const rest=O.length>A.linkedOrders.length, recon=!A.noCrm.length&&A.missingRefs.length;
-    const first=recon?{w:.95,title:"CRM closings vs the sales export",sub:"Value of closings logged this week",chart:{type:"column",cats:[`In the sales export\n${pl(A.linkedOrders.length,"order")}`,`Not in the export\n${pl(A.missingRefs.length,"order")}`],series:[{name:"Value",values:[A.linkedGmv,A.missingVal],colors:[OUTC.won,DOWN]}],fmt:rpM,lblH:36}}
-      :{w:.95,title:"Average order value",sub:"Orders behind CRM wins vs the rest",chart:{type:"column",cats:cats.map(c=>c[0]),series:[{name:"Average order",values:cats.map(c=>c[1]),colors:cats.map(c=>c[2])}],fmt:rpM,lblH:36}};
-    S.push({kicker:pre+"Success story · what the wins are worth",title:N.wwTitle,rows:[{cards:[
-      first,
-      {w:1.25,title:rest?"Product mix: wins vs other orders":"Product mix of the wins",sub:"Share of each group's sales by product type",chart:{type:"column",cats:A.mix.map(m=>m.k),series:[{name:"CRM wins",color:CAT[0],values:A.mix.map(m=>m.win)},...(rest?[{name:"Other orders",color:CAT[2],values:A.mix.map(m=>m.rest)}]:[])],fmt:v=>v+"%",lblH:36}},
-      {w:.72,kpis:[{v:String(pct(A.linkedGmv,A.gmv)),u:"%",l:"of the team's sales came from orders behind CRM wins",hot:true},
-        A.cycle.n?{v:String(A.cycle.median),u:" days",l:`median from CRM engagement to order (${A.cycle.sameDay} of ${A.cycle.n} same day)`}:{v:rpParts(A.aovWin)[0],u:rpParts(A.aovWin)[1],l:"average order behind a win"},
-        A.hasCustStatus?{v:String(A.wonNew),u:`/${A.linkedOrders.length}`,l:"win orders from new customers"}:{v:String(A.wonLinked.length),u:`/${A.won.length}`,l:"wins confirmed in sales"}]}]}],notes:N.wwNotes});
+  // Success story: every sale is a success. Who bought, where, what, how they ordered, and what the CRM adds.
+  if(A.has.sales&&A.orders.length){
+    const O=A.orders, tot=A.gmv||1, share=v=>Math.round(v/tot*100), sumG=os=>os.reduce((s,o)=>s+o.gmv,0);
+    const regionOf=o=>o.lines[0].region||o.city||"Not recorded", catOf=o=>o.cats.length?o.cats.join(", "):(o.lines[0].family||"–");
+    const crmOf=o=>(o.crm||[])[0], typeOf=o=>{ const r=o.lines[0].role, c=crmOf(o); return r?roleName(r):c&&(c.custType||c.userType)?(c.custType||c.userType):"Not recorded"; };
+    const custOf=o=>o.hasStatus?(o.isNew?"New":"Repeat"):"Not recorded", viaOf=o=>o.app?appName(o.app):"Not recorded";
+    const qtyTxt=o=>{ const m=new Map(); o.lines.forEach(l=>{ const k=prodShort(l.item)||shortItem(l.item); m.set(k,(m.get(k)||0)+(l.qty||0)); }); return [...m].map(([k,q])=>`${k}${q?` ×${nf.format(q)}`:""}`).join(", "); };
+    const by=f=>{ const m=new Map(); O.forEach(o=>{ const k=f(o); if(!m.has(k)) m.set(k,[]); m.get(k).push(o); }); return [...m].map(([k,os])=>({k,os,g:sumG(os)})).sort((a,b)=>b.g-a.g); };
+    const R=by(regionOf), Cg=by(catOf), Cu=by(custOf), V=by(viaOf), Ty=by(typeOf), PAL=[CAT[0],CAT[1],CAT[2],CAT[3],CAT[4],"#9AA593"];
+    const seg=g=>g.map((x,i)=>({k:x.k,n:share(x.g),color:x.k==="Not recorded"?OUTC.none:PAL[i]||"#B3BBAB"}));
+    const rows=[{label:"Customer",segs:seg(Cu)},{label:"Ordered via",segs:seg(V)},...(Ty.some(x=>x.k!=="Not recorded")?[{label:"User type",segs:seg(Ty)}]:[]),{label:"Product category",segs:seg(Cg.slice(0,5))}];
+    const nw=Cu.find(x=>x.k==="New"), top=O[0], withCrm=O.filter(o=>o.crm), crmT=countBy(withCrm,o=>crmOf(o).channel||"–")[0], ST=A.stories||[], stX=ST.filter(x=>x.state==="missing");
+    const notes=[
+      Cg[0]&&`<b>${esc(Cg[0].k)} is ${share(Cg[0].g)}% of sales</b> from ${pl(Cg[0].os.length,"order")} (${esc(andList([...new Set(Cg[0].os.map(regionOf))].slice(0,3)))})${Cg[1]?`; then ${esc(Cg[1].k)} ${share(Cg[1].g)}%`:""}.`,
+      nw&&`<b>${pl(nw.os.length,"order")} from new customers (${rp(nw.g)}):</b> ${esc(nw.os.slice(0,3).map(o=>`${qtyTxt(o)} in ${regionOf(o)}`).join("; "))}.`,
+      V.length>1&&`<b>Ordered via:</b> ${esc(V.map(x=>`${x.k} ${pl(x.os.length,"order")} (${share(x.g)}%)`).join(", "))}.`,
+      withCrm.length&&`<b>${pl(withCrm.length,"order")} came with a CRM engagement</b> (${rp(sumG(withCrm))})${crmT?`, mostly ${esc(lc(crmT[0]))}`:""}${A.wonPos&&A.wonPos.length?"; mobile-shop sales logged at checkout":""}.`,
+    ].filter(Boolean);
+    if(stX.length) notes.splice(1,0,`<b>Team put on CRM however sales not reflected yet:</b> ${esc(stX.map(x=>`${x.r.id}${x.r.potential?` (${rp(x.r.potential)})`:""}${x.r.product||x.r.purpose?`, ${prodShort(x.r.product)||x.r.purpose}`:""}`).join("; "))}.`);
+    notes.splice(4);
+    S.push({kicker:pre+"Success story · who bought and where",title:`${pl(O.length,"order")} from ${pl(A.customers,"customer")}: ${Cg[0]?`${Cg[0].k} is ${share(Cg[0].g)}% of sales`:""}${R[0]&&R[0].k!=="Not recorded"?`, ${R[0].k} ${share(R[0].g)}%`:""}`,
+      rows:[{cards:[
+        {w:1,title:"Sales by customer location",sub:"Regency or city; customers in grey",chart:{type:"hbar",items:R.slice(0,6).map(x=>({k:x.k,v:x.g,r:pl(new Set(x.os.map(o=>o.ph||o.nk||o.no)).size,"cust.")})),fmt:rpM}},
+        {w:1.3,title:"Who the buyers are",sub:"Share of the week's sales, %",chart:{type:"stack100",rows}}]}],notes});
+    const ord=O.slice(0,8);
+    S.push({kicker:pre+"Success story · the orders",title:`${nw?`${pl(nw.os.length,"new customer")} and ${pl(O.length-nw.os.length,"repeat order")}`:pl(O.length,"order")}; the largest is ${rp(top.gmv)} (${catOf(top)}, ${regionOf(top)})`,
+      rows:[{cards:[{title:O.length>8?`Top 8 of ${O.length} orders by sales`:"Every order this week",sub:"Names and phone numbers are left out",
+        table:(()=>{ const ut=O.some(o=>typeOf(o)!=="Not recorded");
+          return {colW:[10,13,14,26,8,7,9,...(ut?[10]:[]),13],head:["Order","Location","Category","Products (qty)","Sales","Customer","Ordered via",...(ut?["User type"]:[]),"CRM engagement"],align:["l","l","l","l","r","l","l","l","l"],
+          rows:ord.map(o=>{ const c=crmOf(o); return [o.no,regionOf(o),catOf(o),qtyTxt(o),rp(o.gmv),custOf(o),viaOf(o),...(ut?[typeOf(o)]:[]),c?[c.channel,c.source].filter(Boolean).join(" · ")||"Logged":"–"]; })}; })()}]}],
+      notes:[`<b>PIC:</b> ${esc(A.byPic.slice(0,4).map(x=>`${x.p} ${rp(x.g)} (${pl(x.n,"order")})`).join(", "))}.`,
+        A.partial.length&&`<b>${rp(A.outstanding||A.partial.reduce((s,o)=>s+o.gmv,0))} still to collect</b> on ${pl(A.partial.length,"partly paid order")}; ${A.openOrders.length} of ${O.length} orders are still open.`].filter(Boolean)});
   }
 
   // Sales: last week vs the week before
@@ -814,18 +816,6 @@ function teamSpecs(A,N,pre){
     cards.push({w:.85,kpis:k3});
     S.push({kicker:pre+`${N.sk} · what sold`,title:N.soldTitle,rows:[{cards}]});
 
-    // Sales: who bought and how
-    const parG=A.partial.reduce((s,o)=>s+o.gmv,0), openG=A.openOrders.reduce((s,o)=>s+o.gmv,0), ncG=A.noCrm.reduce((s,o)=>s+o.gmv,0);
-    const left=A.byRegion.length?{w:1,title:"Sales by customer region",sub:`${A.byProvince.map(p=>`${p.k} ${pct(p.gmv,A.gmv)}%`).join(" · ")}; customers in grey`,chart:{type:"hbar",items:A.byRegion.slice(0,7).map(x=>({k:x.k,v:x.gmv,r:`${x.cust} cust.`})),fmt:rpM},foot:N.regionNote||null}
-      :{w:1,title:"Sales by customer role",sub:"No region in this export; orders in grey",chart:{type:"hbar",items:A.byRole.map(x=>({k:roleName(x.k),v:x.gmv,r:pl(x.n,"order")})),fmt:rpM}};
-    const segs=[...A.byApp.map(x=>({k:`${appName(x.k)}\n${pl(x.n,"order")}`,v:x.aov,c:CAT[0]})),...A.byCust.map(x=>({k:`${x.k.replace(" customer","")}\n${pl(x.n,"order")}`,v:x.aov,c:CAT[2]}))];
-    S.push({kicker:pre+`${N.sk} · who bought and how`,title:N.whoTitle,rows:[{cards:[left,
-      {w:1.15,split:[{title:"Average order value",sub:"By ordering channel and customer type",chart:{type:"column",cats:segs.map(x=>x.k),series:[{name:"Average order",values:segs.map(x=>x.v),colors:segs.map(x=>x.c)}],fmt:rpM,lblH:34,
-          legend:A.byCust.length?[{name:"Ordering channel",color:CAT[0]},{name:"Customer type",color:CAT[2]}]:null}},
-        {title:"Sales PIC",sub:"Sales; orders in grey",chart:{type:"hbar",items:A.byPic.slice(0,4).map(x=>({k:x.p,v:x.g,r:pl(x.n,"order")})),fmt:rpM,color:"#5E8C47",rowH:40}}]},
-      {w:.8,kpis:[A.partial.length&&{v:rpParts(A.outstanding||parG)[0],u:rpParts(A.outstanding||parG)[1],l:A.outstanding?`still unpaid on ${pl(A.partial.length,"partially paid order")} (${rp(parG)} sales)`:`Sales on ${pl(A.partial.length,"partially paid order")}`,hot:true},
-        A.openOrders.length&&{v:String(A.openOrders.length),u:`/${O.length}`,l:`orders still open, not completed (${rp(openG)})`},
-        A.has.crm?{v:String(A.noCrm.length),u:`/${O.length}`,l:`orders with no CRM engagement (${rp(ncG)})`}:{v:String(pct(A.top2,A.gmv)),u:"%",l:"of sales from the top 2 orders"}].filter(Boolean)}]}]});
   }
 
   // Sales: order size and timing
@@ -910,8 +900,8 @@ function teamSpecs(A,N,pre){
 
   // Team performance
   if(N.pf){
-    const hasS=A.has.sales, head=["PIC","CRM eng.","Reached","Won · warm · lost",...(hasS?["Orders","Sales","Orders in CRM"]:[])];
-    const rows=A.picCard.slice(0,7).map(g=>[g.p,g.eng||"–",g.eng?`${pct(g.reached,g.eng)}%`:"–",g.eng?`${g.won} · ${g.warm} · ${g.lost}`:"–",...(hasS?[g.orders||"–",g.orders?rp(g.gmv):"–",g.orders?(g.inCrm?`${g.inCrm} of ${g.orders}`:{v:`0 of ${g.orders}`,pill:true}):"–"]:[])]);
+    const hasS=A.has.sales, head=["PIC","CRM eng.","Reached","Won · warm · lost",...(hasS?["Orders","Sales"]:[])];
+    const rows=A.picCard.slice(0,7).map(g=>[g.p,g.eng||"–",g.eng?`${pct(g.reached,g.eng)}%`:"–",g.eng?`${g.won} · ${g.warm} · ${g.lost}`:"–",...(hasS?[g.orders||"–",g.orders?rp(g.gmv):"–"]:[])]);
     S.push({kicker:pre+"Team performance · funnel and PIC scorecard",title:N.pfTitle,rows:[{cards:[
       {w:.85,title:"CRM funnel",sub:"Engagements at each step; step conversion at the right",chart:{type:"funnel",steps:A.funnel}},
       {w:1.5,title:"PIC scorecard",sub:`CRM activity next to the orders each PIC closed${A.picCard.length>7?`; top 7 of ${A.picCard.length}`:""}`,table:{head,align:["l","r","r","r","r","r","r"],rows}}]}],notes:N.pfNotes});
@@ -987,7 +977,7 @@ function deckNarrative0(T){
   X.headline=gmv?`${rp(gmv)} in sales last week: ${T.map(t=>`${t.name} ${rp(t.A.gmv)}${t.A.wow&&t.A.wow.pc!=null?` (${t.A.wow.flat?"flat":(t.A.wow.up?"+":"−")+t.A.wow.pc+"%"})`:""}`).join(", ")}`:`${crm} CRM engagements across ${T.length} teams`;
   X.kpis=[{v:rpParts(gmv)[0],u:rpParts(gmv)[1],l:`Total sales from ${orders} orders`,hot:true},
     ...T.slice(0,2).map(t=>({v:rpParts(t.A.gmv)[0],u:rpParts(t.A.gmv)[1],l:`${t.name}: ${t.A.orders.length} orders, ${pct(t.A.gmv,gmv)}% of sales`})),
-    {v:String(wonL),u:`/${won}`,l:"CRM wins confirmed in sales data"}];
+    (()=>{ const c=all.reduce((s,A)=>s+(A.customers||0),0), nw=all.reduce((s,A)=>s+new Set((A.orders||[]).filter(o=>o.isNew).map(o=>o.ph||o.nk||o.no)).size,0); return {v:String(c),u:"",l:`customers bought${nw?`, ${nw} of them new`:""}`}; })()];
   // two findings per team, labelled with the team
   X.findings=T.flatMap(t=>t.N.findings.slice(0,T.length>2?1:2).map(f=>[`${t.name}: ${f[0]}`,f[1]])).slice(0,4);
   X.bottom={p:`${T[0].name}: ${T[0].N.bottom.p}`,s:T.slice(1).map(t=>`${t.name}: ${t.N.bottom.p}`).join(" ")};
@@ -999,7 +989,7 @@ function deckNarrative0(T){
   const cov=t=>t.A.orders.length?(t.A.orders.length-t.A.noCrm.length)/t.A.orders.length:null;
   const withCov=T.filter(t=>t.A.has.crm&&t.A.has.sales&&t.A.orders.length), best=withCov.slice().sort((a,b)=>cov(b)-cov(a));
   const lead=T.slice().sort((a,b)=>b.A.gmv-a.A.gmv)[0];
-  X.cmpTitle=`${lead.name} drives ${pct(lead.A.gmv,gmv)}% of sales`+(best.length>=2&&cov(best[0])-cov(best[best.length-1])>=.25
+  X.cmpTitle=`${lead.name} drives ${pct(lead.A.gmv,gmv)}% of sales`+(false
     ?`; ${best[0].name} records ${best[0].A.orders.length-best[0].A.noCrm.length} of ${best[0].A.orders.length} orders in the CRM vs ${best[best.length-1].A.orders.length-best[best.length-1].A.noCrm.length} of ${best[best.length-1].A.orders.length}`:"");
   const F=(t)=>t.A.byFamily?.[0];
   X.cmpRows=[
@@ -1011,8 +1001,6 @@ function deckNarrative0(T){
     ["Top product type",T.map(t=>F(t)?`${F(t).k} (${pct(F(t).gmv,t.A.gmv)}%)`:"–")],
     ["Largest order share of sales",T.map(t=>t.A.orders.length?`${pct(t.A.orders[0].gmv,t.A.gmv)}%`:"–")],
     ["CRM engagements logged",T.map(t=>t.A.crm.length?`${t.A.crm.length} (${t.A.won.length} won, ${t.A.lost.length} not interested)`:"–")],
-    ["CRM wins confirmed in sales",T.map(t=>t.A.won.length&&t.A.has.sales?`${t.A.wonLinked.length} of ${t.A.won.length} · ${rp(t.A.linkedGmv)}`:"–")],
-    ["Orders with a CRM record",T.map(t=>t.A.has.crm&&t.A.orders.length?`${t.A.orders.length-t.A.noCrm.length} of ${t.A.orders.length}`:"–")],
     ["Still unpaid",T.map(t=>t.A.has.sales?(t.A.outstanding?rp(t.A.outstanding):"Nothing"):"–")],
   ];
   return X;
@@ -1055,14 +1043,12 @@ const pcs=v=>`${v<0?"−":"+"}${Math.abs(Math.round(v*100))}%`, sgn=v=>(v>=0?"+"
 const crmSpan=C=>span(C.crm.map(r=>r.date)).replace(/ \d{4}$/,"");
 const M_=TR=>TR.M.map(x=>rp(x.gmv)).join(" → ");
 function dividerSlide(no,label,title,meta){
-  return `<div class="slide divider"><img class="bg" src="${IMG.divider}" alt=""><div class="txt"><p class="eyebrow">${esc(label)}</p><p class="title">${esc(title)}</p>${meta?`<p class="dmeta">${esc(meta)}</p>`:""}</div><div class="num">${String(no).padStart(2,"0")}</div></div>`;
+  return `<div class="slide divider26"><img class="bg" src="${IMG.divider26}" alt=""><div class="txt"><p class="eyebrow">${esc(label)}</p><p class="title">${esc(title)}</p>${meta?`<p class="dmeta">${esc(meta)}</p>`:""}</div><div class="num">${String(no).padStart(2,"0")}</div></div>`;
 }
 function buildDeck(T,X){
   const S=[], next=()=>S.length+1;
-  S.push(`<div class="slide cover"><img class="bg" src="${IMG.cover}" alt=""><div class="shade"></div><img class="wm" src="${IMG.wm}" alt="SawitPRO.id">
-    <div class="band"></div><div class="disc"><img src="${IMG.logo}" alt=""></div>
-    <div class="txt"><p class="eyebrow">${esc(X.eyebrow)}</p><p class="title">${esc(X.title)}</p></div>
-    <div class="meta">${esc(X.period)} · ${esc(X.meta)}</div></div>`);
+  S.push(`<div class="slide cover26"><img class="bg" src="${IMG.cover26}" alt=""><div class="hdr">${esc(X.eyebrow)}</div>
+    <div class="txt"><p class="title">${esc(X.title)}</p><p class="sub">${esc(X.period)}</p><p class="meta">${esc(X.meta)}</p></div></div>`);
   S.push(contentSlide(next(),"Executive summary",X.headline,`
     <div class="kpis">${X.kpis.map(kpiHtml).join("")}</div>
     <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin-top:18px">
@@ -1084,7 +1070,6 @@ function buildDeck(T,X){
   S.push(contentSlide(next(),"Next steps",`${X.actions.length} draft actions ${X.dop?"to move the DO pipeline":X.acq?"to grow farmer acquisition":X.forecast?"to deliver the stock plan":X.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`,`
     <div class="act${X.actions.length>4?" act3":""}">${X.actions.map((a,i)=>`<div class="card"><h3><span>${i+1}</span>${esc(a.t)}</h3><p>${esc(a.d)}</p><div class="meta">${a.team?`<span class="team">${esc(a.team)}</span>`:""}<span>Owner: ${esc(a.o)}</span><span class="when">${esc(a.w)}</span></div></div>`).join("")}</div>
     ${X.gaps.length?`<div class="gaps"><b>Also clean up in the CRM:</b> ${esc(X.gaps.join("; "))}.</div>`:""}`));
-  S.push(`<div class="slide closing"><img class="bg" src="${IMG.closing}" alt=""><div class="shade"></div><img class="wm" src="${IMG.wm}" alt="SawitPRO.id"><img class="lg" src="${IMG.logo}" alt="">
-    <div class="box"><h2>Thank You</h2><p>#TerusTumbuh</p></div></div>`);
+  S.push(`<div class="slide closing26"><img class="bg" src="${IMG.closing26}" alt=""><p class="ty">Terima Kasih</p><p class="tag">#TerusTumbuh</p></div>`);
   return S;
 }

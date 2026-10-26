@@ -169,7 +169,7 @@ const svgChart=(c,W,H)=>`<svg class="chart" width="${W}" height="${H}" viewBox="
 /* ---------- Panel slides: a grid of cards described once, rendered as HTML and as PPTX ---------- */
 // spec = {kicker, title, rows:[{h?, cards:[card]}], notes:[html]}
 // card = {w (weight), title, sub, chart | table | kpis (vertical) | kpiRow (horizontal) | split:[card] (stacked), foot}
-const BODY_W=1080, BODY_H=462, GAPX=16, GAPY=14;
+const BODY_W=1080, BODY_H=500, GAPX=16, GAPY=14;
 const CARD={px:22,pt:18,title:24,sub:20,gap:8,pb:14};
 function notesH(notes){ if(!notes?.length) return 0; const lines=notes.reduce((s,n)=>s+Math.ceil(tw(String(n).replace(/<[^>]+>/g,""),12.3)/1030),0); return Math.min(150,22+lines*18); }
 function placeCards(cards,x,y,W,H,horizontal=true){
