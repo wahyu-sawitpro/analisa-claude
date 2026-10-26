@@ -47,11 +47,11 @@ function narrative(A){
   const ND=A.need, tons=kg=>`${(Math.round(kg/100)/10).toLocaleString("en-US")} t`, VW=A.viewers||[];
   const rejTotal=VW.length+A.notWon.length+A.service.length;
   if(ND){ const bs=ND.barriers.filter(([b])=>!/just asking/i.test(b));
-    N.needTitle=ND.nPot||ND.nNeed?`Leads who didn't buy logged ${[ND.nPot&&`${rp(ND.pot)} of potential sales`,ND.kg&&`~${tons(ND.kg)} of need`].filter(Boolean).join(" and stated ")}`
-      :`None of the ${ND.leads.length} leads who didn't buy logged a potential or a quantity`;
+    N.needTitle=ND.nPot||ND.nNeed?`Leads who didn't buy logged ${[ND.nPot&&`${rp(ND.pot)} of potential sales`,ND.kg&&`~${tons(ND.kg)} of fertilizer need`].filter(Boolean).join(" and ")}`
+      :`None of the ${ND.leads.length} leads who didn't buy has potential sales or fertilizer need filled`;
     N.needNotes=[
       bs.length&&`<b>What holds them back:</b> ${esc(bs.slice(0,4).map(([b,n])=>`${lc(b)} (${n})`).join(", "))}.`,
-      ND.none&&`<b>${ND.none} of ${ND.leads.length} leads have no potential or quantity logged</b>${ND.zeroPot?` (${ND.zeroPot} carry a potential of Rp0)`:""}; log the need (kg or sacks) on every lead.`,
+      ND.none&&`<b>${ND.none} of ${ND.leads.length} leads have neither potential sales nor fertilizer need filled</b>${ND.zeroPot?` (${ND.zeroPot} carry a potential of Rp0)`:""}; fill one of the two on every lead.`,
       VW.length&&`<b>${VW.length} TikTok live viewers are left out:</b> an account name and no phone number, so they can't be called.`
     ].filter(Boolean).slice(0,2); }
   if(VW.length&&VW.length>=rejTotal*.5){ N.vwTitle=`${VW.length} of ${rejTotal} “rejection” entries are TikTok live viewers, not leads`; }
@@ -859,15 +859,15 @@ function teamSpecs(A,N,pre){
     const ND=A.need, tons=kg=>`${(Math.round(kg/100)/10).toLocaleString("en-US")} t`;
     const prod=r=>r.product?prodShort(r.product)+(String(r.product).split(/,(?![^(]*\))/).length>1?` +${String(r.product).split(/,(?![^(]*\))/).length-1}`:""):productsIn([r]).slice(0,3).join(", ")||(r.need&&r.need.seeds?"Topaz seeds":"–");
     const cards=[];
-    cards.push(ND.rows.length?{w:1,title:"Leads with a potential or a stated need",sub:"Potential sales only where the PIC logged it; otherwise the need as the lead stated it. Nothing is estimated",
-      table:{colW:[9,12,16,9,16,17],head:["CRM ID","PIC","Product","Potential sales","Need (as stated)","What holds it back"],align:["l","l","l","r","l","l"],
+    cards.push(ND.rows.length?{w:1,title:"Leads with potential sales or fertilizer need filled in",sub:"Only leads whose CRM potential sales or fertilizer need (kg) field is filled. Nothing is estimated",
+      table:{colW:[9,12,16,9,10,17],head:["CRM ID","PIC","Product","Potential sales","Fertilizer need","What holds it back"],align:["l","l","l","r","l","l"],
         rows:ND.rows.slice(0,7).map(r=>[r.id||"–",r.pic||"–",prod(r),r.potential>0?rp(r.potential):"–",r.need?r.need.text:"–",r.barrier])},foot:ND.rows.length>7?`Top 7 of ${ND.rows.length}.`:null}
-      :{w:1,title:"No potential or need logged",sub:"Nothing to size",kpis:[{v:String(ND.leads.length),u:"",l:"leads who didn't buy have no potential sales and no stated quantity",hot:true},{v:String(ND.zeroPot),u:"",l:"carry a potential of Rp0"}]});
+      :{w:1,title:"No potential or need logged",sub:"No lead has the potential sales or fertilizer need (kg) field filled",kpis:[{v:String(ND.leads.length),u:"",l:"leads who didn't buy have no potential sales and no fertilizer need filled",hot:true},{v:String(ND.zeroPot),u:"",l:"carry a potential of Rp0"}]});
     S.push({kicker:pre+"Rejection reasons · potential",title:N.needTitle,rows:[{h:84,cards:[{kpiRow:[
         {v:rpParts(ND.pot)[0]||"0",u:rpParts(ND.pot)[1],l:`potential sales logged (${pl(ND.nPot,"lead")})`,hot:true},
-        {v:ND.kg?`~${tons(ND.kg).replace(" t","")}`:"0",u:" t",l:`need stated by ${pl(ND.nNeed,"more lead")}`},
+        {v:ND.kg?`~${tons(ND.kg).replace(" t","")}`:"0",u:" t",l:`fertilizer need filled for ${pl(ND.nNeed,"more lead")}`},
         ND.seeds?{v:nf.format(ND.seeds),u:"",l:"Topaz seeds requested"}:{v:String(ND.barriers.filter(([b])=>!/just asking/i.test(b)).reduce((s,[,n])=>s+n,0)),u:"",l:"leads with a named blocker"},
-        {v:String(ND.none),u:`/${ND.leads.length}`,l:"leads with no potential or quantity logged"}]}]},{cards}],notes:N.needNotes});
+        {v:String(ND.none),u:`/${ND.leads.length}`,l:"leads with neither field filled"}]}]},{cards}],notes:N.needNotes});
   }
 
   // Customers chasing their orders (logged as leads)

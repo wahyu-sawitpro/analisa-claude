@@ -627,27 +627,20 @@ function monthTrend(L){
     pic:delta(Z.pic,F.pic),cat:delta(Z.cat,F.cat),family:delta(Z.family,F.family),region:delta(Z.region,F.region)};
 }
 
-// What real leads said they need, as logged: the potential sales the PIC entered, else the quantity stated in the
-// fertilizer-need field or the notes (sacks, kg, tonnes, seeds). Nothing is priced or estimated.
+// What real leads said they need, as logged: the potential sales the PIC entered, else the fertilizer need (kg)
+// field. Nothing is priced or estimated.
 const BARRIERS=[["Payment terms (COD / tempo)",(d,r)=>/tempo|\bcod\b|kredit|cicil/.test(d+" "+r)],["Tied to a KUD or agent",(d,r)=>/terikat|kud|agen/.test(r)],
   ["No need yet",(d,r)=>/belum ada kebutuhan|waktu dekat/.test(r)||/stok di gudangnya|jika ada kebutuhan/.test(d)],
   ["No mobile-shop route or long wait",(d,r)=>/(tokling|toko keliling).*(kapan|tidak ada yang kearah)|kapan tokling|belum ada jadwal|antrian/.test(d)||/datang lebih lama/.test(r)],
   ["Price or shipping cost",(d,r)=>/harga mahal/.test(r)||/ongkir|pengiriman ke|pengantaran/.test(d)],["Out of stock",(d,r)=>/tidak tersedia/.test(r)||/kosong|tidak tersedia/.test(d)],
   ["Wants warehouse pick-up",d=>/gudang|jemput/.test(d)],["Decision by family",d=>/orang ?tua|suami|istri/.test(d)&&!/topaz/.test(d)],["Topaz rules or documents",d=>/topaz|benih/.test(d)]];
 const barrierOf=r=>{ const d=norm(r.detail), rs=norm(r.reasonRaw||r.reason); const b=BARRIERS.find(([,f])=>f(d,rs)); return b?b[0]:"Just asking / catalogue sent"; };
-function statedNeed(r){
-  const d=String(r.detail||""), n=v=>parseFloat(String(v).replace(/\.(?=\d{3})/g,"").replace(",",".")), out=[]; let kg=0, seeds=0;
-  const prods=new Set((d.match(new RegExp(PRODUCT_RE.source,"gi"))||[]).map(x=>x.toUpperCase().split(" ")[0])).size;
-  for(const m of d.matchAll(/(\d+(?:[.,]\d+)?)\s*(sak|zak|karung|sack)s?\b/gi)){ const each=/masing/i.test(d.slice(m.index-60,m.index+40))&&prods>1; const q=n(m[1])*(each?prods:1); kg+=q*50; out.push(each?`${m[1]} sacks each (${q} sacks)`:`${m[1]} sacks`); }
-  for(const m of d.matchAll(/(\d+(?:[.,]\d+)?)\s*ton\b/gi)){ kg+=n(m[1])*1000; out.push(`${m[1]} t`); }
-  for(const m of d.matchAll(/(\d+(?:[.,]\d+)?)\s*(butir|benih|seeds?)\b/gi)){ seeds+=n(m[1]); out.push(`${m[1]} seeds`); }
-  if(r.needKg>0&&!out.length){ kg+=r.needKg; out.push(`${nf.format(r.needKg)} kg`); }
-  return out.length?{text:out.join(", "),kg,seeds}:null; }
 function leadNeed(A,C,O){
   const ordered=new Set(O.map(o=>o.ph).filter(Boolean));
   const L=C.filter(r=>r.kind==="lead"&&r.outcome!=="Won"&&!(r.ph&&ordered.has(r.ph))&&!/success|closing/i.test(r._src||""));
   if(!L.length) return null;
-  L.forEach(r=>{ r.barrier=barrierOf(r); r.need=statedNeed(r); });
+  // Only the CRM fields count: potential sales / GMV and fertilizer need (kg); quantities in the notes are not read.
+  L.forEach(r=>{ r.barrier=barrierOf(r); r.need=r.needKg>0?{text:`${nf.format(r.needKg)} kg`,kg:r.needKg,seeds:0}:null; });
   const withPot=L.filter(r=>r.potential>0), withNeed=L.filter(r=>!(r.potential>0)&&r.need);
   const rows=[...withPot.sort((a,b)=>b.potential-a.potential),...withNeed.sort((a,b)=>(b.need.kg||0)-(a.need.kg||0))];
   return {leads:L,rows,pot:withPot.reduce((s,r)=>s+r.potential,0),nPot:withPot.length,kg:withNeed.reduce((s,r)=>s+(r.need.kg||0),0),seeds:withNeed.reduce((s,r)=>s+(r.need.seeds||0),0),
