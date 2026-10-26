@@ -729,9 +729,10 @@ function teamSpecs(A,N,pre){
         {w:1.3,title:"Who the buyers are",sub:"Share of the week's sales, %",chart:{type:"stack100",rows}}]}],notes});
     const ord=O.slice(0,8);
     S.push({kicker:pre+"Success story · the orders",title:`${nw?`${pl(nw.os.length,"new customer")} and ${pl(O.length-nw.os.length,"repeat order")}`:pl(O.length,"order")}; the largest is ${rp(top.gmv)} (${catOf(top)}, ${regionOf(top)})`,
-      rows:[{cards:[{title:O.length>8?`Top 8 of ${O.length} orders by sales`:"Every order this week",sub:"Customer name and phone from the sales export (CRM if missing)",
+      rows:[{cards:[{title:O.length>8?`Top 8 of ${O.length} orders by sales`:"Every order this week",sub:O.some(o=>o.lines.some(l=>/^P[0-9a-f]{8}$/.test(l.phone||"")))?"Sample data: names and phones are anonymised. Upload the sales export to see them":"Customer name and phone from the sales export (CRM if missing)",
         table:(()=>{ const ut=O.some(o=>typeOf(o)!=="Not recorded");
-          const who=o=>{ const l=o.lines.find(x=>x.name||x.phone)||{}, c=crmOf(o)||{}; return [l.name||c.name||"–",l.phone||c.phone||"–"]; };
+          const anon=v=>/^P[0-9a-f]{8}$/.test(v||"")||/^Customer [0-9A-F]{5}$/.test(v||""), shown=v=>!v?"–":anon(v)?"Hidden (sample)":v;
+          const who=o=>{ const l=o.lines.find(x=>x.name||x.phone)||{}, c=crmOf(o)||{}; return [shown(l.name||c.name),shown(l.phone||c.phone)]; };
           return {colW:[9,13,10,11,11,20,8,7,...(ut?[9]:[]),11],head:["Order","Customer name","Phone","Location","Category","Products (qty)","Sales","Status",...(ut?["User type"]:[]),"CRM engagement"],align:["l","l","l","l","l","l","r","l","l","l"],
           rows:ord.map(o=>{ const c=crmOf(o); return [o.no,...who(o),regionOf(o),catOf(o),qtyTxt(o),rp(o.gmv),custOf(o),...(ut?[typeOf(o)]:[]),c?[c.channel,c.source].filter(Boolean).join(" · ")||"Logged":"–"]; })}; })()}]}],
       notes:[`<b>PIC:</b> ${esc(A.byPic.slice(0,4).map(x=>`${x.p} ${rp(x.g)} (${pl(x.n,"order")})`).join(", "))}.`,
