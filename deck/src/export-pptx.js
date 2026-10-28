@@ -26,21 +26,18 @@ function buildPptx(T,DX){
   const base={catAxisLabelFontFace:FONT,valAxisLabelFontFace:FONT,dataLabelFontFace:FONT,legendFontFace:FONT,catAxisLabelColor:"535353",catAxisLabelFontSize:10,
     dataLabelFontSize:10,dataLabelColor:"2B2F28",valGridLine:{style:"none"},catGridLine:{style:"none"},catAxisLineShow:false,valAxisLineShow:false,valAxisHidden:true};
   function content(kicker,title){
+    // SawitPRO 2026 template frame: logo, rule, internal-use badge and footer band come from the frame image
     const sl=pres.addSlide(), no=pres.slides.length; sl.background={color:"FFFFFF"};
-    sl.addImage({data:imgData(IMG.panel),x:X(38),y:X(38),w:X(1204),h:X(644),sizing:{type:"cover",w:X(1204),h:X(644)}});
-    sl.addShape(pres.shapes.RECTANGLE,{x:X(38),y:X(655),w:X(1154),h:X(13),fill:{color:"F5D347"},line:{color:"F5D347",width:0}});
-    sl.addImage({data:imgData(IMG.palm),x:X(1188),y:X(606),w:X(84),h:X(88)});
-    sl.addImage({data:imgData(IMG.logo),x:X(1152),y:X(30),w:X(94),h:X(94)});
-    txt(sl,DX.basis||"SAWITPRO PROPRIETARY",{x:X(40),y:X(690),w:X(570),h:0.22,fontSize:9,color:"7A8373"});
-    txt(sl,String(no),{x:X(620),y:X(690),w:0.4,h:0.22,fontSize:8,bold:true,color:"4A653B",align:"center"});
-    txt(sl,"Do not use or distribute without permission from SawitPRO",{x:X(700),y:X(690),w:X(540),h:0.22,fontSize:8,color:"7A8373",align:"right"});
-    txt(sl,kicker.toUpperCase(),{x:X(82),y:X(64),w:8,h:0.25,fontSize:10,bold:true,color:"D9A21B",charSpacing:2});
-    txt(sl,title,{x:X(80),y:X(88),w:X(1040),h:X(84),fontSize:23,bold:true,color:"4A653B",fit:"shrink"});
+    sl.addImage({data:imgData(IMG.frame),x:0,y:0,w:13.333,h:7.5});
+    txt(sl,title,{x:X(143),y:X(12),w:X(1080),h:X(76),fontSize:19,bold:true,color:"141414",valign:"bottom",fit:"shrink"});
+    txt(sl,kicker.toUpperCase(),{x:X(54),y:X(99),w:X(620),h:X(18),fontSize:9,bold:true,color:"007200",charSpacing:1});
+    if(DX.basis) txt(sl,DX.basis,{x:X(600),y:X(99),w:X(626),h:X(18),fontSize:9,color:"7A8373",align:"right"});
+    txt(sl,String(no),{x:X(1180),y:X(638),w:X(46),h:X(18),fontSize:9,bold:true,color:"007200",align:"right"});
     return sl;
   }
-  const heading=(sl,x,y,w,t,sub)=>{ txt(sl,t,{x:X(x),y:X(y),w:X(w),h:0.28,fontSize:13,bold:true,color:"274E13"}); if(sub) txt(sl,sub,{x:X(x),y:X(y+24),w:X(w),h:0.25,fontSize:9.5,color:"7A8373",fit:"shrink"}); };
-  const kpi=(sl,x,y,w,h,k)=>{ box(sl,x,y,w,h,k.hot?"4A653B":"FFFFFF");
-    txt(sl,[{text:k.v,options:{fontSize:28,bold:true,color:k.hot?"FFFFFF":"274E13"}},{text:k.u,options:{fontSize:14,bold:true,color:k.hot?"FFFFFF":"4A653B"}}],{x:X(x+16),y:X(y+12),w:X(w-32),h:0.5});
+  const heading=(sl,x,y,w,t,sub)=>{ txt(sl,t,{x:X(x),y:X(y),w:X(w),h:0.28,fontSize:13,bold:true,color:"0B5A0B"}); if(sub) txt(sl,sub,{x:X(x),y:X(y+24),w:X(w),h:0.25,fontSize:9.5,color:"7A8373",fit:"shrink"}); };
+  const kpi=(sl,x,y,w,h,k)=>{ box(sl,x,y,w,h,k.hot?"007200":"FFFFFF");
+    txt(sl,[{text:k.v,options:{fontSize:28,bold:true,color:k.hot?"FFFFFF":"0B5A0B"}},{text:k.u,options:{fontSize:14,bold:true,color:k.hot?"FFFFFF":"4A653B"}}],{x:X(x+16),y:X(y+12),w:X(w-32),h:0.5});
     txt(sl,k.l,{x:X(x+16),y:X(y+56),w:X(w-32),h:X(h-62),fontSize:9.5,color:k.hot?"E4ECDD":"535353",fit:"shrink"}); };
   // Bar charts are drawn from plain shapes and text boxes, not native charts: Google Slides drops the
   // category labels of imported PPTX charts (showing 1, 2, 3 …) and shows an embedded-workbook preview.
@@ -60,51 +57,47 @@ function buildPptx(T,DX){
         rect(sl,bx,by,bw-(stacked?1.5:0),bh,c);
         if(stacked&&bw>=18&&bh>=10) txt(sl,String(v),{x:X(bx),y:X(by),w:X(bw),h:X(bh),fontSize:7.5,bold:true,color:"FFFFFF",align:"center",valign:"middle",chart:true});
         bx+=bw; }); }); };
-  const table=(sl,head,rows,x,y,w,colW,o={})=>{ const hd=head.map(t=>({text:t,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:9.5}}));
+  const table=(sl,head,rows,x,y,w,colW,o={})=>{ const hd=head.map(t=>({text:t,options:{bold:true,color:"FFFFFF",fill:{color:"007200"},fontSize:9.5}}));
     sl.addTable([hd,...rows.map(r=>r.map(c=>typeof c==="object"?c:{text:String(c)}))],{x:X(x),y:X(y),w:X(w),colW:colW&&colW.map(X),fontFace:FONT,fontSize:9,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.045,autoPage:false,...o}); };
   const R={align:"right"};
 
-  // Cover
+  // Cover (SawitPRO 2026 template)
   { const sl=pres.addSlide();
-    sl.addImage({data:imgData(IMG.cover),x:0,y:0,w:13.333,h:7.5,sizing:{type:"cover",w:13.333,h:7.5}});
-    sl.addImage({data:imgData(IMG.wm),x:X(66),y:X(62),w:X(247),h:X(81)});
-    sl.addShape(pres.shapes.RECTANGLE,{x:X(498),y:X(362),w:X(782),h:X(257),fill:{color:"4A653B"},line:{color:"4A653B",width:0}});
-    sl.addShape(pres.shapes.OVAL,{x:X(371),y:X(362),w:X(257),h:X(257),fill:{color:"4A653B"},line:{color:"4A653B",width:0}});
-    sl.addImage({data:imgData(IMG.logo),x:X(388),y:X(379),w:X(222),h:X(222)});
-    txt(sl,DX.eyebrow,{x:X(652),y:X(380),w:X(590),h:0.5,fontSize:26,bold:true,color:"F5D347"});
-    txt(sl,DX.title,{x:X(652),y:X(430),w:X(590),h:1.1,fontSize:34,bold:true,color:"FFFFFF",fit:"shrink"});
-    txt(sl,`${DX.period} · ${DX.meta}`,{x:X(652),y:X(630),w:X(600),h:0.3,fontSize:12,bold:true,color:"FFFFFF"}); }
+    sl.addImage({data:imgData(IMG.cover26),x:0,y:0,w:13.333,h:7.5});
+    txt(sl,DX.eyebrow,{x:X(300),y:X(36),w:X(680),h:X(32),fontSize:14,bold:true,color:"141414",align:"center"});
+    txt(sl,DX.title,{x:X(65),y:X(160),w:X(1100),h:X(130),fontSize:38,bold:true,color:"141414",valign:"bottom",fit:"shrink"});
+    txt(sl,DX.period,{x:X(65),y:X(306),w:X(1000),h:X(30),fontSize:15,bold:true,color:"141414"});
+    txt(sl,DX.meta,{x:X(65),y:X(338),w:X(1000),h:X(26),fontSize:11,color:"535353"}); }
 
   // Executive summary
   { const sl=content("Executive summary",DX.headline);
-    DX.kpis.forEach((k,i)=>kpi(sl,80+i*274,180,256,118,k));
-    box(sl,80,316,650,326);
-    txt(sl,DX.findings.flatMap((x,i)=>[{text:x[0],options:{fontSize:13,bold:true,color:"274E13",bullet:{code:"25CF"},breakLine:true}},
-      {text:x[1],options:{fontSize:10.5,color:"535353",indentLevel:1,breakLine:i<DX.findings.length-1,paraSpaceAfter:9}}]),{x:X(100),y:X(334),w:X(612),h:X(292),fit:"shrink"});
-    box(sl,750,316,410,326,"274E13");
-    txt(sl,[{text:"BOTTOM LINE",options:{fontSize:9.5,bold:true,color:"F5D347",charSpacing:2,breakLine:true,paraSpaceAfter:8}},
-      {text:DX.bottom.p,options:{fontSize:16,bold:true,color:"FFFFFF",breakLine:true,paraSpaceAfter:10}},{text:DX.bottom.s,options:{fontSize:10.5,color:"D8E3CF"}}],{x:X(774),y:X(338),w:X(362),h:X(286),fit:"shrink"}); }
+    DX.kpis.forEach((k,i)=>kpi(sl,80+i*274,132,256,118,k));
+    box(sl,80,268,650,370);
+    txt(sl,DX.findings.flatMap((x,i)=>[{text:x[0],options:{fontSize:13,bold:true,color:"0B5A0B",bullet:{code:"25CF"},breakLine:true}},
+      {text:x[1],options:{fontSize:10.5,color:"535353",indentLevel:1,breakLine:i<DX.findings.length-1,paraSpaceAfter:9}}]),{x:X(100),y:X(286),w:X(612),h:X(334),fit:"shrink"});
+    box(sl,750,268,410,370,"007200");
+    txt(sl,[{text:"BOTTOM LINE",options:{fontSize:9.5,bold:true,color:"FCD102",charSpacing:2,breakLine:true,paraSpaceAfter:8}},
+      {text:DX.bottom.p,options:{fontSize:16,bold:true,color:"FFFFFF",breakLine:true,paraSpaceAfter:10}},{text:DX.bottom.s,options:{fontSize:10.5,color:"D8E3CF"}}],{x:X(774),y:X(290),w:X(362),h:X(326),fit:"shrink"}); }
 
   // Teams at a glance
-  if(DX.multi&&!DX.trend){ const sl=content("Teams at a glance",DX.cmpTitle), tot=T.reduce((s,t)=>s+t.A.gmv,0), TC=["274E13","D9A21B","6E8F5A","5B7F95"];
-    if(tot){ box(sl,80,180,1080,96); heading(sl,100,192,600,"Share of GMV");
-      let x=100; T.forEach((t,i)=>{ const w=Math.max(4,1040*t.A.gmv/tot); sl.addShape(pres.shapes.RECTANGLE,{x:X(x),y:X(222),w:X(w-2),h:X(38),fill:{color:TC[i]},line:{color:TC[i],width:0}});
-        if(t.A.gmv/tot>.12) txt(sl,`${t.name} · ${rp(t.A.gmv)} (${pct(t.A.gmv,tot)}%)`,{x:X(x+10),y:X(222),w:X(w-20),h:X(38),fontSize:11,bold:true,color:"FFFFFF",valign:"middle"});
-        else txt(sl,`${t.name} ${pct(t.A.gmv,tot)}%`,{x:X(x-150),y:X(262),w:X(150+w),h:X(14),fontSize:8.5,color:"535353",align:"right"});
+  if(DX.multi&&!DX.trend){ const sl=content("Teams at a glance",DX.cmpTitle), tot=T.reduce((s,t)=>s+t.A.gmv,0), TC=["0B5A0B","D9A21B","6E8F5A","5B7F95"];
+    if(tot){ box(sl,80,132,1080,96); heading(sl,100,144,600,"Share of sales");
+      let x=100; T.forEach((t,i)=>{ const w=Math.max(4,1040*t.A.gmv/tot); sl.addShape(pres.shapes.RECTANGLE,{x:X(x),y:X(174),w:X(w-2),h:X(38),fill:{color:TC[i]},line:{color:TC[i],width:0}});
+        if(t.A.gmv/tot>.12) txt(sl,`${t.name} · ${rp(t.A.gmv)} (${pct(t.A.gmv,tot)}%)`,{x:X(x+10),y:X(174),w:X(w-20),h:X(38),fontSize:11,bold:true,color:"FFFFFF",valign:"middle"});
+        else txt(sl,`${t.name} ${pct(t.A.gmv,tot)}%`,{x:X(x-150),y:X(214),w:X(150+w),h:X(14),fontSize:8.5,color:"535353",align:"right"});
         x+=w; }); }
-    const y0=tot?292:180; box(sl,80,y0,1080,642-y0);
-    const hd=t=>({text:t,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:10}});
+    const y0=tot?244:132; box(sl,80,y0,1080,632-y0);
+    const hd=t=>({text:t,options:{bold:true,color:"FFFFFF",fill:{color:"007200"},fontSize:10}});
     sl.addTable([[hd(""),...T.map(t=>hd(t.name))],...DX.cmpRows.map(([k,v])=>[{text:k,options:{bold:true,color:"7A8373"}},...v.map(x=>({text:x}))])],
       {x:X(96),y:X(y0+14),w:X(1048),colW:[X(260),...T.map(()=>X(788/T.length))],fontFace:FONT,fontSize:10,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.05,autoPage:false}); }
 
   // One section per team
   T.forEach((t,i)=>{
     if(DX.multi){ const sl=pres.addSlide();
-      sl.addImage({data:imgData(IMG.divider),x:0,y:0,w:13.333,h:7.5,sizing:{type:"cover",w:13.333,h:7.5}});
-      txt(sl,`Team ${i+1}`,{x:X(131),y:X(300),w:X(820),h:0.6,fontSize:28,bold:true,color:"F5D347"});
-      txt(sl,t.name,{x:X(131),y:X(350),w:X(900),h:1.1,fontSize:54,bold:true,color:"FFFFFF"});
-      txt(sl,[t.A.has.sales&&`${rp(t.A.gmv)} from ${t.A.orders.length} orders`,t.A.crm.length&&`${t.A.crm.length} CRM engagements`].filter(Boolean).join(" · "),{x:X(131),y:X(460),w:X(900),h:0.4,fontSize:16,bold:true,color:"E4ECDD"});
-      txt(sl,String(i+1).padStart(2,"0"),{x:X(900),y:X(500),w:X(300),h:X(170),fontSize:130,bold:true,color:"FFFFFF",transparency:85,align:"right"}); }
+      sl.addImage({data:imgData(IMG.divider26),x:0,y:0,w:13.333,h:7.5});
+      txt(sl,`TEAM ${i+1}`,{x:X(65),y:X(230),w:X(560),h:X(32),fontSize:16,bold:true,color:"007200",charSpacing:1});
+      txt(sl,t.name,{x:X(65),y:X(266),w:X(560),h:X(80),fontSize:44,bold:true,color:"141414"});
+      txt(sl,[t.A.has.sales&&`${rp(t.A.gmv)} from ${t.A.orders.length} orders`,t.A.crm.length&&`${t.A.crm.length} CRM engagements`].filter(Boolean).join(" · "),{x:X(65),y:X(356),w:X(560),h:X(30),fontSize:13,bold:true,color:"535353"}); }
     teamBlock(t.A,t.N,DX.multi?`${t.name} · `:"");
     if(t.C&&t.NC&&!t.A.forecast) teamBlock(t.C,t.NC,`${DX.multi?`${t.name} · `:""}CRM ${crmSpan(t.C)} · `);
   });
@@ -118,9 +111,9 @@ function buildPptx(T,DX){
     else if(p.t==="d") sl.addShape(pres.shapes.OVAL,{x:X(ox+p.cx-p.rad),y:X(oy+p.cy-p.rad),w:X(p.rad*2),h:X(p.rad*2),fill:{color:H(p.fill)},line:{color:"FFFFFF",width:1.5}});
     else if(p.t==="t") txt(sl,p.s,{x:X(ox+p.x),y:X(oy+p.y),w:X(Math.max(p.w,8)),h:X(Math.max(p.h,8)),fontSize:Math.round(p.size*.75*10)/10,bold:p.bold,color:H(p.color),align:p.align,valign:p.valign==="middle"?"middle":p.valign,lineSpacingMultiple:.95,chart:true});
   }); }
-  function cellOf(v){ const o=typeof v==="object"&&v?v:{v}; return {text:String(o.v),options:o.fill?{bold:true,color:(o.color||"#2B2F28").replace("#",""),fill:{color:o.fill.replace("#","")}}:o.pill?{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}:o.bold?{bold:true,color:"274E13"}:{}}; }
+  function cellOf(v){ const o=typeof v==="object"&&v?v:{v}; return {text:String(o.v),options:o.fill?{bold:true,color:(o.color||"#2B2F28").replace("#",""),fill:{color:o.fill.replace("#","")}}:o.pill?{bold:true,color:"6B4F00",fill:{color:"FBEFC4"}}:o.bold?{bold:true,color:"0B5A0B"}:{}}; }
   function panelSlide(spec){
-    const sl=content(spec.kicker,spec.title), L=layoutPanels(spec), ox=80, oy=180;
+    const sl=content(spec.kicker,spec.title), L=layoutPanels(spec), ox=80, oy=132;
     L.cells.forEach(c=>{
       if(c.kpi) return kpi(sl,ox+c.x,oy+c.y,c.w,c.h,c.kpi);
       box(sl,ox+c.x,oy+c.y,c.w,c.h);
@@ -128,7 +121,7 @@ function buildPptx(T,DX){
       const I=c.inner;
       if(c.chart) draw(sl,layoutChart(c.chart,I.w,I.h),ox+c.x+I.x,oy+c.y+I.y);
       else if(c.table){ const T=c.table, al=i=>T.align?.[i]==="r"?"right":T.align?.[i]==="c"?"center":"left";
-        const hd=T.head.map((h,i)=>({text:h,options:{bold:true,color:"FFFFFF",fill:{color:"4A653B"},fontSize:9,align:al(i)}}));
+        const hd=T.head.map((h,i)=>({text:h,options:{bold:true,color:"FFFFFF",fill:{color:"007200"},fontSize:9,align:al(i)}}));
         sl.addTable([hd,...T.rows.map(r=>r.map((v,i)=>{ const c2=cellOf(v); c2.options={...c2.options,align:al(i)}; return c2; }))],
           {x:X(ox+c.x+I.x-6),y:X(oy+c.y+I.y),w:X(I.w+12),colW:(()=>{ const w=colWeights(T), t=w.reduce((a,b)=>a+b,0); return w.map(x=>X((I.w+12)*x/t)); })(),fontFace:FONT,fontSize:9,color:"2B2F28",border:{type:"solid",pt:0.5,color:"DCE2D6"},valign:"middle",margin:0.04,autoPage:false}); }
       if(c.foot) txt(sl,c.foot,{x:X(ox+c.x+20),y:X(oy+c.y+c.h-c.fh-6),w:X(c.w-40),h:X(c.fh),fontSize:10,color:"535353",valign:"bottom",fit:"shrink"});
@@ -141,20 +134,17 @@ function buildPptx(T,DX){
   // Next steps
   { const sl=content("Next steps",`${DX.actions.length} draft actions ${DX.dop?"to move the DO pipeline":DX.acq?"to grow farmer acquisition":DX.forecast?"to deliver the stock plan":DX.trend?"to recover sales":"for the coming week"}; owners and dates to be agreed`);
     const nc=DX.actions.length>4?3:2, cw=nc===3?(1080-2*14)/3:532, gap=nc===3?14:16;
-    DX.actions.forEach((a,i)=>{ const x=80+(i%nc)*(cw+gap), y=180+Math.floor(i/nc)*205; box(sl,x,y,cw,190);
-      txt(sl,[{text:`${i+1}  `,options:{color:"D9A21B",bold:true,fontSize:12}},{text:a.t,options:{color:"274E13",bold:true,fontSize:nc===3?12:13}}],{x:X(x+18),y:X(y+14),w:X(cw-36),h:X(40),fit:"shrink"});
+    DX.actions.forEach((a,i)=>{ const x=80+(i%nc)*(cw+gap), y=132+Math.floor(i/nc)*215; box(sl,x,y,cw,200);
+      txt(sl,[{text:`${i+1}  `,options:{color:"D9A21B",bold:true,fontSize:12}},{text:a.t,options:{color:"0B5A0B",bold:true,fontSize:nc===3?12:13}}],{x:X(x+18),y:X(y+14),w:X(cw-36),h:X(40),fit:"shrink"});
       txt(sl,a.d,{x:X(x+18),y:X(y+56),w:X(cw-36),h:X(92),fontSize:nc===3?9.5:10.5,color:"535353",fit:"shrink"});
-      txt(sl,[...(a.team?[{text:`${a.team}  ·  `,options:{bold:true,color:"4A653B"}}]:[]),{text:`Owner: ${a.o}`,options:{bold:true,color:"274E13"}},{text:`  ·  ${a.w}`,options:{bold:true,color:"9A6F00"}}],{x:X(x+18),y:X(y+156),w:X(cw-36),h:0.25,fontSize:9}); });
-    if(DX.gaps.length) txt(sl,[{text:"Also clean up in the CRM: ",options:{bold:true,color:"274E13"}},{text:DX.gaps.join("; ")+"."}],{x:X(80),y:X(600),w:X(1080),h:X(40),fontSize:10,color:"535353",fit:"shrink"}); }
+      txt(sl,[...(a.team?[{text:`${a.team}  ·  `,options:{bold:true,color:"4A653B"}}]:[]),{text:`Owner: ${a.o}`,options:{bold:true,color:"0B5A0B"}},{text:`  ·  ${a.w}`,options:{bold:true,color:"9A6F00"}}],{x:X(x+18),y:X(y+156),w:X(cw-36),h:0.25,fontSize:9}); });
+    if(DX.gaps.length) txt(sl,[{text:"Also clean up in the CRM: ",options:{bold:true,color:"0B5A0B"}},{text:DX.gaps.join("; ")+"."}],{x:X(80),y:X(568),w:X(1080),h:X(50),fontSize:10,color:"535353",fit:"shrink"}); }
 
-  // Closing
+  // Closing (template "Terima Kasih")
   { const sl=pres.addSlide();
-    sl.addImage({data:imgData(IMG.closing),x:0,y:0,w:13.333,h:7.5,sizing:{type:"cover",w:13.333,h:7.5}});
-    sl.addShape(pres.shapes.RECTANGLE,{x:0,y:0,w:13.333,h:7.5,fill:{color:"000000",transparency:65},line:{color:"000000",width:0,transparency:100}});
-    sl.addImage({data:imgData(IMG.wm),x:X(66),y:X(62),w:X(247),h:X(81)});
-    sl.addImage({data:imgData(IMG.logo),x:X(1094),y:X(48),w:X(120),h:X(120)});
-    txt(sl,"Thank You",{x:0,y:X(290),w:13.333,h:1.1,fontSize:60,bold:true,color:"FFFFFF",align:"center"});
-    txt(sl,"#TerusTumbuh",{x:0,y:X(400),w:13.333,h:0.6,fontSize:26,bold:true,color:"F5D347",align:"center"}); }
+    sl.addImage({data:imgData(IMG.closing26),x:0,y:0,w:13.333,h:7.5});
+    txt(sl,"Terima Kasih",{x:X(47),y:X(388),w:X(700),h:X(80),fontSize:44,bold:true,color:"141414"});
+    txt(sl,"#TerusTumbuh",{x:X(50),y:X(468),w:X(600),h:X(36),fontSize:18,bold:true,color:"007200"}); }
   return pres;
 }
 

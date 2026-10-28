@@ -5,8 +5,8 @@
 <style>
 :root{
   color-scheme: light;
-  --green:#4A653B; --green-dk:#274E13; --yellow:#F5D347; --amber:#D9A21B; --sage:#8E9C84;
-  --ink:#2B2F28; --body:#535353; --muted:#7A8373; --line:#DCE2D6; --page:#EEF1EA; --tint:#F4F6F1; --warm:#FBEFC4;
+  --green:#007200; --green-dk:#0B5A0B; --yellow:#FCD102; --amber:#FCA502; --sage:#8E9C84;
+  --ink:#141414; --body:#535353; --muted:#7A8373; --line:#DCE2D6; --page:#EEF1EA; --tint:#F4F6F1; --warm:#FBEFC4;
   --font:"Plus Jakarta Sans","Segoe UI",Arial,sans-serif;
 }
 *{box-sizing:border-box}
@@ -62,16 +62,33 @@ main{padding-block:14px 60px;padding-inline:16px}
 .present .ctrl .btn{padding:6px 12px}
 
 /* ---------- Template chrome (1280x720 canvas) ---------- */
+.content .frame26{position:absolute;inset:0;width:100%;height:100%}
+.content .basis{position:absolute;right:54px;top:101px;max-width:640px;text-align:right;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.content .pgno{position:absolute;left:1180px;top:640px;width:46px;text-align:right;font-size:11px;font-weight:700;color:var(--green)}
+.content .card{box-shadow:none;border:1px solid #E1E5DE}
 .content .panel{position:absolute;left:38px;top:38px;width:1204px;height:644px;background:#F3F4F2 url({{IMG:panel.jpg}}) center/cover;border-radius:0 110px 0 50px}
 .content .ybar{position:absolute;left:38px;top:655px;width:1154px;height:13px;background:var(--yellow)}
 .content .palm{position:absolute;left:1188px;top:606px;width:84px;height:88px}
 .content .logo{position:absolute;left:1152px;top:30px;width:94px;height:94px}
 .content .foot{position:absolute;top:690px;left:40px;right:40px;display:flex;justify-content:space-between;font-size:10px;color:var(--muted);letter-spacing:.06em}
 .content .foot>span{flex:1;min-width:0}.content .foot .pg{flex:0 0 40px;text-align:center;font-weight:700;color:var(--green)}.content .foot>span:last-child{text-align:right}
-.content .kicker{position:absolute;left:82px;top:64px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
-.content h2{position:absolute;left:80px;top:88px;width:1040px;margin:0;font-size:31px;line-height:1.15;font-weight:800;color:var(--green);text-wrap:balance;letter-spacing:-.01em}
-.content .body{position:absolute;left:80px;top:180px;width:1080px;height:462px}
+.content .kicker{position:absolute;left:54px;top:100px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--green)}
+.content h2{position:absolute;left:143px;top:12px;width:1080px;height:76px;margin:0;display:flex;align-items:flex-end;font-size:25px;line-height:1.12;font-weight:800;color:var(--ink);text-wrap:balance;letter-spacing:-.01em}
+.content .body{position:absolute;left:80px;top:132px;width:1080px;height:500px}
 
+.cover26 .bg,.closing26 .bg,.divider26 .bg{position:absolute;inset:0;width:100%;height:100%}
+.cover26 .hdr{position:absolute;left:300px;top:40px;width:680px;text-align:center;font-size:19px;font-weight:700;color:var(--ink)}
+.cover26 .txt{position:absolute;left:65px;top:168px;width:1080px}
+.cover26 .title{font-size:52px;font-weight:800;line-height:1.08;margin:0;color:var(--ink);text-wrap:balance;letter-spacing:-.01em}
+.cover26 .sub{font-size:20px;font-weight:700;margin:22px 0 0;color:var(--ink)}
+.cover26 .meta{font-size:15px;margin:6px 0 0;color:var(--body)}
+.divider26 .txt{position:absolute;left:65px;top:230px;width:560px}
+.divider26 .eyebrow{font-size:22px;font-weight:800;color:var(--green);margin:0;letter-spacing:.04em;text-transform:uppercase}
+.divider26 .title{font-size:62px;font-weight:800;color:var(--ink);line-height:1.04;margin:8px 0 0;letter-spacing:-.01em}
+.divider26 .dmeta{font-size:18px;font-weight:600;color:var(--body);margin:16px 0 0}
+.divider26 .num{position:absolute;left:60px;top:470px;font-size:120px;font-weight:800;color:rgba(0,114,0,.08);line-height:1}
+.closing26 .ty{position:absolute;left:47px;top:392px;margin:0;font-size:60px;font-weight:800;color:var(--ink)}
+.closing26 .tag{position:absolute;left:50px;top:470px;margin:0;font-size:24px;font-weight:700;color:var(--green)}
 .cover .bg,.closing .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .cover .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.25),rgba(0,0,0,0) 45%)}
 .cover .wm,.closing .wm{position:absolute;left:66px;top:62px;width:247px}
@@ -250,7 +267,7 @@ svg.chart{display:block;overflow:visible;font-family:inherit}svg.chart rect[data
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
-const IMG={cover:"{{IMG:cover.jpg}}",closing:"{{IMG:closing.jpg}}",logo:"{{IMG:logo.png}}",wm:"{{IMG:wordmark.png}}",palm:"{{IMG:palm.png}}",divider:"{{IMG:divider.jpg}}",panel:"{{IMG:panel.jpg}}"};
+const IMG={frame:"{{IMG:frame26.jpg}}",cover26:"{{IMG:cover26.jpg}}",closing26:"{{IMG:closing26.jpg}}",divider26:"{{IMG:divider26.jpg}}",cover:"{{IMG:cover.jpg}}",closing:"{{IMG:closing.jpg}}",logo:"{{IMG:logo.png}}",wm:"{{IMG:wordmark.png}}",palm:"{{IMG:palm.png}}",divider:"{{IMG:divider.jpg}}",panel:"{{IMG:panel.jpg}}"};
 const SAMPLE=/*SAMPLE_DATA*/null;
 /*INCLUDE:analysis.js*/
 /*INCLUDE:viz.js*/
