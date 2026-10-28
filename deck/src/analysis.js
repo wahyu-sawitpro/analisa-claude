@@ -70,7 +70,7 @@ const detectCrm=h=>detectWith(CRM_FIELDS,h), detectSales=h=>detectWith(SALES_FIE
 // A farmer acquisition export: one row per registered farmer, with the registration week and Duta / non-Duta type.
 const ACQ_FIELDS=[["week",[/minggu_?register|register_?week|week_?register|^minggu$|^week$/]],["type",[/akuisisi_?type|acquisition_?type/]],["joined",[/join_?date_?farmer|register_?date|join_?date|tanggal_?daftar/]],
   ["source",[/^utm_?source$/]],["campaign",[/^utm_?source_?name$|utm_?campaign/]],["status",[/status_?under_?duta/]],["duta",[/^duta_?id$|^duta_?name$/]],["dutaName",[/^duta_?name$/]],
-  ["test",[/is_?test_?duta|is_?test/]],["role",[/user_?role|^role$/]],["farms",[/jumlah_?farm|farm_?count|num_?farms/]],["ha",[/total_?area_?hectare|area_?hectare|^hectare|luas/]],["prov",[/^province$|^provinsi$/]],["regency",[/^regency$|^kabupaten$/]],["farmHa",[/detail_?hectare|farm_?hectares?$/]],["name",[/farmer_?name|^name$|user_?name/]],["farmName",[/^farm_?name$/]],["email",[/farmer_?email|^e-?mail$/]],["farmLoc",[/^location$|farm_?location/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
+  ["test",[/is_?test_?duta|is_?test/]],["role",[/user_?role|^role$/]],["farms",[/jumlah_?farm|farm_?count|num_?farms/]],["ha",[/total_?area_?hectare|area_?hectare|^hectare|luas/]],["prov",[/^province$|^provinsi$/]],["regency",[/^regency$|^kabupaten$/]],["farmHa",[/detail_?hectare|farm_?hectares?$/]],["name",[/farmer_?name|^name$|user_?name/]],["farmName",[/^farm_?name$/]],["lastSale",[/last_?sale_?order_?date|last_?order_?date/]],["email",[/farmer_?email|^e-?mail$/]],["farmLoc",[/^location$|farm_?location/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
 const detectAcq=h=>detectWith(ACQ_FIELDS,h);
 const isAcqList=headers=>{ const m=detectAcq(headers); return !!(m.type||m.week&&m.joined&&(m.id||m.duta)); };
 // A DO (FFB supplier) pipeline export from the CRM: one row per DO lead, with area, potential FFB and the nearest mill.
@@ -855,7 +855,7 @@ function acqProfile(r,m){ if(!m.role&&!m.ha&&!m.prov) return {};
   const fl=m.farmLoc?[...String(r[m.farmLoc]??"").matchAll(/\[([^\[\]]+)\]/g)].map(x=>x[1].split(",").map(t=>t.trim())):[];
   const fn=m.farmName?String(r[m.farmName]??"").replace(/^\s*\[|\]\s*$/g,"").split(",").map(t=>t.trim()):[];
   const farmList=fh.map((h,i)=>({name:fn[i]||null,ha:Math.round(h*100)/100,district:fl[i]?.[0]||null,regency:fl[i]?.[1]||null,prov:fl[i]?.[2]||null}));
-  return {farmList,name:m.name?clean(r[m.name]):null,contact:(m.phone&&clean(r[m.phone]))||(m.email&&clean(r[m.email]))||null,role:m.role?ROLE_OF(r[m.role]):null,roleRaw:clean(r[m.role]),ha:ha||0,farms:farms||0,hasFarm:(farms||0)>0||(ha||0)>0,prov:m.prov?firstOf(r[m.prov]):null,regency:m.regency?firstOf(r[m.regency]):null}; }
+  return {ordered:m.lastSale?!blank(r[m.lastSale]):null,farmList,name:m.name?clean(r[m.name]):null,contact:(m.phone&&clean(r[m.phone]))||(m.email&&clean(r[m.email]))||null,role:m.role?ROLE_OF(r[m.role]):null,roleRaw:clean(r[m.role]),ha:ha||0,farms:farms||0,hasFarm:(farms||0)>0||(ha||0)>0,prov:m.prov?firstOf(r[m.prov]):null,regency:m.regency?firstOf(r[m.regency]):null}; }
 // Weekly registrations from the export: the last full week against the week before, split by Duta / non-Duta, channel and campaign.
 // A week that is still in progress (its data stops before the Sunday) is left out.
 function acquisition(sources){
@@ -876,7 +876,7 @@ function acquisition(sources){
     return {w,label:wl(w),short:fds(new Date(w)),total:x.length,under:u.length,non:x.length-u.length,test:u.filter(r=>r.test).length,real:u.filter(r=>r.real).length,
       sale:u.filter(r=>/sale/i.test(r.status||"")).length,leads:u.filter(r=>/lead/i.test(r.status||"")).length,dutas:new Set(u.map(r=>r.duta).filter(Boolean)).size,
       realDutas:new Set(u.filter(r=>r.real).map(r=>r.duta).filter(Boolean)).size,noPhone:x.filter(r=>!r.phone).length,
-      roles:new Map(countBy(x,r=>r.role)),withFarm:x.filter(r=>r.hasFarm).length,ha:x.reduce((t,r)=>t+(r.ha||0),0),big:x.filter(r=>r.ha>100),
+      roles:new Map(countBy(x,r=>r.role)),ownerLoc:{n:x.filter(r=>r.role==="Estate owner").length,places:x.filter(r=>r.role==="Estate owner"&&r.hasFarm).map(r=>[r.regency,r.prov].filter(Boolean).join(", "))},ordered:x.some(r=>r.ordered!=null&&r.ordered!==undefined)?x.filter(r=>r.ordered).length:null,withFarm:x.filter(r=>r.hasFarm).length,ha:x.reduce((t,r)=>t+(r.ha||0),0),big:x.filter(r=>r.ha>100),
       prov:new Map(countBy(x.filter(r=>r.hasFarm),r=>r.prov)),regency:new Map(countBy(x.filter(r=>r.hasFarm),r=>r.regency&&`${r.regency}|${r.prov||""}`)),
       haMed:median(x.filter(r=>r.hasFarm&&r.ha>0).map(r=>r.ha)),bands:ACQ_BANDS.map(([,lo,hi])=>x.filter(r=>r.hasFarm&&r.ha>lo&&r.ha<=hi).length),
       src:new Map(countBy(x,r=>r.src)),nonSrc:new Map(countBy(x.filter(r=>!r.under),r=>r.src)),camp:new Map(countBy(x.filter(r=>!r.under),r=>r.camp)),

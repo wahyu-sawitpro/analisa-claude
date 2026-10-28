@@ -92,12 +92,12 @@ weekly farmer.csv`) three slides are added: farmers vs estate owners (estate own
 included, is a farmer; who added a farm; median farm size), where users are (province and regency of the first farm), and users
 above 100 ha (one slide per week, with each user's name and contact: phone, else email; one row per farm with its farm name from `detail_hectare` and `location`, with a note that
 hectares are as entered by the user and not yet validated). Farm names are not shown. In the committed sample, names, phones and emails are hashed. All
-wording follows the direction of the change (rise or drop).
+wording follows the direction of the change (rise or drop). With `last_sale_order_date` the role slide also counts new
+users who have ordered.
 
-Findings for 12–18 Oct 2026 (sample): 600 farmers, +223 (+59%) on 5–11 Oct, the highest week in the file; 0 under a Duta
-(4 the week before); 0 estate owners; 34% added a farm (205), median 2 ha; Riau 53, Kalimantan
-13 → 64; 11 users above 100 ha (4 the week before), 2 report 5,000 ha or more; Organic +203 (direct 48 → 153, organic
-46 → 126) explains 91% of the rise; 184 registrations on Wed 14 Oct.
+Findings for 19–25 Oct 2026 (sample, data to 28 Oct): 1,626 users, +1,026 (+171%) on 12–18 Oct; 1,625 farmers and
+1 estate owner; 11 under a Duta (0 the week before); Organic +927 (90% of the rise), 923 registrations on Sun 25 Oct alone;
+34% added a farm; Riau 162, Kalimantan 70 → 141; 22 users above 100 ha (12 the week before); 2 of 1,626 have ordered.
 
 A file with `akuisisi_type` / `minggu_register` / `join_date_farmer` columns is read as **Acquisition** and sets the whole
 deck (other files are left out). Last week = the latest full registration week; a week still in progress (its data stops

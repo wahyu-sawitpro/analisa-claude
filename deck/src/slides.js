@@ -540,6 +540,7 @@ function acqProfileSpecs(Q,pre){
   const own=g(L,"Estate owner"), ownP=g(P,"Estate owner"), ownAll=W.reduce((t,w)=>t+g(w,"Estate owner"),0);
   const rows=[row("Farmers",g(L,"Farmer"),g(P,"Farmer"),true),
     row("Estate owners",own,ownP,true),row("Added a farm",L.withFarm,P?P.withFarm:0,true),row("   No farm yet",L.total-L.withFarm,P?P.total-P.withFarm:0),
+    ...(L.ordered!=null?[row("Ordered since registering",L.ordered,P?P.ordered||0:0,true)]:[]),
     [{v:"Median farm size",bold:true},P&&P.haMed!=null?`${haF(P.haMed)} ha`:"–",{v:L.haMed!=null?`${haF(L.haMed)} ha`:"–",bold:true},"","",""]];
   S.push({kicker:pre+"Registrations · farmers vs estate owners",
     title:`${nf.format(g(L,"Farmer"))} farmers and ${own} estate owner${own===1?"":"s"} last week${P?` (${nf.format(g(P,"Farmer"))} and ${ownP} the week before)`:""}; ${pct(L.withFarm,L.total)}% added a farm`,
@@ -547,7 +548,7 @@ function acqProfileSpecs(Q,pre){
       {w:1.15,title:"By user role, last week vs the week before",sub:P?`${P.label} vs ${L.label}`:L.label,table:{colW:[31,13,13,12,11,10],head:["Users",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change","Change %","Share"],align:["l","r","r","r","r","r"],rows}},
       {w:1,title:"Registrations by role, per week",sub:"Estate owner = the ESTATE_OWNER role; every other role is a farmer",chart:{type:"column",stacked:true,cats:W.map(w=>w.short),series:ROLES.map(k=>({name:k,color:ROLE_C[k],values:W.map(w=>g(w,k))})),lblH:24}}]}],
     notes:[`<b>Estate owners are rare:</b> ${ownAll} in ${W.length} weeks (${own} last week, ${ownP} the week before); almost every registration is a farmer. Farmer includes every other role (farmer & agent, farmer & owner, ...).`,
-      `<b>Farm details:</b> ${nf.format(L.total-L.withFarm)} of ${nf.format(L.total)} (${pct(L.total-L.withFarm,L.total)}%) registered without a farm, so their location and hectares are unknown${P?` (week before ${pct(P.total-P.withFarm,P.total)}%)`:""}.`]});
+      `${L.ordered!=null?`<b>Orders:</b> ${L.ordered} of ${nf.format(L.total)} new users have ordered so far${P?` (${P.ordered||0} of ${nf.format(P.total)} the week before)`:""}. `:""}<b>Farm details:</b> ${nf.format(L.total-L.withFarm)} of ${nf.format(L.total)} (${pct(L.total-L.withFarm,L.total)}%) registered without a farm, so their location and hectares are unknown${P?` (week before ${pct(P.total-P.withFarm,P.total)}%)`:""}.`]});
   // where they are (users who added a farm)
   const provs=[...new Set([...L.prov.keys(),...(P?P.prov.keys():[])])].filter(Boolean).map(k=>({k,l:L.prov.get(k)||0,p:P?P.prov.get(k)||0:0})).sort((a,b)=>b.l-a.l||b.p-a.p);
   const regs=[...L.regency].filter(([k])=>k).slice(0,10).map(([k,v])=>{ const [r,pv]=k.split("|"); const pp=P?P.regency.get(k)||0:0; return [{v:r,bold:true},pv||"–",P?nf.format(pp):"–",{v:nf.format(v),bold:true},P?sg(v-pp):"–"]; });
@@ -557,21 +558,23 @@ function acqProfileSpecs(Q,pre){
     rows:[{cards:[
       {w:1,title:"Users with a farm, by province",sub:P?`Last week; week before in grey`:"Last week",chart:{type:"hbar",items:provs.slice(0,9).map(x=>({k:x.k,v:x.l,r:P?`was ${x.p}`:""})),rowH:36}},
       {w:1.05,title:"Top regencies last week",sub:"Users who added a farm",table:{colW:[30,30,14,14,12],head:["Regency","Province",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change"],align:["l","l","r","r","r"],rows:regs}}]}],
-    notes:[`<b>Location is known only for users who added a farm:</b> ${nf.format(L.withFarm)} of ${nf.format(L.total)} last week; ${nf.format(L.total-L.withFarm)} more have no location yet.`]});
+    notes:[`<b>Location is known only for users who added a farm:</b> ${nf.format(L.withFarm)} of ${nf.format(L.total)} last week; ${nf.format(L.total-L.withFarm)} more have no location yet.`,
+      L.ownerLoc&&`<b>Estate owners:</b> ${L.ownerLoc.n} last week${L.ownerLoc.n?`: ${L.ownerLoc.places.length?L.ownerLoc.places.join(", "):"no farm added yet"}`:""}. Every other user with a farm is a farmer.`].filter(Boolean)});
   // users above 100 ha: one row per farm, so multi-farm users show their breakdown; one slide per week
   const allBig=W.reduce((t,w)=>t+w.big.length,0), flag=farmFlag;
   [[L,"last week"],...(P?[[P,"the week before"]]:[])].forEach(([w,lab],wi)=>{
-    const us=[...w.big].sort((a,b)=>b.ha-a.ha), rowsB=[];
-    us.forEach(r=>{ const fs=r.farmList.length?r.farmList:[{ha:r.ha,district:null,regency:r.regency,prov:r.prov}];
+    const us=[...w.big].sort((a,b)=>b.ha-a.ha), groups=[];
+    us.forEach(r=>{ const fs=r.farmList.length?r.farmList:[{ha:r.ha,district:null,regency:r.regency,prov:r.prov}], rowsB=[]; groups.push(rowsB);
       fs.forEach((f,k)=>rowsB.push(k?["","","","",f.name||`Farm ${k+1}`,{v:haF(f.ha)},f.district||"–",f.regency||"–",f.prov||"–"]
         :[{v:r.name||"–",bold:true},r.contact||"–",r.role||"–",{v:`${haF(r.ha)}`,bold:true},fs[0].name||(fs.length>1?"Farm 1":"–"),{v:haF(f.ha)},f.district||"–",f.regency||"–",f.prov||"–"])); });
     const odd=us.filter(userOdd), multi=us.filter(r=>r.farmList.length>1);
-    const chunks=[]; for(let k=0;k<rowsB.length;k+=12) chunks.push(rowsB.slice(k,k+12));
+    // pages of up to 12 rows; a user's farms stay on one page
+    const chunks=[]; groups.forEach(g=>{ const c=chunks[chunks.length-1]; if(c&&c.length+g.length<=12) c.push(...g); else chunks.push([...g]); });
     (chunks.length?chunks:[[]]).forEach((ch,ci)=>S.push({kicker:pre+`Registrations · users above 100 ha, ${lab}${chunks.length>1?` (${ci+1}/${chunks.length})`:""}`,
       title:wi===0?`${us.length} users above 100 ha last week${P?`, ${sg(us.length-P.big.length)} on the week before (${P.big.length})`:""}`
         :`${us.length} users above 100 ha the week before (${w.label})`,
       rows:[{cards:[{table:{colW:[17,12,7,8,14,8,11,11,12],head:["Name","Contact","Role","Total ha","Farm name","Farm ha","District","Regency","Province"],align:["l","l","l","r","l","r","l","l","l"],rows:ch.length?ch:[["No users above 100 ha","","","","","","","",""]]}}]}],
-      notes:ci?[]:[`<b>${us.length} users, ${haF(us.reduce((t,r)=>t+r.ha,0))} ha${multi.length?`; ${multi.length} with several farms, one row per farm`:""}.</b> Contact = phone number, or email when there is no phone.`,`<b>Note:</b> hectares are the area each user entered in the app; they have not yet been validated and need to be confirmed with the user.`]})); });
+      notes:ci?[`<b>Note:</b> hectares are the area each user entered in the app; they have not yet been validated and need to be confirmed with the user.`]:[`<b>${us.length} users, ${haF(us.reduce((t,r)=>t+r.ha,0))} ha${multi.length?`; ${multi.length} with several farms, one row per farm`:""}.</b> Contact = phone number, or email when there is no phone.`,`<b>Note:</b> hectares are the area each user entered in the app; they have not yet been validated and need to be confirmed with the user.`]})); });
   return S;
 }
 function acqNarrative(T){
@@ -590,7 +593,7 @@ function acqNarrative(T){
   const provs=L.prov?[...L.prov].filter(([k])=>k):[], kal=k=>[...(k||new Map())].filter(([x])=>/kalimantan/i.test(x||"")).reduce((t,[,v])=>t+v,0);
   if(Q.profile) X.title=`Farmer Registrations, ${L.label}`;
   X.findings=[
-    mv&&[`${mv.k} drove the ${rise?"rise":"drop"}`,`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)} (${sg(mv.d)}), ${pct(Math.abs(mv.d),Math.max(1,Math.abs(d)))}% of the ${nf.format(Math.abs(d))} ${rise?"more":"fewer"} farmers.${mvC?` “${mvC.k}” ${nf.format(mvC.p)} → ${nf.format(mvC.l)}${mvC2?`, “${mvC2.k}” ${nf.format(mvC2.p)} → ${nf.format(mvC2.l)}`:""}.`:""}`],
+    mv&&[`${mv.k} drove the ${rise?"rise":"drop"}`,`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)} (${sg(mv.d)}), ${pct(Math.abs(mv.d),Math.max(1,Math.abs(d)))}% of the ${nf.format(Math.abs(d))} ${rise?"more":"fewer"} farmers.${(()=>{ const mx=Math.max(...L.days), i=L.days.indexOf(mx); return mx>=L.total*.35?` ${nf.format(mx)} (${pct(mx,L.total)}%) came on ${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i]} alone.`:""; })()}${mvC?` “${mvC.k}” ${nf.format(mvC.p)} → ${nf.format(mvC.l)}${mvC2?`, “${mvC2.k}” ${nf.format(mvC2.p)} → ${nf.format(mvC2.l)}`:""}.`:""}`],
     P&&[L.under?`Dutas brought ${L.under}`:`No farmer came through a Duta`,`${nf.format(P.under)} → ${nf.format(L.under)} under a Duta (${(L.under/L.total*100).toFixed(1)}% of all). ${act.length} of ${D.length} Dutas registered a farmer last week${lead?`; ${lead.k} leads with ${lead.tot} in ${Q.weeks.length} weeks`:""}. ${intD.length} of the ${D.length} are internal team.`],
     Q.profile&&[`All farmers, ${own} estate owner${own===1?"":"s"}`,`${nf.format(L.total-own)} farmers${P?` (${nf.format(P.total-(P.roles?.get("Estate owner")||0))} the week before)`:""}; every role other than estate owner counts as a farmer. ${pct(L.withFarm,L.total)}% added a farm (median ${L.haMed!=null?haF(L.haMed):"–"} ha); ${nf.format(L.total-L.withFarm)} have no farm or location yet.`],
     Q.profile&&[`${L.big.length} users above 100 ha; Kalimantan grows`.replace("; Kalimantan grows",kal(L.prov)>kal(P?.prov)?"; Kalimantan grows":""),`${P?`${P.big.length} the week before (${sg(L.big.length-P.big.length)}). `:""}${provs.slice(0,2).map(([k,v])=>`${k} ${v}`).join(", ")} lead on location${kal(L.prov)?`; Kalimantan ${kal(P?.prov)} → ${kal(L.prov)}`:""}. Hectares are as entered by users, not yet validated.`],
