@@ -14,6 +14,14 @@ added to this deck, not built as separate decks.
 - **Always go deeper.** Don't stop at totals and the first explanation. For any change, break it down (volume vs
   price vs mix, customers lost vs returning vs new, accounts, PICs, products, regions, channels, timing), test whether
   one account or one deal explains it, and turn each finding into a concrete action with an owner.
+- **Rejection reasons: read the notes.** For every rejection reason, analyse the "Detail Pembahasan" notes (what was
+  asked, price sent and no reply, products and quantities named, waiting for Toling, shipping, stock, documents) and
+  give a next step per reason ("Rejection reasons · what the notes say" slide).
+- **"Belum ketertarikan yang jelas (cek harga / nanya-nanya)" is not a refusal.** Label it "Still inquiring, no clear
+  interest to buy now" and treat it as an open enquiry.
+- **SawitPRO price tiers, cheapest to most expensive:** Khusus Petani (farmer price, close to the subsidised price),
+  Toling (toko keliling: sells at set stops, so the customer pays no shipping), Grosir (wholesale), Retail (product_cat
+  "Pupuk"). Use this order on the "price tiers" slide and in every price-related finding or action.
 - Match the review to the data the user uploaded: a weekly export is a weekly review; a multi-month export is a
   trend or decline review. Say when a file's dates don't match what its name suggests.
 - Deck text is in English; chat replies follow the user's language (usually Indonesian).

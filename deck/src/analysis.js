@@ -107,7 +107,7 @@ function canonStatus(v){ const s=norm(v); if(!s) return null;
   if(/tertarik|minat|interest|hot|warm/.test(s)) return "Interested";
   return clean(v).replace(/^./,c=>c.toUpperCase()); }
 const REASON_EN=[
-  [/belum\s*(ada\s*)?ketertarikan|cek harga|nanya|no clear interest/,"Just asking (no clear interest)"],
+  [/belum\s*(ada\s*)?ketertarikan|cek harga|nanya|no clear interest/,"Still inquiring, no clear interest to buy now"],
   [/belum\s*ada\s*kebutuhan|kebutuhan\s*dalam\s*waktu/,"No need in the near term"],
   [/tempo|kredit|cicil|hutang|credit\s*terms/,"Wants credit terms"],
   [/datang\s*lebih\s*lama|pengiriman\s*lama|slow\s*delivery|delivery\s*too\s*slow/,"Delivery too slow"],
@@ -131,7 +131,7 @@ const THEMES=[
   ["Price",/price|credit terms/i,"#B5523B"],
   ["Not a fit",/land|small quantities|wrong number/i,"#8E9C84"],
   ["Timing",/near term/i,"#5B7F95"],
-  ["Just asking",/just asking|no clear interest|^other$/i,"#C9B458"],
+  ["Still inquiring",/still inquiring|no clear interest|^other$/i,"#C9B458"],
 ];
 const themeOf=r=>{ if(!r) return null; const t=THEMES.find(([,re])=>re.test(r)); return t?t[0]:"Other"; };
 // Signals read from the free-text discussion notes (Indonesian).
@@ -356,6 +356,7 @@ function analyse(sources,opt={}){
       const g=m.get(k); g.gmv+=l.gmv||0; g.qty+=l.qty||0; g.orders.add(l.orderNo||l.invoice||l); g.cust.add(l.ph||l.nk); }
     return [...m.values()].map(g=>({...g,orders:g.orders.size,cust:g.cust.size})).sort((a,b)=>b.gmv-a.gmv); };
   A.byFamily=grp(l=>l.family); A.byCat=A.lines.some(l=>l.category)?grp(l=>l.category||"(no category)"):[]; A.byRegion=grp(l=>l.region); A.byProvince=grp(l=>regionOf(l.province));
+  A.tiers=priceTiers(A.lines);
   A.qtyTotal=lines.reduce((s,l)=>s+(l.qty||0),0);
   A.itemsPerOrder=O.length?O.reduce((s,o)=>s+o.lines.length,0)/O.length:0;
   const pairs=new Map(); for(const o of O){ const f=[...new Set(o.lines.map(l=>l.family).filter(Boolean))].sort(); for(let i=0;i<f.length;i++) for(let j=i+1;j<f.length;j++){ const k=f[i]+" + "+f[j]; pairs.set(k,(pairs.get(k)||0)+1); } }
@@ -504,7 +505,7 @@ function analyse(sources,opt={}){
   A.intentWarm=A.warm.filter(r=>r.signals.some(s=>s==="logistics"||s==="price"));
 
   // ---- Who can be won back: reason theme by whether the conversation happened
-  const RECOV=new Set(["Just asking","Stock & delivery","Price","Timing"]);
+  const RECOV=new Set(["Still inquiring","Stock & delivery","Price","Timing"]);
   A.notWon.forEach(r=>{ r.contact=/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"")?"Call didn't connect":/phone/i.test(r.channel||"")?"Call connected":r.channel||"Not recorded";
     r.recov=RECOV.has(r.theme)||r.outcome==="Warm"; });
   A.recovN=A.notWon.filter(r=>r.recov).length;
@@ -512,6 +513,7 @@ function analyse(sources,opt={}){
 
   // ---- Rejection reasons in detail: which dimension predicts the reason given
   const RR=A.notWon.filter(r=>r.reason); A.reasonRows=RR;
+  A.reasonNotes=reasonNotes(A.notWon.filter(r=>r.kind==='lead'||!r.kind));
   A.reasonList=countBy(RR,r=>r.reason).map(([k,n])=>({k,n,raw:countBy(RR.filter(r=>r.reason===k),r=>r.reasonRaw)[0]?.[0]||k,
     lost:RR.filter(r=>r.reason===k&&r.outcome==="Lost").length,warm:RR.filter(r=>r.reason===k&&r.outcome==="Warm").length,other:RR.filter(r=>r.reason===k&&!r.outcome).length}));
   const RD=["leadType","channel","source","custType","location","pic"].filter(k=>RR.filter(r=>r[k]).length>=RR.length*.6);
@@ -526,8 +528,8 @@ function analyse(sources,opt={}){
   A.uniform=countBy(C.filter(r=>r.pic),r=>r.pic).filter(([,n])=>n>=30).map(([p,n])=>{
     const top=countBy(C.filter(r=>r.pic===p),r=>`${r.status||""}|${r.reasonRaw||""}`)[0]; return {p,n,same:top[1],status:top[0].split("|")[0],reason:top[0].split("|")[1]}; })
     .filter(x=>x.same/x.n>=.95);
-  A.askUnreach=RR.filter(r=>r.theme==="Just asking"&&/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"")).length;
-  A.askTotal=RR.filter(r=>r.theme==="Just asking").length;
+  A.askUnreach=RR.filter(r=>r.theme==="Still inquiring"&&/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"")).length;
+  A.askTotal=RR.filter(r=>r.theme==="Still inquiring").length;
   A.locHot=countBy(RR,r=>r.location).filter(([,n])=>n>=4).map(([g,n])=>{const t=countBy(RR.filter(r=>r.location===g),r=>r.theme)[0];return {g,n,theme:t[0],tn:t[1]}}).filter(x=>x.tn/x.n>=.75)[0]||null;
 
   // ---- Which dimension separates winners (or warm leads) from the rest
@@ -634,7 +636,53 @@ const BARRIERS=[["Payment terms (COD / tempo)",(d,r)=>/tempo|\bcod\b|kredit|cici
   ["No mobile-shop route or long wait",(d,r)=>/(tokling|toko keliling).*(kapan|tidak ada yang kearah)|kapan tokling|belum ada jadwal|antrian/.test(d)||/datang lebih lama/.test(r)],
   ["Price or shipping cost",(d,r)=>/harga mahal/.test(r)||/ongkir|pengiriman ke|pengantaran/.test(d)],["Out of stock",(d,r)=>/tidak tersedia/.test(r)||/kosong|tidak tersedia/.test(d)],
   ["Wants warehouse pick-up",d=>/gudang|jemput/.test(d)],["Decision by family",d=>/orang ?tua|suami|istri/.test(d)&&!/topaz/.test(d)],["Topaz rules or documents",d=>/topaz|benih/.test(d)]];
-const barrierOf=r=>{ const d=norm(r.detail), rs=norm(r.reasonRaw||r.reason); const b=BARRIERS.find(([,f])=>f(d,rs)); return b?b[0]:"Just asking / catalogue sent"; };
+const barrierOf=r=>{ const d=norm(r.detail), rs=norm(r.reasonRaw||r.reason); const b=BARRIERS.find(([,f])=>f(d,rs)); return b?b[0]:"Still inquiring / catalogue sent"; };
+// SawitPRO price tiers (product_cat), cheapest to most expensive, as the user defined them:
+// Khusus Petani (farmer price, close to the subsidised price), Toling (mobile shop: sells at set stops, so the
+// customer pays no shipping), Grosir (wholesale) and Retail (the standard app price).
+const PRICE_TIERS=[["Khusus Petani",/khusus\s*petani|\bhkp\b/i,"Farmer price, close to the subsidised price"],
+  ["Toling",/toling|toko\s*keliling|tokling/i,"Mobile shop at set stops; no shipping for the customer"],
+  ["Grosir",/grosir/i,"Wholesale, for shops and bulk buyers"],["Retail",/^pupuk(\s*sawitpro)?$|retail|eceran/i,"Standard app price"]];
+const priceTierOf=c=>{ const t=PRICE_TIERS.find(([,re])=>re.test(String(c||"").trim())); return t?t[0]:null; };
+function priceTiers(L){
+  const T=L.filter(l=>priceTierOf(l.category)); if(!T.length) return null;
+  const rows=PRICE_TIERS.map(([k,,d],rank)=>{ const ls=T.filter(l=>priceTierOf(l.category)===k);
+    return {k,rank,desc:d,gmv:ls.reduce((s,l)=>s+(l.gmv||0),0),orders:new Set(ls.map(l=>l.orderNo||l.invoice)).size,cust:new Set(ls.map(l=>l.ph||l.nk).filter(Boolean)).size,
+      cats:[...new Set(ls.map(l=>l.category))],farmersRetail:k==="Retail"?new Set(ls.filter(l=>/farmer|petani/i.test(l.role||"")).map(l=>l.ph||l.nk).filter(Boolean)).size:0}; }).filter(r=>r.orders);
+  // the same product across tiers: the item sold in the most tiers, average price per unit (before shipping) in each
+  const byItem=new Map(); T.forEach(l=>{ if(!l.unit||!l.item) return; const k=shortItem(l.item); (byItem.get(k)||byItem.set(k,new Map()).get(k)); const m=byItem.get(k), t=priceTierOf(l.category); (m.get(t)||m.set(t,[]).get(t)).push(l.unit); });
+  const best=[...byItem].sort((a,b)=>b[1].size-a[1].size||[...b[1].values()].flat().length-[...a[1].values()].flat().length)[0];
+  const cmp=best&&best[1].size>=2?{item:best[0],prices:PRICE_TIERS.map(([k])=>k).filter(k=>best[1].has(k)).map(k=>{ const v=best[1].get(k); return {k,avg:v.reduce((s,x)=>s+x,0)/v.length,n:v.length}; })}:null;
+  if(cmp) cmp.inverted=cmp.prices.filter((p,i)=>i&&p.avg<cmp.prices[i-1].avg*.995).map((p,i)=>[cmp.prices[cmp.prices.indexOf(p)-1].k,p.k]);
+  return {rows,cmp,gmv:rows.reduce((s,r)=>s+r.gmv,0)};
+}
+// What the "Detail Pembahasan" notes say behind each rejection reason (read from the notes; nothing estimated).
+const NOTE_THEMES=[
+  ["Asked the price",/harga|price|berapa|hkp|katalog/i],
+  ["Price sent, no reply",d=>/(share|kirim|sampaikan|info).{0,60}(harga|katalog|hkp)|katalog/i.test(d)&&/(tidak|belum) ada (res+pon|balasan)|tidak (merespon|dibalas|membalas)|no response/i.test(d)],
+  ["Template note (catalogue sent)",/^\s*mengirimkan katalog/i],
+  ["Khusus Petani price (HKP)",/\bhkp\b|khusus petani/i],
+  ["Shop / wholesale buyer",/grosir|\btoko\b(?! ?keliling)|kerja ?sama|reseller|buka toko/i],
+  ["Waiting for the mobile shop",/tokling|toko keliling|toling/i],
+  ["Shipping cost or delivery",/ongkir|pengiriman|diantar|antar|kirim ke/i],
+  ["Warehouse pick-up",/gudang|pick ?up|jemput/i],
+  ["Out of stock or SKU unavailable",/tidak tersedia|kosong|\bstok|habis|harga 0/i],
+  ["Payment terms or documents",/\bktp\b|tempo|\bcod\b|kredit|cicil|syarat/i],
+  ["Will decide later",/pertimbang|pikir|nanti|diskusi|tanya (suami|istri|bos)/i],
+  ["Came from a TikTok comment",/tiktok|\bvt\b|komentar|\bsw\b/i],
+  ["Could not be reached",/tidak (aktif|diangkat|bisa dihubungi)|tidak terhubung/i]];
+const noteQtyKg=d=>{ let kg=0; const n=v=>parseFloat(String(v).replace(/\.(?=\d{3})/g,"").replace(",","."));
+  for(const m of d.matchAll(/(\d+(?:[.,]\d+)?)\s*(sak|zak|karung)\b/gi)) kg+=n(m[1])*50;
+  for(const m of d.matchAll(/(\d+(?:[.,]\d+)?)\s*ton\b/gi)) kg+=n(m[1])*1000;
+  for(const m of d.matchAll(/(\d+(?:[.,]\d+)?)\s*kg\b/gi)) if(n(m[1])>50) kg+=n(m[1]); // "50kg" in a product name is a pack size, not a need
+  return kg; };
+function reasonNotes(rows){
+  const g=new Map(); rows.forEach(r=>{ const k=r.reason||"No reason logged"; (g.get(k)||g.set(k,[]).get(k)).push(r); });
+  return [...g].map(([k,rs])=>{ const wn=rs.filter(r=>clean(r.detail));
+    const th=NOTE_THEMES.map(([t,f])=>[t,wn.filter(r=>typeof f==="function"?f(r.detail):f.test(r.detail)).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);
+    const q=wn.map(r=>noteQtyKg(r.detail)).filter(x=>x>0);
+    return {k,n:rs.length,notes:wn.length,themes:th,qtyN:q.length,qtyKg:q.reduce((s,x)=>s+x,0),rows:rs}; }).sort((a,b)=>b.n-a.n);
+}
 function leadNeed(A,C,O){
   const ordered=new Set(O.map(o=>o.ph).filter(Boolean));
   const L=C.filter(r=>r.kind==="lead"&&r.outcome!=="Won"&&!(r.ph&&ordered.has(r.ph))&&!/success|closing/i.test(r._src||""));
@@ -649,7 +697,7 @@ function leadNeed(A,C,O){
 // Potential loss: what the leads who didn't order said they needed, valued at this week's selling prices.
 // Order of evidence: the potential GMV the PIC logged, a rupiah total written in the notes, sacks or tonnes in the notes,
 // then the fertilizer need in kg. Leads who ordered this week (by phone) and engagements that aren't leads are left out.
-const LOSS_GROUP=t=>({"Stock & delivery":"Out of stock or slow delivery","Price":"Price or payment terms","Timing":"Not buying yet","Locked in elsewhere":"Buys elsewhere (shop, KUD, agent)","Not a fit":"Not a fit","Just asking":"No clear reason"}[t]||null);
+const LOSS_GROUP=t=>({"Stock & delivery":"Out of stock or slow delivery","Price":"Price or payment terms","Timing":"Not buying yet","Locked in elsewhere":"Buys elsewhere (shop, KUD, agent)","Not a fit":"Not a fit","Still inquiring":"No clear reason"}[t]||null);
 const FIXABLE=new Set(["Out of stock or slow delivery","Price or payment terms"]);
 function leadLoss(A,C,lines,O){
   const med=a=>{ const v=a.filter(x=>x>0).sort((x,y)=>x-y); return v.length?v[Math.floor(v.length/2)]:null; };

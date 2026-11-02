@@ -174,6 +174,14 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - **Slide order in each team section is fixed:** sales vs the week before (then the other sales slides), success
   stories, rejection reasons (incl. customers chasing orders), then the rest (winners, team performance, recoverable
   demand). `teamSpecs` in `src/slides.js` sorts by kicker; new slides fall into place by their kicker prefix.
+- **Price tiers** (`priceTiers` in `src/analysis.js`): sales by product_cat tier, cheapest to most expensive (Khusus Petani,
+  Toling, Grosir, Retail), the same product's average price in each tier with a check when the order is inverted, and
+  farmers who paid the Retail price. Slide "Sales last week · price tiers".
+- **Rejection notes** (`reasonNotes`): per reason, what the "Detail Pembahasan" notes show (asked the price, price sent
+  and no reply, template "catalogue sent" notes, HKP, shop buyers, waiting for Toling, shipping, pick-up, stock,
+  documents, will decide later, TikTok comment, unreachable), products and quantities named, and a next step. Slide
+  "Rejection reasons · what the notes say". "Belum ketertarikan yang jelas" is labelled "Still inquiring, no clear
+  interest to buy now".
 - `tools/make_sample.js`: rebuilds `src/sample-data.json` from CSV exports with the deck's own column detection,
   anonymising names and phones (`node deck/tools/make_sample.js file1.csv file2.csv ...`). `--real --out <file>` keeps
   them for the private published deck (`SAMPLE=<file> python3 deck/build.py`); that file is never committed.
