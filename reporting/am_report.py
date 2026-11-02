@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import re
 import datetime as dt
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -108,6 +109,17 @@ def to_num(s: pd.Series) -> pd.Series:
 
 
 # ================================================================ data
+def norm_phone(x):
+    """08xx / 628xx / 8xx / '8xx.0' -> '8xx' (digits only), None if not a phone."""
+    if x is None or (isinstance(x, float) and pd.isna(x)) or pd.isna(x):
+        return None
+    d = re.sub(r"\D", "", str(x).split(".")[0])
+    if d.startswith("62"):
+        d = d[2:]
+    d = d.lstrip("0")
+    return d if len(d) >= 8 else None
+
+
 def load(data_dir: Path):
     crm = pd.read_csv(data_dir / "CRM Smallholder.csv", encoding="utf-8-sig", dtype=str)
     sales = pd.read_csv(data_dir / "Sales Smallholder.csv", dtype=str)
@@ -119,12 +131,14 @@ def load(data_dir: Path):
     crm["responded"] = crm["Respon Pengguna"].notna()
     crm["hot"] = crm["Respon Pengguna"].isin(HOT)
     crm["new_lead"] = crm["Leads"].eq("New Leads")
+    crm["phone"] = crm["cleaned phone"].map(norm_phone)
     crm = crm[crm["date"].notna()]
 
     sales["date"] = pd.to_datetime(sales["sale_order_date"], format="%d/%m/%Y", errors="coerce")
     sales["am"] = sales["pic_name"].fillna("(Tanpa PIC)").str.strip()
     for c in ["gmv", "nett_sales", "qty"]:
         sales[c] = to_num(sales[c])
+    sales["phone"] = sales["customer_phone"].map(norm_phone)
     sales = sales[sales["date"].notna()]
     return crm, sales
 
@@ -305,7 +319,7 @@ def table(slide, x, y, w, cols, rows, widths, row_h=int(0.215 * IN), font=8, hig
             color = INK
             if isinstance(val, tuple):
                 val, color = val
-            cell.text = str(val)
+            cell.text = str(val) if str(val) != "" else " "
             cell.margin_left = cell.margin_right = Emu(int(0.06 * IN))
             cell.margin_top = cell.margin_bottom = Emu(int(0.02 * IN))
             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
@@ -386,6 +400,240 @@ def bar_chart(slide, x, y, w, h, cats, series, colors, title=None, num_fmt='#,##
     return ch
 
 
+# ================================================================ insights
+def compute_insights(crm, sales, weeks, cutoff):
+    """Rule-based analysis. Returns dict of tables + list of insight sentences."""
+    lw_a, lw_b = weeks[-1]
+    pw_a, pw_b = weeks[-2]
+    base_a = weeks[-5][0]            # 4 weeks before last week
+    base_b = weeks[-2][1]
+    crm_lw, sal_lw = in_range(crm, lw_a, lw_b), in_range(sales, lw_a, lw_b)
+    crm_pw, sal_pw = in_range(crm, pw_a, pw_b), in_range(sales, pw_a, pw_b)
+    crm_base, sal_base = in_range(crm, base_a, base_b), in_range(sales, base_a, base_b)
+    out = {"insights": [], "actions": []}
+
+    # ---- 1. GMV drivers --------------------------------------------------
+    g_lw = sal_lw.groupby("am")["gmv"].sum()
+    g_pw = sal_pw.groupby("am")["gmv"].sum()
+    g_avg = sal_base.groupby("am")["gmv"].sum() / 4
+    ams = g_lw.index.union(g_pw.index).union(g_avg.index)
+    mv = pd.DataFrame({"lw": g_lw, "pw": g_pw, "avg4": g_avg}).reindex(ams).fillna(0)
+    mv["d_pw"] = mv["lw"] - mv["pw"]
+    mv["d_avg"] = mv["lw"] - mv["avg4"]
+    tot_lw, tot_avg = mv["lw"].sum(), mv["avg4"].sum()
+    if tot_avg > 0:
+        d = (tot_lw - tot_avg) / tot_avg
+        out["insights"].append(
+            f"Team GMV {fmt_idr(tot_lw)} is {abs(d)*100:.0f}% {'above' if d >= 0 else 'below'} "
+            f"the prior 4-week average ({fmt_idr(tot_avg)}/week).")
+    up = mv[mv["d_avg"] > 0].sort_values("d_avg", ascending=False).head(2)
+    dn = mv[mv["d_avg"] < 0].sort_values("d_avg").head(2)
+    if len(up):
+        out["insights"].append("Biggest GMV gain vs 4-week avg: " + "; ".join(
+            f"{am} (+{fmt_idr(r.d_avg)})" for am, r in up.iterrows()) + ".")
+    if len(dn):
+        out["insights"].append("Biggest GMV drop vs 4-week avg: " + "; ".join(
+            f"{am} (−{fmt_idr(-r.d_avg)})" for am, r in dn.iterrows()) + ".")
+    p_lw = sal_lw.groupby("item_name")["gmv"].sum()
+    p_avg = sal_base.groupby("item_name")["gmv"].sum() / 4
+    pm = (p_lw.reindex(p_lw.index.union(p_avg.index)).fillna(0)
+          - p_avg.reindex(p_lw.index.union(p_avg.index)).fillna(0)).sort_values()
+    if len(pm) and pm.iloc[0] < 0:
+        out["insights"].append(f"Product with the largest GMV decline vs 4-week avg: {pm.index[0]} (−{fmt_idr(-pm.iloc[0])}).")
+    if len(pm) and pm.iloc[-1] > 0:
+        out["insights"].append(f"Product with the largest GMV increase vs 4-week avg: {pm.index[-1]} (+{fmt_idr(pm.iloc[-1])}).")
+
+    # ---- 2. AMs needing attention -----------------------------------------
+    flags = []
+    e_lw = crm_lw.groupby("am").size()
+    e_avg = crm_base.groupby("am").size() / 4
+    inv_lw = sal_lw.groupby("am")["main_invoice_no"].nunique()
+    resp = crm_lw.groupby("am")["responded"].sum()
+    reach = crm_lw.groupby("am")["reached"].sum() / resp.where(resp > 0)
+    team_reach = crm_lw["reached"].sum() / max(crm_lw["responded"].sum(), 1)
+    for am in e_lw.index.union(e_avg.index):
+        el, ea = e_lw.get(am, 0), e_avg.get(am, 0)
+        if el >= 20 and inv_lw.get(am, 0) == 0:
+            flags.append((am, f"{fmt_int(el)} engagements but no invoice last week"))
+        if resp.get(am, 0) >= 20 and reach.get(am, 1) < team_reach - 0.15:
+            flags.append((am, f"reach rate {fmt_pct(reach[am])} vs team {fmt_pct(team_reach)}"))
+        if ea >= 20 and el < 0.5 * ea:
+            flags.append((am, f"engagements fell to {fmt_int(el)} from avg {fmt_int(ea)}/week"))
+    out["flags"] = flags
+
+    # ---- 3. CRM -> sales conversion (contacts in the last 4 weeks) ---------
+    c4 = in_range(crm, weeks[-4][0], lw_b)
+    c4 = c4[c4["phone"].notna()].sort_values("date")
+    first = c4.groupby(["am", "phone"], as_index=False)["date"].min()
+    sal_cut = sales[(sales["date"] <= pd.Timestamp(cutoff)) & sales["phone"].notna()]
+    m = first.merge(sal_cut[["phone", "date", "gmv", "main_invoice_no"]], on="phone", how="left", suffixes=("", "_s"))
+    m = m[m["date_s"].isna() | (m["date_s"] >= m["date"])]
+    conv = m[m["date_s"].notna()]
+    ct = first.groupby("am")["phone"].nunique().rename("contacted").to_frame()
+    ct["converted"] = conv.groupby("am")["phone"].nunique()
+    ct["gmv"] = conv.groupby("am")["gmv"].sum()
+    ct = ct.fillna(0)
+    ct["rate"] = ct["converted"] / ct["contacted"].where(ct["contacted"] > 0)
+    out["conversion"] = ct.sort_values(["converted", "contacted"], ascending=False)
+    out["conv_window"] = (weeks[-4][0], lw_b)
+    tc, tv = ct["contacted"].sum(), ct["converted"].sum()
+    if tc:
+        out["insights"].append(
+            f"CRM→sales conversion (contacts {d_id(weeks[-4][0])} – {d_id(lw_b)}): "
+            f"{fmt_int(tv)} of {fmt_int(tc)} leads bought ({tv/tc*100:.1f}%), GMV {fmt_idr(ct['gmv'].sum())}.")
+
+    # ---- 4. Hot prospects not yet converted (last 30 days) -----------------
+    h = in_range(crm, cutoff - dt.timedelta(days=29), cutoff)
+    h = h[h["hot"] & h["phone"].notna()].sort_values("date").groupby("phone").tail(1)
+    bought = sal_cut.groupby("phone")["date"].max()
+    h = h[~h.apply(lambda r: r["phone"] in bought.index and bought[r["phone"]] >= r["date"], axis=1)] if len(h) else h
+    h = h.sort_values("date", ascending=False)
+    out["hot_open"] = h
+    if len(h):
+        by = h.groupby("am").size().sort_values(ascending=False)
+        out["actions"].append(
+            f"Follow up {fmt_int(len(h))} hot prospects (last 30 days) with no order yet — "
+            + ", ".join(f"{am} {n}" for am, n in by.head(4).items()) + ".")
+
+    # ---- 5. Churn risk: regular buyers gone quiet --------------------------
+    hist = sales[sales["date"] <= pd.Timestamp(cutoff)]
+    six = hist[hist["date"] > pd.Timestamp(cutoff - dt.timedelta(days=180))]
+    cs = six.groupby("customer_id").agg(
+        name=("customer_name", "first"), am=("am", lambda x: x.mode().iat[0]),
+        months=("date", lambda x: x.dt.to_period("M").nunique()),
+        orders=("main_invoice_no", "nunique"), gmv=("gmv", "sum"), last=("date", "max"))
+    risk = cs[(cs["months"] >= 3) & (cs["last"] < pd.Timestamp(cutoff - dt.timedelta(days=45)))]
+    out["churn"] = risk.sort_values("gmv", ascending=False)
+    if len(risk):
+        out["actions"].append(
+            f"Re-engage {fmt_int(len(risk))} regular customers (orders in ≥3 of the last 6 months) with no order "
+            f"in 45+ days — {fmt_idr(risk['gmv'].sum())} GMV in the last 6 months at risk.")
+
+    # ---- 6. Rejection reason trend -----------------------------------------
+    rs = crm[crm["Alasan customer tidak tertarik"].notna()].copy()
+    rs["reason"] = rs["Alasan customer tidak tertarik"].str.strip().map(lambda x: REASON_EN.get(x, x))
+    wk = {}
+    for i, (a_, b_) in enumerate(weeks[-4:]):
+        wk[i] = in_range(rs, a_, b_)["reason"].value_counts()
+    wt = pd.DataFrame(wk).fillna(0)
+    rising = []
+    for reason, r in wt.iterrows():
+        if r[3] >= 5 and r[3] > r[2] > r[1]:
+            rising.append(f"'{reason}' rose 3 weeks in a row ({int(r[1])}→{int(r[2])}→{int(r[3])})")
+        elif r[3] >= 5 and r[3] >= 1.5 * max(r[0:3].mean(), 1):
+            rising.append(f"'{reason}' jumped to {int(r[3])} (avg {r[0:3].mean():.0f}/week)")
+    out["reason_trend"] = wt
+    if rising:
+        out["insights"].append("Rejection reasons rising: " + "; ".join(rising[:2]) + ".")
+
+    # ---- 7. Data quality ---------------------------------------------------
+    dq = crm_lw.groupby("am").agg(total=("am", "size"), empty=("responded", lambda x: int((~x).sum())))
+    dq["pct"] = dq["empty"] / dq["total"]
+    dq = dq[dq["empty"] > 0].sort_values("empty", ascending=False)
+    out["dq"] = dq
+    if len(dq):
+        tot = dq["empty"].sum()
+        out["actions"].append(
+            f"{fmt_int(tot)} engagements last week have no 'Respon Pengguna' filled in "
+            f"({tot/len(crm_lw)*100:.0f}% of all) — mostly " + ", ".join(dq.index[:3]) + ".")
+    merged = {}
+    for am, why in flags:
+        merged.setdefault(am, []).append(why)
+    for am, whys in list(merged.items())[:4]:
+        out["actions"].append(f"Check in with {am}: " + "; ".join(whys) + ".")
+
+    # data freshness caveat goes first
+    smax, cmax = sales["date"].max().date(), crm["date"].max().date()
+    if smax < lw_b:
+        out["insights"].insert(0, f"Caution: Sales data only runs to {d_id(smax)}, so last week's GMV figures are incomplete.")
+    if cmax < lw_b:
+        out["insights"].insert(0, f"Caution: CRM data only runs to {d_id(cmax)}, so last week's activity figures are incomplete.")
+    return out
+
+
+def insight_slides(deck, ins, iso_wk, cutoff):
+    W = deck.W
+    gap = int(0.14 * IN)
+    half = (W - 2 * MX - gap) // 2
+    y = TOP + int(0.68 * IN)
+
+    # ---- Key insights & actions
+    s = deck.new()
+    header(deck, s, f"Key Insights & Action Items — W{iso_wk}", "Generated automatically from CRM and Sales data")
+    text(s, MX, y, half, int(0.25 * IN), "What happened", size=11, bold=True, color=GREEN)
+    text(s, MX, y + int(0.32 * IN), half, int(3.3 * IN),
+         [[("•  ", {"bold": True, "color": GREEN}), (t, {})] for t in ins["insights"][:8]] or ["No notable changes."],
+         size=9)
+    x2 = MX + half + gap
+    rect(s, x2, y - int(0.06 * IN), half, int(3.55 * IN), LIGHT)
+    pad = int(0.14 * IN)
+    text(s, x2 + pad, y, half - 2 * pad, int(0.25 * IN), "What to do this week", size=11, bold=True, color=GREEN)
+    text(s, x2 + pad, y + int(0.32 * IN), half - 2 * pad, int(3.1 * IN),
+         [[(f"{i+1}.  ", {"bold": True, "color": GREEN}), (t, {})] for i, t in enumerate(ins["actions"][:7])]
+         or ["No action items."], size=9)
+
+    # ---- Conversion
+    s = deck.new()
+    a, b = ins["conv_window"]
+    header(deck, s, "CRM → Sales Conversion per Account Manager",
+           f"Leads first contacted {d_id(a)} – {d_id(b)} (matched by phone) that ordered on/after contact, up to {d_id(cutoff)}")
+    ct = ins["conversion"]
+    ct = ct[ct["contacted"] > 0]
+    rows = [[am, fmt_int(r["contacted"]), fmt_int(r["converted"]), fmt_pct(r["rate"]) if r["contacted"] else "–",
+             fmt_idr(r["gmv"]) if r["gmv"] else "–"] for am, r in ct.head(13).iterrows()]
+    tc, tv = ct["contacted"].sum(), ct["converted"].sum()
+    rows.append(["Total", fmt_int(tc), fmt_int(tv), fmt_pct(tv / tc) if tc else "–", fmt_idr(ct["gmv"].sum())])
+    table(s, MX, y, int((W - 2 * MX) * 0.62), ["Account Manager", "Leads contacted", "Converted", "Conv. rate", "GMV from converted"],
+          rows, [2.4, 1.2, 1, 1, 1.4], highlight_col=3)
+    xn = MX + int((W - 2 * MX) * 0.62) + gap
+    wn = W - MX - xn
+    flags = ins["flags"]
+    text(s, xn, y, wn, int(0.25 * IN), "Needs attention", size=10, bold=True, color=GREEN)
+    text(s, xn, y + int(0.3 * IN), wn, int(3.2 * IN),
+         [[("•  ", {"bold": True, "color": RED}), (f"{am}: ", {"bold": True}), (why, {})] for am, why in flags[:8]]
+         or ["No AM flags this week."], size=8)
+
+    # ---- Follow-up priorities
+    s = deck.new()
+    header(deck, s, "Follow-up Priorities",
+           "Left: hot prospects (last 30 days) with no order yet  •  Right: regular customers with no order in 45+ days")
+    h = ins["hot_open"]
+    hr = [[str(r["Nama Customer"] if pd.notna(r["Nama Customer"]) else "(no name)")[:22], r["am"].split()[0] if r["am"] else "",
+           r["date"].strftime("%d %b"),
+           "High" if str(r["Respon Pengguna"]).startswith("High") else "≤1 mo"] for _, r in h.head(12).iterrows()]
+    if len(h) > 12:
+        hr.append([f"+{len(h)-12} more", "", "", ""])
+    text(s, MX, y, half, int(0.25 * IN), f"Hot prospects not converted ({fmt_int(len(h))})", size=10, bold=True, color=GREEN)
+    table(s, MX, y + int(0.3 * IN), half, ["Customer", "AM", "Last contact", "Stage"],
+          hr or [["(none)", "", "", ""]], [2.2, 1.3, 1.1, 0.8])
+    c = ins["churn"]
+    cr = [[str(r["name"])[:22], str(r["am"]).split()[0], r["last"].strftime("%d %b"), fmt_int(r["orders"]), fmt_idr(r["gmv"])]
+          for _, r in c.head(12).iterrows()]
+    if len(c) > 12:
+        cr.append([f"+{len(c)-12} more", "", "", "", ""])
+    text(s, MX + half + gap, y, half, int(0.25 * IN), f"Churn risk ({fmt_int(len(c))})", size=10, bold=True, color=GREEN)
+    table(s, MX + half + gap, y + int(0.3 * IN), half, ["Customer", "AM", "Last order", "Orders 6M", "GMV 6M"],
+          cr or [["(none)", "", "", "", ""]], [2.1, 1.1, 1, 0.9, 1.2])
+
+    # ---- Data quality & rejection trend
+    s = deck.new()
+    header(deck, s, f"CRM Data Quality & Rejection Trend — W{iso_wk}",
+           "Engagements without a recorded response, and reasons for no interest over the last 4 weeks")
+    dq = ins["dq"]
+    dr = [[am, fmt_int(r["total"]), fmt_int(r["empty"]), fmt_pct(r["pct"])] for am, r in dq.head(12).iterrows()]
+    text(s, MX, y, half, int(0.25 * IN), "Response not filled in (last week)", size=10, bold=True, color=GREEN)
+    table(s, MX, y + int(0.3 * IN), half, ["Account Manager", "Engagements", "No response", "% empty"],
+          dr or [["All filled in ✓", "", "", ""]], [2.4, 1.1, 1.1, 0.9], highlight_col=3)
+    wt = ins["reason_trend"]
+    if len(wt):
+        wt = wt.loc[wt.sum(axis=1).sort_values(ascending=False).index].head(8)
+        bar_chart(s, MX + half + gap, y, half, int(3.45 * IN),
+                  [r[:30] + ("…" if len(r) > 30 else "") for r in wt.index][::-1],
+                  [(f"W{(cutoff - dt.timedelta(days=7*(3-i))).isocalendar()[1]}", wt[i].tolist()[::-1]) for i in range(4)],
+                  [GREY, YELLOW, ORANGE, GREEN], title="Reasons for no interest — last 4 weeks",
+                  kind=XL_CHART_TYPE.BAR_CLUSTERED, labels=False)
+
+
 # ================================================================ slides
 def build(data_dir: Path, template: Path, out: Path, today: dt.date):
     crm, sales = load(data_dir)
@@ -393,8 +641,8 @@ def build(data_dir: Path, template: Path, out: Path, today: dt.date):
     lw_a, lw_b = weeks[-1]
     pw_a, pw_b = weeks[-2]
     iso_wk = lw_a.isocalendar()[1]
-    year_start = dt.date(cutoff.year, 1, 1)
     m_end = cutoff if cutoff.day >= 7 else (cutoff.replace(day=1) - dt.timedelta(days=1))
+    year_start = dt.date(m_end.year, 1, 1)
 
     crm_lw, crm_pw = in_range(crm, lw_a, lw_b), in_range(crm, pw_a, pw_b)
     sal_lw, sal_pw = in_range(sales, lw_a, lw_b), in_range(sales, pw_a, pw_b)
@@ -503,6 +751,10 @@ def build(data_dir: Path, template: Path, out: Path, today: dt.date):
           ["Account Manager", "Engagements", "Unique leads", "Reach", "Hot", "Invoices", "Customers", "GMV", "Δ GMV"],
           rows, [2.4, 1.2, 1.1, 0.8, 0.6, 0.8, 0.95, 1.3, 1.4], highlight_col=7)
 
+    # ---------------------------------------------------------- 4b. insights (rule-based)
+    ins = compute_insights(crm, sales, weeks, cutoff)
+    insight_slides(deck, ins, iso_wk, cutoff)
+
     # ---------------------------------------------------------- 5. kualitas CRM minggu lalu
     s = deck.new()
     header(deck, s, f"CRM Engagement Outcomes — W{iso_wk}", "User response distribution & reasons for no interest")
@@ -544,7 +796,7 @@ def build(data_dir: Path, template: Path, out: Path, today: dt.date):
                     if m_end.day != months[-1].days_in_month else "")
 
     s = deck.new()
-    header(deck, s, f"Monthly Trend {cutoff.year} (YTD)",
+    header(deck, s, f"Monthly Trend {m_end.year} (YTD)",
            f"1 Jan – {d_id(m_end)}  {('•  ' + partial_note) if partial_note else ''}")
     g_m = sal_ytd.groupby("m")["gmv"].sum().reindex(months, fill_value=0)
     newc = sal_ytd[sal_ytd["customer_status"].eq("new customer")].groupby("m")["customer_id"].nunique().reindex(months, fill_value=0)
@@ -578,7 +830,7 @@ def build(data_dir: Path, template: Path, out: Path, today: dt.date):
     lab3 = [mlabel[list(months).index(m)] for m in last3]
     table(s, MX, TOP + int(0.72 * IN), W - 2 * MX,
           ["Account Manager"] + lab3 + ["GMV YTD", "Invoices YTD", "Customers YTD", "Share"],
-          rows, [2.5, 1.15, 1.15, 1.15, 1.25, 1.1, 1.3, 0.8], highlight_col=4)
+          rows, [2.5] + [1.15] * len(last3) + [1.25, 1.1, 1.3, 0.8], highlight_col=len(last3) + 1)
 
     # ---------------------------------------------------------- 8. aktivitas CRM per AM per bulan
     s = deck.new()
@@ -600,7 +852,7 @@ def build(data_dir: Path, template: Path, out: Path, today: dt.date):
                      fmt_int(r["YTD"])])
     table(s, MX, TOP + int(0.72 * IN), W - 2 * MX,
           ["Account Manager"] + lab3 + [f"Reach {lab3[-1]}", f"Hot {lab3[-1]}", f"New leads {lab3[-1]}", "Engagements YTD"],
-          rows, [2.6, 1, 1, 1, 1.1, 1, 1.2, 1.3], highlight_col=3)
+          rows, [2.6] + [1] * len(last3) + [1.1, 1, 1.2, 1.3], highlight_col=len(last3))
 
     # ---------------------------------------------------------- 9. produk teratas
     s = deck.new()
