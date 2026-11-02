@@ -14,8 +14,10 @@ added to this deck, not built as separate decks.
 - Deck text is in English; chat replies follow the user's language (usually Indonesian).
 
 ## Rules
-- No customer names or phone numbers on any slide, except the "Success story · the orders" table, which the user asked
-  to show each buyer's name and phone (from the uploaded export, read in the browser only). Raw CSV exports are never
-  committed (the sample is anonymised by hashing phone numbers and names).
+- No customer names or phone numbers on any slide, except (at the user's request) the "Success story · the orders"
+  table (each buyer's name and phone) and the "users above 100 ha" registration slides (name and contact: phone, else
+  email). Those details come from the export uploaded in the browser; files built from real exports with them are sent
+  to the user, not committed. Raw CSV exports are never committed (the sample is anonymised by hashing phone numbers
+  and names).
 - PPTX charts are drawn as shapes and text boxes (no native charts), so Google Slides keeps every label.
 - Rebuild with `python3 deck/build.py` after editing `deck/src/`.
