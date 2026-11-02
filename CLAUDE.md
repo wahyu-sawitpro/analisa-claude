@@ -1,8 +1,13 @@
 # SawitPRO sales analysis
 
 The main deliverable is the deck in `deck/` (see `deck/README.md`): a single HTML page with upload, Analyze,
-Download PPTX and Google Slides export, published as the claude.ai artifact "SawitPRO Deck"
-(https://claude.ai/artifact/H73dmaq1yoCnzL2p2JMg5p). New analysis requests (sales, acquisition, forecasting, ...) are
+Download PPTX and Google Slides export. It is published as two claude.ai artifacts, each refreshed by its own weekly
+routine:
+- "SawitPRO Sales Deck" (https://claude.ai/artifact/WFkx8cUiCoSgwT3Y5ooSEn): weekly sales and CRM review, built with
+  `TITLE="SawitPRO Sales Deck" python3 deck/build.py` from the six weekly exports; routine every Monday 13:00 WIB.
+- "SawitPRO Deck" (https://claude.ai/artifact/H73dmaq1yoCnzL2p2JMg5p): farmer registration review; routine every
+  Tuesday 10:00 WIB (see "Weekly registration refresh" in `deck/README.md`).
+Never publish one review to the other's artifact. New analysis requests (sales, acquisition, forecasting, ...) are
 added to this deck, not built as separate decks.
 
 ## Standing requests from the user

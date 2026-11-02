@@ -174,9 +174,11 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `tools/make_sample.js`: rebuilds `src/sample-data.json` from CSV exports with the deck's own column detection,
   anonymising names and phones (`node deck/tools/make_sample.js file1.csv file2.csv ...`). `--real --out <file>` keeps
   them for the private published deck (`SAMPLE=<file> python3 deck/build.py`); that file is never committed.
-- **Weekly routine:** every Tuesday 13:00 WIB a scheduled Claude session reads the six weekly exports on `main`
+- **Weekly sales routine:** every Monday 13:00 WIB a scheduled Claude session reads the six weekly exports on `main`
   (sales last two weeks, success story and rejection reasons, both teams), rebuilds the sample, updates the findings
-  here, pushes to `claude/deck-slide-data-upload-c45lkx` and republishes the artifact.
+  here, pushes to `claude/deck-slide-data-upload-c45lkx` and republishes "SawitPRO Sales Deck"
+  (https://claude.ai/artifact/WFkx8cUiCoSgwT3Y5ooSEn), built with `TITLE="SawitPRO Sales Deck"`. The registration
+  review keeps its own artifact ("SawitPRO Deck") and Tuesday routine.
 - `src/sample-data.json`: the six weekly exports for 19–25 Oct (sales and CRM, both teams), with phone numbers and names replaced by anonymous tokens
 - Built PPTX files, `audit.csv` and `DECISIONS.md` for the forecast, acquisition, DO pipeline and Jul–Sep reviews are on branch `claude/pensive-ritchie-9d38qh` under `deck/output/`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`

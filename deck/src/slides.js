@@ -980,9 +980,9 @@ function deckNarrative0(T){
   const won=all.reduce((s,A)=>s+A.won.length,0), wonL=all.reduce((s,A)=>s+A.wonLinked.length,0);
   X.eyebrow="Weekly Sales Review"; X.title=`${andList(T.map(t=>t.name))} Last Week`;
   X.meta=[orders&&`${orders} orders`,crm&&`${crm} CRM engagements`,`${T.length} teams`].filter(Boolean).join(" · ");
-  X.headline=gmv?`${rp(gmv)} in sales last week: ${T.map(t=>`${t.name} ${rp(t.A.gmv)}${t.A.wow&&t.A.wow.pc!=null?` (${t.A.wow.flat?"flat":(t.A.wow.up?"+":"−")+t.A.wow.pc+"%"})`:""}`).join(", ")}`:`${crm} CRM engagements across ${T.length} teams`;
+  X.headline=gmv?`${rp(gmv)} in sales last week: ${T.map(t=>!t.A.has.sales?`${t.name} no sales file`:`${t.name} ${rp(t.A.gmv)}${t.A.wow&&t.A.wow.pc!=null?` (${t.A.wow.flat?"flat":(t.A.wow.up?"+":"−")+t.A.wow.pc+"%"})`:""}`).join(", ")}`:`${crm} CRM engagements across ${T.length} teams`;
   X.kpis=[{v:rpParts(gmv)[0],u:rpParts(gmv)[1],l:`Total sales from ${orders} orders`,hot:true},
-    ...T.slice(0,2).map(t=>({v:rpParts(t.A.gmv)[0],u:rpParts(t.A.gmv)[1],l:`${t.name}: ${t.A.orders.length} orders, ${pct(t.A.gmv,gmv)}% of sales`})),
+    ...T.slice(0,2).map(t=>t.A.has.sales?{v:rpParts(t.A.gmv)[0],u:rpParts(t.A.gmv)[1],l:`${t.name}: ${t.A.orders.length} orders, ${pct(t.A.gmv,gmv)}% of sales`}:{v:"–",u:"",l:`${t.name}: no sales file uploaded`}),
     (()=>{ const c=all.reduce((s,A)=>s+(A.customers||0),0), nw=all.reduce((s,A)=>s+new Set((A.orders||[]).filter(o=>o.isNew).map(o=>o.ph||o.nk||o.no)).size,0); return {v:String(c),u:"",l:`customers bought${nw?`, ${nw} of them new`:""}`}; })()];
   // two findings per team, labelled with the team
   X.findings=T.flatMap(t=>t.N.findings.slice(0,T.length>2?1:2).map(f=>[`${t.name}: ${f[0]}`,f[1]])).slice(0,4);
@@ -995,7 +995,7 @@ function deckNarrative0(T){
   const cov=t=>t.A.orders.length?(t.A.orders.length-t.A.noCrm.length)/t.A.orders.length:null;
   const withCov=T.filter(t=>t.A.has.crm&&t.A.has.sales&&t.A.orders.length), best=withCov.slice().sort((a,b)=>cov(b)-cov(a));
   const lead=T.slice().sort((a,b)=>b.A.gmv-a.A.gmv)[0];
-  X.cmpTitle=`${lead.name} drives ${pct(lead.A.gmv,gmv)}% of sales`+(false
+  X.cmpTitle=(T.some(t=>!t.A.has.sales)?`${T.filter(t=>t.A.has.sales).map(t=>t.name).join(", ")||"No team"} has sales data; ${T.filter(t=>!t.A.has.sales).map(t=>t.name).join(", ")} has CRM only`:`${lead.name} drives ${pct(lead.A.gmv,gmv)}% of sales`)+(false
     ?`; ${best[0].name} records ${best[0].A.orders.length-best[0].A.noCrm.length} of ${best[0].A.orders.length} orders in the CRM vs ${best[best.length-1].A.orders.length-best[best.length-1].A.noCrm.length} of ${best[best.length-1].A.orders.length}`:"");
   const F=(t)=>t.A.byFamily?.[0];
   X.cmpRows=[
