@@ -290,7 +290,7 @@ BOTTOM = int(5.08 * IN)   # di atas footer hijau
 
 
 def header(deck, slide, title, subtitle=None):
-    text(slide, MX, TOP, deck.W - 2 * MX - int(2.2 * IN), int(0.4 * IN), title, size=20, bold=True)
+    text(slide, MX, TOP, deck.W - 2 * MX, int(0.4 * IN), title, size=20 if len(title) <= 48 else 17, bold=True)
     if subtitle:
         text(slide, MX, TOP + int(0.40 * IN), deck.W - 2 * MX, int(0.25 * IN), subtitle, size=10, color=MUTED)
 
@@ -336,6 +336,46 @@ def table(slide, x, y, w, cols, rows, widths, row_h=int(0.215 * IN), font=8, hig
                 f.color.rgb = color
                 f.bold = c == 0 or c == highlight_col
     return gt
+
+
+ROWS_PER_PAGE = 15
+
+
+def paged_table(deck, title, subtitle, cols, rows, widths, *, footer_rows=None, highlight_col=None,
+                x=None, w=None, y=None, per_page=ROWS_PER_PAGE, legend=None, first_extra=None, label=None,
+                empty_row=None):
+    """Render ALL rows; continue onto extra slides ("cont.") when they don't fit on one slide."""
+    x = MX if x is None else x
+    w = (deck.W - 2 * MX) if w is None else w
+    y0 = TOP + int(0.72 * IN) if y is None else y
+    rows = list(rows) or ([empty_row] if empty_row else [])
+    footer_rows = footer_rows or []
+    if legend:
+        per_page -= 2
+    if label:
+        per_page -= 1
+    chunks = [rows[i:i + per_page] for i in range(0, len(rows), per_page)] or [[]]
+    if footer_rows and len(chunks[-1]) + len(footer_rows) > per_page:
+        chunks.append([])
+    slides = []
+    for i, chunk in enumerate(chunks):
+        s = deck.new()
+        t = title if i == 0 else f"{title} (cont.)"
+        header(deck, s, t, subtitle)
+        yy = y0
+        if legend:
+            text(s, MX, yy - int(0.04 * IN), deck.W - 2 * MX, int(0.36 * IN), legend, size=8, color=MUTED)
+            yy += int(0.38 * IN)
+        if label:
+            text(s, x, yy, w, int(0.22 * IN), label, size=10, bold=True, color=GREEN)
+            yy += int(0.26 * IN)
+        body = chunk + (footer_rows if i == len(chunks) - 1 else [])
+        if body:
+            table(s, x, yy, w, cols, body, widths, highlight_col=highlight_col)
+        if i == 0 and first_extra:
+            first_extra(s)
+        slides.append(s)
+    return slides
 
 
 def style_chart(ch, legend=True, num_fmt='#,##0'):
@@ -572,66 +612,157 @@ def insight_slides(deck, ins, iso_wk, cutoff):
          [[(f"{i+1}.  ", {"bold": True, "color": GREEN}), (t, {})] for i, t in enumerate(ins["actions"][:7])]
          or ["No action items."], size=9)
 
-    # ---- Conversion
-    s = deck.new()
+    # ---- Conversion (all AMs) + needs-attention panel on the first page
     a, b = ins["conv_window"]
-    header(deck, s, "CRM → Sales Conversion per Account Manager",
-           f"Leads first contacted {d_id(a)} – {d_id(b)} (matched by phone) that ordered on/after contact, up to {d_id(cutoff)}")
     ct = ins["conversion"]
     ct = ct[ct["contacted"] > 0]
-    rows = [[am, fmt_int(r["contacted"]), fmt_int(r["converted"]), fmt_pct(r["rate"]) if r["contacted"] else "–",
-             fmt_idr(r["gmv"]) if r["gmv"] else "–"] for am, r in ct.head(13).iterrows()]
+    rows = [[am, fmt_int(r["contacted"]), fmt_int(r["converted"]), fmt_pct(r["rate"]),
+             fmt_idr(r["gmv"]) if r["gmv"] else "–"] for am, r in ct.iterrows()]
     tc, tv = ct["contacted"].sum(), ct["converted"].sum()
-    rows.append(["Total", fmt_int(tc), fmt_int(tv), fmt_pct(tv / tc) if tc else "–", fmt_idr(ct["gmv"].sum())])
-    table(s, MX, y, int((W - 2 * MX) * 0.62), ["Account Manager", "Leads contacted", "Converted", "Conv. rate", "GMV from converted"],
-          rows, [2.4, 1.2, 1, 1, 1.4], highlight_col=3)
-    xn = MX + int((W - 2 * MX) * 0.62) + gap
-    wn = W - MX - xn
-    flags = ins["flags"]
-    text(s, xn, y, wn, int(0.25 * IN), "Needs attention", size=10, bold=True, color=GREEN)
-    text(s, xn, y + int(0.3 * IN), wn, int(3.2 * IN),
-         [[("•  ", {"bold": True, "color": RED}), (f"{am}: ", {"bold": True}), (why, {})] for am, why in flags[:8]]
-         or ["No AM flags this week."], size=8)
+    total = [[("Total", INK), fmt_int(tc), fmt_int(tv), fmt_pct(tv / tc) if tc else "–", fmt_idr(ct["gmv"].sum())]]
+    tw = int((W - 2 * MX) * 0.62)
+    merged = {}
+    for am, why in ins["flags"]:
+        merged.setdefault(am, []).append(why)
 
-    # ---- Follow-up priorities
-    s = deck.new()
-    header(deck, s, "Follow-up Priorities",
-           "Left: hot prospects (last 30 days) with no order yet  •  Right: regular customers with no order in 45+ days")
+    def flags_panel(s):
+        xn = MX + tw + gap
+        wn = W - MX - xn
+        text(s, xn, y, wn, int(0.25 * IN), "Needs attention", size=10, bold=True, color=GREEN)
+        lines = [[("•  ", {"bold": True, "color": RED}), (f"{am}: ", {"bold": True}), ("; ".join(w), {})]
+                 for am, w in merged.items()] or ["No AM flags this week."]
+        text(s, xn, y + int(0.3 * IN), wn, int(3.2 * IN), lines, size=8 if len(lines) <= 8 else 7)
+
+    paged_table(deck, "CRM → Sales Conversion per Account Manager",
+                f"Leads first contacted {d_id(a)} – {d_id(b)} (matched by phone) that ordered on/after contact, up to {d_id(cutoff)}",
+                ["Account Manager", "Leads contacted", "Converted", "Conv. rate", "GMV from converted"],
+                rows, [2.4, 1.2, 1, 1, 1.4], footer_rows=total, highlight_col=3, w=tw, first_extra=flags_panel,
+                empty_row=["(no contacts)", "", "", "", ""])
+
+    # ---- Follow-up 1: hot prospects not yet converted (all rows)
     h = ins["hot_open"]
-    hr = [[str(r["Nama Customer"] if pd.notna(r["Nama Customer"]) else "(no name)")[:22], r["am"].split()[0] if r["am"] else "",
-           r["date"].strftime("%d %b"),
-           "High" if str(r["Respon Pengguna"]).startswith("High") else "≤1 mo"] for _, r in h.head(12).iterrows()]
-    if len(h) > 12:
-        hr.append([f"+{len(h)-12} more", "", "", ""])
-    text(s, MX, y, half, int(0.25 * IN), f"Hot prospects not converted ({fmt_int(len(h))})", size=10, bold=True, color=GREEN)
-    table(s, MX, y + int(0.3 * IN), half, ["Customer", "AM", "Last contact", "Stage"],
-          hr or [["(none)", "", "", ""]], [2.2, 1.3, 1.1, 0.8])
-    c = ins["churn"]
-    cr = [[str(r["name"])[:22], str(r["am"]).split()[0], r["last"].strftime("%d %b"), fmt_int(r["orders"]), fmt_idr(r["gmv"])]
-          for _, r in c.head(12).iterrows()]
-    if len(c) > 12:
-        cr.append([f"+{len(c)-12} more", "", "", "", ""])
-    text(s, MX + half + gap, y, half, int(0.25 * IN), f"Churn risk ({fmt_int(len(c))})", size=10, bold=True, color=GREEN)
-    table(s, MX + half + gap, y + int(0.3 * IN), half, ["Customer", "AM", "Last order", "Orders 6M", "GMV 6M"],
-          cr or [["(none)", "", "", "", ""]], [2.1, 1.1, 1, 0.9, 1.2])
+    stage_lbl = {
+        "High Prospect - Segera transaksi": ("High prospect — buy now", RED),
+        "Prospect - Transaksi dalam sebulan": ("Prospect — within 1 month", ORANGE),
+    }
+    hr = []
+    for _, r in h.iterrows():
+        lbl, col = stage_lbl.get(str(r["Respon Pengguna"]).strip(), (str(r["Respon Pengguna"]), INK))
+        prod = r.get("Product yang diminta customer")
+        if pd.isna(prod) or not str(prod).strip():
+            prod = r.get("Pupuk Ditawarkan")
+        prod = "–" if pd.isna(prod) or not str(prod).strip() else str(prod)
+        hr.append([(str(r["Nama Customer"]) if pd.notna(r["Nama Customer"]) else "(no name)")[:24], r["am"],
+                   r["date"].strftime("%d %b %Y"), fmt_int((pd.Timestamp(cutoff) - r["date"]).days),
+                   (lbl, col), prod[:30] + ("…" if len(prod) > 30 else "")])
+    n_high = sum(1 for _, r in h.iterrows() if str(r["Respon Pengguna"]).startswith("High"))
+    paged_table(deck, f"Follow-up: Hot Prospects Not Yet Converted ({fmt_int(len(h))})",
+                f"Contacted in the last 30 days (to {d_id(cutoff)}), marked hot in CRM, no order since the last contact  •  "
+                f"{n_high} high prospect, {len(h)-n_high} prospect",
+                ["Customer", "Account Manager", "Last contact", "Days ago", "Stage", "Product requested / offered"],
+                hr, [1.7, 1.9, 1.05, 0.75, 1.75, 2.6],
+                legend=[[("Stage:  ", {"bold": True, "color": INK}),
+                         ("High prospect — buy now", {"bold": True, "color": RED}),
+                         (" = customer said they will order immediately (CRM: 'High Prospect – Segera transaksi').   ", {}),
+                         ("Prospect — within 1 month", {"bold": True, "color": ORANGE}),
+                         (" = expected to order within a month (CRM: 'Prospect – Transaksi dalam sebulan').", {})]],
+                empty_row=["(none — all hot prospects have ordered)", "", "", "", "", ""])
 
-    # ---- Data quality & rejection trend
-    s = deck.new()
-    header(deck, s, f"CRM Data Quality & Rejection Trend — W{iso_wk}",
-           "Engagements without a recorded response, and reasons for no interest over the last 4 weeks")
+    # ---- Follow-up 2: churn risk (all rows)
+    c = ins["churn"]
+    cr = [[str(r["name"])[:28], str(r["am"]), r["last"].strftime("%d %b %Y"),
+           fmt_int((pd.Timestamp(cutoff) - r["last"]).days), fmt_int(r["months"]), fmt_int(r["orders"]), fmt_idr(r["gmv"])]
+          for _, r in c.iterrows()]
+    paged_table(deck, f"Follow-up: Regular Customers at Churn Risk ({fmt_int(len(c))})",
+                f"Ordered in ≥3 of the last 6 months but no order in the last 45+ days (to {d_id(cutoff)})  •  "
+                f"GMV at risk {fmt_idr(c['gmv'].sum()) if len(c) else 'IDR 0'}",
+                ["Customer", "Account Manager", "Last order", "Days since", "Active months (6M)", "Orders (6M)", "GMV (6M)"],
+                cr, [2, 2, 1.1, 0.9, 1.2, 1, 1.2], highlight_col=6,
+                empty_row=["(none)", "", "", "", "", "", ""])
+
+    # ---- Data quality (all AMs) + rejection trend chart on the first page
     dq = ins["dq"]
-    dr = [[am, fmt_int(r["total"]), fmt_int(r["empty"]), fmt_pct(r["pct"])] for am, r in dq.head(12).iterrows()]
-    text(s, MX, y, half, int(0.25 * IN), "Response not filled in (last week)", size=10, bold=True, color=GREEN)
-    table(s, MX, y + int(0.3 * IN), half, ["Account Manager", "Engagements", "No response", "% empty"],
-          dr or [["All filled in ✓", "", "", ""]], [2.4, 1.1, 1.1, 0.9], highlight_col=3)
-    wt = ins["reason_trend"]
-    if len(wt):
-        wt = wt.loc[wt.sum(axis=1).sort_values(ascending=False).index].head(8)
-        bar_chart(s, MX + half + gap, y, half, int(3.45 * IN),
-                  [r[:30] + ("…" if len(r) > 30 else "") for r in wt.index][::-1],
-                  [(f"W{(cutoff - dt.timedelta(days=7*(3-i))).isocalendar()[1]}", wt[i].tolist()[::-1]) for i in range(4)],
-                  [GREY, YELLOW, ORANGE, GREEN], title="Reasons for no interest — last 4 weeks",
-                  kind=XL_CHART_TYPE.BAR_CLUSTERED, labels=False)
+    dr = [[am, fmt_int(r["total"]), fmt_int(r["empty"]), fmt_pct(r["pct"])] for am, r in dq.iterrows()]
+
+    def reason_chart(s):
+        wt = ins["reason_trend"]
+        if len(wt):
+            wt = wt.loc[wt.sum(axis=1).sort_values(ascending=False).index].head(8)
+            bar_chart(s, MX + half + gap, y, half, int(3.45 * IN),
+                      [r[:30] + ("…" if len(r) > 30 else "") for r in wt.index][::-1],
+                      [(f"W{(cutoff - dt.timedelta(days=7*(3-i))).isocalendar()[1]}", wt[i].tolist()[::-1]) for i in range(4)],
+                      [GREY, YELLOW, ORANGE, GREEN], title="Reasons for no interest — last 4 weeks",
+                      kind=XL_CHART_TYPE.BAR_CLUSTERED, labels=False)
+
+    paged_table(deck, f"CRM Data Quality & Rejection Trend — W{iso_wk}",
+                "Engagements without a recorded response, and reasons for no interest over the last 4 weeks",
+                ["Account Manager", "Engagements", "No response", "% empty"],
+                dr, [2.4, 1.1, 1.1, 0.9], highlight_col=3, w=half, y=y, label="Response not filled in (last week)",
+                first_extra=reason_chart, empty_row=["All filled in ✓", "", "", ""])
+
+
+def channel_slides(deck, crm, crm_lw, weeks, iso_wk, lw_a, lw_b):
+    """Engagement type (channel) + lead source breakdown."""
+    W = deck.W
+    gap = int(0.14 * IN)
+    half = (W - 2 * MX - gap) // 2
+    y = TOP + int(0.68 * IN)
+    order = ["Phone Call", "WhatsApp / Text", "Onsite", "Social Media", "Conference Call", "(Not filled)"]
+    colors = [GREEN, YELLOW, ORANGE, RGBColor(0x4C, 0xAF, 0x50), RGBColor(0x8D, 0x6E, 0x63), GREY]
+    c6 = in_range(crm, weeks[0][0], weeks[-1][1]).copy()
+    c6["ch"] = c6["Engagement Type"].fillna("(Not filled)").str.strip()
+    extra = [t for t in c6["ch"].unique() if t not in order]
+    chans = [t for t in order if t in set(c6["ch"])] + sorted(extra)
+    cmap = {t: colors[order.index(t)] if t in order else MUTED for t in chans}
+
+    # ---- slide A: trend + channel effectiveness + lead source
+    s = deck.new()
+    header(deck, s, f"CRM Engagement Channels — W{iso_wk}",
+           "Where engagements happen (Engagement Type) and where leads come from (Sumber Lead)")
+    cats, series = [], {t: [] for t in chans}
+    for a, b in weeks:
+        cats.append(f"W{a.isocalendar()[1]}")
+        vc = in_range(c6, a, b)["ch"].value_counts()
+        for t in chans:
+            series[t].append(int(vc.get(t, 0)))
+    ch = bar_chart(s, MX, y, half, int(3.45 * IN), cats, [(t, series[t]) for t in chans], [cmap[t] for t in chans],
+                   title="Engagements by channel — last 6 weeks", kind=XL_CHART_TYPE.COLUMN_STACKED, labels=False)
+
+    lw = crm_lw.copy()
+    lw["ch"] = lw["Engagement Type"].fillna("(Not filled)").str.strip()
+    g = lw.groupby("ch").agg(n=("ch", "size"), resp=("responded", "sum"), reached=("reached", "sum"),
+                             hot=("hot", "sum"), leads=("lead_key", "nunique"))
+    g = g.reindex([t for t in chans if t in g.index])
+    tot = g["n"].sum() or 1
+    rows = [[t, fmt_int(r["n"]), f"{r['n']/tot*100:.0f}%", fmt_int(r["leads"]),
+             fmt_pct(r["reached"] / r["resp"]) if r["resp"] else "–", fmt_int(r["hot"])] for t, r in g.iterrows()]
+    rows.append([("Total", INK), fmt_int(g["n"].sum()), "100%", fmt_int(lw["lead_key"].nunique()),
+                 fmt_pct(g["reached"].sum() / g["resp"].sum()) if g["resp"].sum() else "–", fmt_int(g["hot"].sum())])
+    x2 = MX + half + gap
+    text(s, x2, y, half, int(0.22 * IN), f"Channel results — W{iso_wk}", size=10, bold=True, color=GREEN)
+    table(s, x2, y + int(0.26 * IN), half, ["Channel", "Engagements", "Share", "Leads", "Reach", "Hot"],
+          rows, [1.7, 1.25, 0.7, 0.75, 0.75, 0.55], row_h=int(0.2 * IN))
+    src = lw["Sumber Lead"].fillna("(Not filled)").str.strip().value_counts()
+    ys = y + int(0.26 * IN) + int(0.2 * IN) * (len(rows) + 1) + int(0.15 * IN)
+    text(s, x2, ys, half, int(0.22 * IN), f"Lead source — W{iso_wk}", size=10, bold=True, color=GREEN)
+    text(s, x2, ys + int(0.25 * IN), half, int(1.2 * IN),
+         [[(f"{k}: ", {"bold": True}), (f"{fmt_int(v)} ({v/tot*100:.0f}%)", {})] for k, v in src.items()],
+         size=8)
+
+    # ---- slide B: per AM x channel (all AMs)
+    pv = lw.pivot_table(index="am", columns="ch", values="Engagement ID", aggfunc="count", fill_value=0)
+    pv = pv.reindex(columns=[t for t in chans if t in pv.columns], fill_value=0)
+    pv["Total"] = pv.sum(axis=1)
+    pv = pv.sort_values("Total", ascending=False)
+    cols = list(pv.columns)
+    rows = [[am] + [fmt_int(r[c]) if r[c] else "–" for c in cols] for am, r in pv.iterrows()]
+    total = [[("Total", INK)] + [fmt_int(pv[c].sum()) for c in cols]]
+    short = {"WhatsApp / Text": "WhatsApp", "Conference Call": "Conf. call", "(Not filled)": "Not filled"}
+    paged_table(deck, f"Engagement Channels per Account Manager — W{iso_wk}",
+                f"{d_id(lw_a)} – {d_id(lw_b)}  •  number of engagements by Engagement Type",
+                ["Account Manager"] + [short.get(c, c) for c in cols], rows,
+                [2.6] + [1] * (len(cols) - 1) + [0.9], footer_rows=total, highlight_col=len(cols),
+                empty_row=["(no engagements)"] + [""] * len(cols))
 
 
 # ================================================================ slides
@@ -731,11 +862,8 @@ def build(data_dir: Path, template: Path, out: Path, today: dt.date):
               [GREEN, YELLOW, ORANGE], title="CRM Activity vs Invoices")
 
     # ---------------------------------------------------------- 4. leaderboard AM mingguan
-    s = deck.new()
-    header(deck, s, f"Account Manager Performance — W{iso_wk}",
-           f"{d_id(lw_a)} – {d_id(lw_b)}  •  sorted by GMV  •  Δ GMV vs prior week")
     rows = []
-    for am, r in t_lw.head(14).iterrows():
+    for am, r in t_lw.iterrows():
         d = "–"
         dc = MUTED
         if r.get("gmv_prev", 0) > 0 or r["gmv"] > 0:
@@ -745,11 +873,14 @@ def build(data_dir: Path, template: Path, out: Path, today: dt.date):
         rows.append([am, fmt_int(r["engagements"]), fmt_int(r["leads"]), fmt_pct(r["reach"]),
                      fmt_int(r["hot"]), fmt_int(r["invoices"]), fmt_int(r["customers"]),
                      fmt_idr(r["gmv"]), (d, dc)])
-    if len(t_lw) > 14:
-        rows.append([f"+{len(t_lw)-14} other AMs", "", "", "", "", "", "", "", ""])
-    table(s, MX, TOP + int(0.72 * IN), W - 2 * MX,
-          ["Account Manager", "Engagements", "Unique leads", "Reach", "Hot", "Invoices", "Customers", "GMV", "Δ GMV"],
-          rows, [2.4, 1.2, 1.1, 0.8, 0.6, 0.8, 0.95, 1.3, 1.4], highlight_col=7)
+    paged_table(deck, f"Account Manager Performance — W{iso_wk}",
+                f"{d_id(lw_a)} – {d_id(lw_b)}  •  sorted by GMV  •  Δ GMV vs prior week",
+                ["Account Manager", "Engagements", "Unique leads", "Reach", "Hot", "Invoices", "Customers", "GMV", "Δ GMV"],
+                rows, [2.4, 1.2, 1.1, 0.8, 0.6, 0.8, 0.95, 1.3, 1.4], highlight_col=7,
+                empty_row=["(no activity)", "", "", "", "", "", "", "", ""])
+
+    # ---------------------------------------------------------- 4a. engagement channels
+    channel_slides(deck, crm, crm_lw, weeks, iso_wk, lw_a, lw_b)
 
     # ---------------------------------------------------------- 4b. insights (rule-based)
     ins = compute_insights(crm, sales, weeks, cutoff)
@@ -779,9 +910,6 @@ def build(data_dir: Path, template: Path, out: Path, today: dt.date):
         ytype = ch_y + int(0.3 * IN) + int(0.25 * IN) * (len(rr) + 1) + int(0.2 * IN)
     else:
         ytype = ch_y
-    et = crm_lw["Engagement Type"].fillna("(Empty)").value_counts()
-    text(s, MX + cw_ + gap, ytype, cw_, int(0.6 * IN),
-         [[("Channels: ", {"bold": True})] + [(f"{k} {fmt_int(v)}  ", {}) for k, v in et.items()]], size=8, color=MUTED)
 
     # ---------------------------------------------------------- 6. tren bulanan
     # Bulan berjalan baru diikutkan (sebagai MTD) jika sudah >= 7 hari terlewati
@@ -810,49 +938,49 @@ def build(data_dir: Path, template: Path, out: Path, today: dt.date):
 
     # ---------------------------------------------------------- 7. GMV per AM per bulan
     last3 = list(months[-3:])
-    s = deck.new()
-    header(deck, s, "GMV per Account Manager — Monthly",
-           f"Last 3 months + YTD  {('•  ' + partial_note) if partial_note else ''}")
     piv = sal_ytd.pivot_table(index="am", columns="m", values="gmv", aggfunc="sum", fill_value=0)
     piv = piv.reindex(columns=months, fill_value=0)
     piv["YTD"] = piv.sum(axis=1)
     inv_ytd = sal_ytd.groupby("am")["main_invoice_no"].nunique()
     cus_ytd = sal_ytd.groupby("am")["customer_id"].nunique()
     piv = piv.sort_values("YTD", ascending=False)
+    ytd_tot = piv["YTD"].sum() or 1
     rows = []
-    for am, r in piv.head(14).iterrows():
+    for am, r in piv.iterrows():
         rows.append([am] + [fmt_idr(r[m]) if r[m] else "–" for m in last3] +
                     [fmt_idr(r["YTD"]), fmt_int(inv_ytd.get(am, 0)), fmt_int(cus_ytd.get(am, 0)),
-                     f"{r['YTD']/piv['YTD'].sum()*100:.0f}%"])
-    rows.append([("Total", INK)] + [fmt_idr(piv[m].sum()) for m in last3] +
-                [fmt_idr(piv["YTD"].sum()), fmt_int(sal_ytd["main_invoice_no"].nunique()),
-                 fmt_int(sal_ytd["customer_id"].nunique()), "100%"])
+                     f"{r['YTD']/ytd_tot*100:.0f}%"])
+    total = [[("Total", INK)] + [fmt_idr(piv[m].sum()) for m in last3] +
+             [fmt_idr(piv["YTD"].sum()), fmt_int(sal_ytd["main_invoice_no"].nunique()),
+              fmt_int(sal_ytd["customer_id"].nunique()), "100%"]]
     lab3 = [mlabel[list(months).index(m)] for m in last3]
-    table(s, MX, TOP + int(0.72 * IN), W - 2 * MX,
-          ["Account Manager"] + lab3 + ["GMV YTD", "Invoices YTD", "Customers YTD", "Share"],
-          rows, [2.5] + [1.15] * len(last3) + [1.25, 1.1, 1.3, 0.8], highlight_col=len(last3) + 1)
+    paged_table(deck, "GMV per Account Manager — Monthly",
+                f"Last 3 months + YTD  {('•  ' + partial_note) if partial_note else ''}",
+                ["Account Manager"] + lab3 + ["GMV YTD", "Invoices YTD", "Customers YTD", "Share"],
+                rows, [2.5] + [1.15] * len(last3) + [1.25, 1.1, 1.3, 0.8], footer_rows=total,
+                highlight_col=len(last3) + 1)
 
     # ---------------------------------------------------------- 8. aktivitas CRM per AM per bulan
-    s = deck.new()
-    header(deck, s, "CRM Activity per Account Manager — Monthly",
-           f"Engagements per month (last 3 months) + reach rate & hot prospects for the latest month  {('•  ' + partial_note) if partial_note else ''}")
     pe = crm_ytd.pivot_table(index="am", columns="m", values="Engagement ID", aggfunc="count", fill_value=0)
     pe = pe.reindex(columns=months, fill_value=0)
     pe["YTD"] = pe.sum(axis=1)
     lm = crm_ytd[crm_ytd["m"] == last3[-1]]
-    lm_reach = lm.groupby("am").apply(lambda d: d["reached"].sum() / d["responded"].sum() if d["responded"].sum() else float("nan"))
+    lm_resp = lm.groupby("am")["responded"].sum()
+    lm_reach = lm.groupby("am")["reached"].sum() / lm_resp.where(lm_resp > 0)
     lm_hot = lm.groupby("am")["hot"].sum()
     lm_new = lm.groupby("am")["new_lead"].sum()
     pe = pe.sort_values([last3[-1], "YTD"], ascending=False)
     pe = pe[pe[last3].sum(axis=1) > 0]
     rows = []
-    for am, r in pe.head(14).iterrows():
+    for am, r in pe.iterrows():
         rows.append([am] + [fmt_int(r[m]) for m in last3] +
                     [fmt_pct(lm_reach.get(am, float("nan"))), fmt_int(lm_hot.get(am, 0)), fmt_int(lm_new.get(am, 0)),
                      fmt_int(r["YTD"])])
-    table(s, MX, TOP + int(0.72 * IN), W - 2 * MX,
-          ["Account Manager"] + lab3 + [f"Reach {lab3[-1]}", f"Hot {lab3[-1]}", f"New leads {lab3[-1]}", "Engagements YTD"],
-          rows, [2.6] + [1] * len(last3) + [1.1, 1, 1.2, 1.3], highlight_col=len(last3))
+    paged_table(deck, "CRM Activity per Account Manager — Monthly",
+                f"Engagements per month (last 3 months) + reach rate & hot prospects for the latest month  "
+                f"{('•  ' + partial_note) if partial_note else ''}",
+                ["Account Manager"] + lab3 + [f"Reach {lab3[-1]}", f"Hot {lab3[-1]}", f"New leads {lab3[-1]}", "Engagements YTD"],
+                rows, [2.6] + [1] * len(last3) + [1.1, 1, 1.2, 1.3], highlight_col=len(last3))
 
     # ---------------------------------------------------------- 9. produk teratas
     s = deck.new()
