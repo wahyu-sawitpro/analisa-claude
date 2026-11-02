@@ -730,16 +730,32 @@ function teamSpecs(A,N,pre){
       rows:[{cards:[
         {w:1,title:"Sales by customer location",sub:"Regency or city; customers in grey",chart:{type:"hbar",items:R.slice(0,6).map(x=>({k:x.k,v:x.g,r:pl(new Set(x.os.map(o=>o.ph||o.nk||o.no)).size,"cust.")})),fmt:rpM}},
         {w:1.3,title:"Who the buyers are",sub:"Share of the week's sales, %",chart:{type:"stack100",rows}}]}],notes});
-    const ord=O.slice(0,8);
-    S.push({kicker:pre+"Success story · the orders",title:`${nw?`${pl(nw.os.length,"new customer")} and ${pl(O.length-nw.os.length,"repeat order")}`:pl(O.length,"order")}; the largest is ${rp(top.gmv)} (${catOf(top)}, ${regionOf(top)})`,
-      rows:[{cards:[{title:O.length>8?`Top 8 of ${O.length} orders by sales`:"Every order this week",sub:O.some(o=>o.lines.some(l=>/^P[0-9a-f]{8}$/.test(l.phone||"")))?"Sample data: customer names and phones are anonymised; upload the sales export to see them. PIC is the seller on the order":"Customer name and phone from the sales export (CRM if missing); PIC is the seller on the order",
-        table:(()=>{ const ut=O.some(o=>typeOf(o)!=="Not recorded");
-          const anon=v=>/^P[0-9a-f]{8}$/.test(v||"")||/^Customer [0-9A-F]{5}$/.test(v||""), shown=v=>!v?"–":anon(v)?"Hidden (sample)":v;
-          const who=o=>{ const l=o.lines.find(x=>x.name||x.phone)||{}, c=crmOf(o)||{}; return [shown(l.name||c.name),...(hid?[]:[shown(l.phone||c.phone)])]; };
-          const hid=O.some(o=>o.lines.some(l=>anon(l.phone)||anon(l.name))), picOf=o=>o.lines.find(l=>l.pic)?.pic||"–";
-          return {colW:[9,13,...(hid?[]:[10]),11,10,10,19,8,7,...(ut?[9]:[]),11],head:["Order","Customer name",...(hid?[]:["Phone"]),"PIC","Location","Category","Products (qty)","Sales","Status",...(ut?["User type"]:[]),"CRM engagement"],align:["l","l",...(hid?[]:["l"]),"l","l","l","l","r","l","l","l"],
-          rows:ord.map(o=>{ const c=crmOf(o); return [o.no,...who(o),picOf(o),regionOf(o),catOf(o),qtyTxt(o),rp(o.gmv),custOf(o),...(ut?[typeOf(o)]:[]),c?[c.channel,c.source].filter(Boolean).join(" · ")||"Logged":"–"]; })}; })()}]}],
-      notes:[`<b>PIC:</b> ${esc(A.byPic.slice(0,4).map(x=>`${x.p} ${rp(x.g)} (${pl(x.n,"order")})`).join(", "))}.`,
+    // Which orders make the story: every order of Rp50M+ (else the top 3), customers with more than one invoice this
+    // week, and CRM successes that came from an interesting source (ads, social media, referral...) rather than Toling.
+    const ckey=o=>o.ph||o.nk||null, BIG=50e6, big=O.filter(o=>o.gmv>=BIG), main=(big.length?big:O.slice(0,3)).slice(0,6);
+    const multi=(()=>{ const m=new Map(); O.forEach(o=>{ const k=ckey(o); if(k) (m.get(k)||m.set(k,[]).get(k)).push(o); }); return [...m.values()].filter(os=>os.length>=2).sort((a,b)=>sumG(b)-sumG(a)); })();
+    const OUTL=/ads|iklan|tiktok|instagram|facebook|\bfb\b|social|sosmed|referral|referensi|rekomendasi|webinar|event|\blive\b|komunitas|group/i, srcTxt=r=>[r.source,r.channel,r.detail].filter(Boolean).join(" ");
+    const hi=ST.filter(x=>x.state==="matched"&&x.orders.length&&OUTL.test(srcTxt(x.r))).sort((a,b)=>b.sales-a.sales);
+    const srcLabel=r=>{ const t=srcTxt(r); const m=t.match(/tiktok|instagram|facebook|ads|iklan|social media|sosmed|referral|referensi|rekomendasi|webinar|event|live|komunitas/i); return m?({iklan:"Ads",sosmed:"Social media",referensi:"Referral",rekomendasi:"Referral"}[m[0].toLowerCase()]||m[0].replace(/^./,c=>c.toUpperCase())):(r.source||r.channel); };
+    const story=new Map(), add=(key,os,why,crm)=>{ const x=story.get(key); if(x){ if(!x.why.includes(why)) x.why.push(why); if(crm&&!x.crm) x.crm=crm; return; } story.set(key,{os,why:[why],crm}); };
+    main.forEach(o=>add(ckey(o)&&multi.some(os=>ckey(os[0])===ckey(o))?"c:"+ckey(o):"o:"+o.no,multi.find(os=>ckey(os[0])===ckey(o))||[o],o.gmv>=BIG?"Rp50M+ order":"Top 3 order"));
+    multi.forEach(os=>add("c:"+ckey(os[0]),os,`${os.length} invoices this week`));
+    hi.forEach(x=>{ const o=x.orders[0], k=ckey(o)&&multi.some(os=>ckey(os[0])===ckey(o))?"c:"+ckey(o):"o:"+o.no; add(k,story.get(k)?.os||x.orders,`CRM: from ${srcLabel(x.r)}`,x.r); });
+    const SR=[...story.values()].slice(0,9), bigG=sumG(big);
+    const title=[big.length?`${pl(big.length,"order")} of Rp50M+ (${rp(bigG)}, ${share(bigG)}% of sales)`:`No order reached Rp50M; the top 3 bring ${rp(sumG(main))} (${share(sumG(main))}%)`,
+      multi.length&&`${pl(multi.length,"customer")} bought more than once (${rp(multi.reduce((s,os)=>s+sumG(os),0))})`,
+      hi.length&&`${hi.length} CRM ${hi.length===1?"win":"wins"} from ${andList([...new Set(hi.map(x=>srcLabel(x.r)))])}`].filter(Boolean).join("; ");
+    S.push({kicker:pre+"Success story · the orders",title,
+      rows:[{cards:[{title:"The stories behind this week's sales",sub:"Rp50M+ orders (else the top 3), repeat buyers, CRM wins from ads, social media or referrals"+(O.some(o=>o.lines.some(l=>/^P[0-9a-f]{8}$/.test(l.phone||"")))?". Sample: names hidden":""),
+        table:(()=>{ const anon=v=>/^P[0-9a-f]{8}$/.test(v||"")||/^Customer [0-9A-F]{5}$/.test(v||""), shown=v=>!v?"–":anon(v)?"Hidden (sample)":v;
+          const hid=O.some(o=>o.lines.some(l=>anon(l.phone)||anon(l.name))), picOf=os=>[...new Set(os.flatMap(o=>o.lines.map(l=>l.pic)).filter(Boolean))].join(", ")||"–";
+          const who=(os,c)=>{ const l=os.flatMap(o=>o.lines).find(x=>x.name||x.phone)||{}; c=c||crmOf(os[0])||{}; return [shown(l.name||c.name),...(hid?[]:[shown(l.phone||c.phone)])]; };
+          return {colW:[13,11,12,...(hid?[]:[9]),10,9,9,16,8,6,11],head:["Why it's a story","Order(s)","Customer name",...(hid?[]:["Phone"]),"PIC","Location","Category","Products (qty)","Sales","Status","CRM / source"],
+            align:["l","l","l",...(hid?[]:["l"]),"l","l","l","l","r","l","l"],
+            rows:SR.map(x=>{ const os=x.os, o=os[0], c=x.crm||crmOf(o); return [{v:x.why.join(" · "),bold:true},os.map(y=>y.no).join(", "),...who(os,c),picOf(os),regionOf(o),[...new Set(os.map(catOf))].join(", "),os.map(qtyTxt).join("; "),rp(sumG(os)),custOf(o),c?[c.id,srcLabel(c)||c.channel].filter(Boolean).join(" · "):"–"]; })}; })()}]}],
+      notes:[hi.length&&`<b>CRM wins worth telling:</b> ${esc(hi.slice(0,3).map(x=>`${x.r.id} (${x.r.pic||"–"}) from ${srcLabel(x.r)}${x.r.channel?` via ${lc(x.r.channel)}`:""}, ${rp(x.sales)}`).join("; "))}.`,
+        multi.length&&`<b>Repeat buyers this week:</b> ${esc(multi.slice(0,3).map(os=>`${os.length} invoices, ${rp(sumG(os))} (${regionOf(os[0])})`).join("; "))}.`,
+        `<b>PIC:</b> ${esc(A.byPic.slice(0,4).map(x=>`${x.p} ${rp(x.g)} (${pl(x.n,"order")})`).join(", "))}.`,
         A.partial.length&&`<b>${rp(A.outstanding||A.partial.reduce((s,o)=>s+o.gmv,0))} still to collect</b> on ${pl(A.partial.length,"partly paid order")}; ${A.openOrders.length} of ${O.length} orders are still open.`].filter(Boolean)});
   }
 
@@ -825,13 +841,20 @@ function teamSpecs(A,N,pre){
     const PT=A.tiers;
     if(PT&&(PT.rows.length>=2||PT.gmv>=A.gmv*.5)){
       const R=PT.rows, top=R.slice().sort((a,b)=>b.gmv-a.gmv)[0], C=PT.cmp, cp=k=>C&&C.prices.find(p=>p.k===k), rt=R.find(r=>r.k==="Retail");
-      S.push({kicker:pre+`${N.sk} · price tiers`,title:`${top.k} brings ${pct(top.gmv,A.gmv)}% of sales${R.length>1?`; ${R.length} price tiers, from ${R[0].k} (cheapest) to ${R[R.length-1].k}`:""}`,
+      // last week vs the week before, per tier (all four tiers, so a tier that dropped to zero still shows)
+      const W=A.wow, TN=["Khusus Petani","Toling","Grosir","Retail"], pv=k=>W?W.p.tier.get(k)||0:0, cv=k=>W?W.c.tier.get(k)||0:(R.find(r=>r.k===k)||{}).gmv||0;
+      const TT=TN.filter(k=>cv(k)||pv(k)), lead=k=>TT.slice().sort((a,b)=>k(b)-k(a))[0], cL=lead(cv), pL=W?lead(pv):null;
+      const shift=W&&cL&&pL&&cL!==pL?`${cL} outsold ${pL} last week (${rp(cv(cL))} vs ${rp(cv(pL))}); the week before ${pL} led (${rp(pv(pL))} vs ${rp(pv(cL))})`
+        :W&&cL?`${cL} led both weeks (${rp(pv(cL))} → ${rp(cv(cL))})${TT.length>1?`; ${TT.filter(k=>k!==cL).map(k=>`${k} ${rp(pv(k))} → ${rp(cv(k))}`).join(", ")}`:""}`:null;
+      N.tierShift=shift;
+      if(shift&&Array.isArray(N.wowNotes)&&!N.wowNotes.some(x=>/Price tiers:/.test(x))) N.wowNotes.push(`<b>Price tiers:</b> ${shift}.`);
+      S.push({kicker:pre+`${N.sk} · price tiers`,title:shift||`${top.k} brings ${pct(top.gmv,A.gmv)}% of sales${R.length>1?`; ${R.length} price tiers, from ${R[0].k} (cheapest) to ${R[R.length-1].k}`:""}`,
         rows:[{cards:[
-          {w:.9,title:"Sales by price tier",sub:"Cheapest at the top; orders and customers in grey",chart:{type:"hbar",items:R.map(r=>({k:`${r.rank+1}. ${r.k}`,v:r.gmv,r:`${pl(r.orders,"order")} · ${r.cust} cust.`})),fmt:rpM}},
-          {w:1.25,title:"The tiers",sub:C?`Average price per unit of ${C.item}, before shipping, as sold this week`:"As sold this week",
-            table:{colW:[13,30,9,9,12,14],head:["Tier","What it is","Orders","Cust.","Sales",C?"Avg price":"Share"],align:["l","l","r","r","r","r"],
-              rows:R.map(r=>[{v:r.k,bold:true},r.desc,String(r.orders),String(r.cust),rp(r.gmv),C?(cp(r.k)?rp(cp(r.k).avg):"–"):`${pct(r.gmv,A.gmv)}%`])}}]}],
-        notes:[`<b>Tier order, cheapest to most expensive:</b> Khusus Petani (farmer price, close to the subsidised price), Toling (mobile shop: sells at set stops, so the customer pays no shipping), Grosir (wholesale) and Retail.${PT.gmv<A.gmv*.98?` ${pct(A.gmv-PT.gmv,A.gmv)}% of sales is outside these tiers (seeds, crop protection, services).`:""}`,
+          {w:.9,title:"Sales by price tier",sub:`Cheapest at the top; ${W?"change vs the week before":"orders and customers"} in grey`,chart:{type:"hbar",items:TT.map(k=>{ const r=R.find(x=>x.k===k); return {k:`${TN.indexOf(k)+1}. ${k}`,v:cv(k),r:W?`${cv(k)>=pv(k)?"+":"−"}${rp(Math.abs(cv(k)-pv(k)))} (was ${rp(pv(k))})`:`${pl(r?r.orders:0,"order")} · ${r?r.cust:0} cust.`}; }),fmt:rpM}},
+          {w:1.25,title:"The tiers, cheapest to most expensive",sub:C?`Avg price = average price per unit of ${C.item}, before shipping, this week`:"Last week",
+            table:{colW:[13,27,8,8,12,...(W?[12]:[]),...(C?[12]:[])],head:["Tier","What it is","Orders","Cust.","Sales",...(W?["Week before"]:[]),...(C?["Avg price"]:[])],align:["l","l","r","r","r","r","r"],
+              rows:TT.map(k=>{ const r=R.find(x=>x.k===k)||{orders:0,cust:0,desc:PRICE_TIERS.find(t=>t[0]===k)[2]}; return [{v:k,bold:true},r.desc,String(r.orders),String(r.cust),rp(cv(k)),...(W?[rp(pv(k))]:[]),...(C?[cp(k)?rp(cp(k).avg):"–"]:[])]; })}}]}],
+        notes:[W&&TT.length>1&&`<b>Tier mix:</b> ${TT.map(k=>`${k} ${pct(pv(k),W.p.gmv)}% → ${pct(cv(k),W.c.gmv)}%`).join(", ")} of sales (week before → last week).`,`<b>Tier order, cheapest to most expensive:</b> Khusus Petani (farmer price, close to the subsidised price), Toling (mobile shop: sells at set stops, so the customer pays no shipping), Grosir (wholesale) and Retail.${PT.gmv<A.gmv*.98?` ${pct(A.gmv-PT.gmv,A.gmv)}% of sales is outside these tiers (seeds, crop protection, services).`:""}`,
           C&&C.inverted.length&&`<b>Price check:</b> ${esc(C.item)} sold for more in ${andList(C.inverted.map(x=>x[0]))} than in ${andList(C.inverted.map(x=>x[1]))} (${C.prices.map(p=>`${p.k} ${rp(p.avg)}`).join(", ")}), against the tier order. Check the price list or the category on those orders.`,
           C&&!C.inverted.length&&`<b>Same product across tiers (${esc(C.item)}):</b> ${C.prices.map(p=>`${p.k} ${rp(p.avg)}`).join(" → ")}.`,
           rt&&rt.farmersRetail&&`<b>${pl(rt.farmersRetail,"farmer")} bought at the Retail price.</b> Khusus Petani is cheaper for them; help them qualify (farm location, KTP) or point them to the next Toling stop.`].filter(Boolean)});

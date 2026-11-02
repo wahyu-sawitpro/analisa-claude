@@ -22,6 +22,11 @@ added to this deck, not built as separate decks.
 - **SawitPRO price tiers, cheapest to most expensive:** Khusus Petani (farmer price, close to the subsidised price),
   Toling (toko keliling: sells at set stops, so the customer pays no shipping), Grosir (wholesale), Retail (product_cat
   "Pupuk"). Use this order on the "price tiers" slide and in every price-related finding or action.
+- **Price tiers are also a sales lens:** compare each tier last week vs the week before and say which tier led and
+  which overtook which (e.g. "Toling outsold Grosir last week; the week before Grosir led").
+- **Success story · the orders** shows: every order of Rp50M+ (if none, the top 3 orders), customers with more than one
+  invoice in the week, and CRM wins whose source or discussion notes point to something other than Toling/canvassing
+  (ads, social media, TikTok, referral, events) as outliers worth telling.
 - Match the review to the data the user uploaded: a weekly export is a weekly review; a multi-month export is a
   trend or decline review. Say when a file's dates don't match what its name suggests.
 - Deck text is in English; chat replies follow the user's language (usually Indonesian).

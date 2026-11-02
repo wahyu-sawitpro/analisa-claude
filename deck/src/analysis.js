@@ -388,7 +388,7 @@ function analyse(sources,opt={}){
     const delta=(mc,mp)=>[...new Set([...mc.keys(),...mp.keys()])].map(k=>({k,cur:mc.get(k)||0,prev:mp.get(k)||0})).map(x=>({...x,d:x.cur-x.prev})).filter(x=>x.d).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
     const ret=[...c.cust.keys()].filter(k=>p.cust.has(k)), gain=[...c.cust.keys()].filter(k=>!p.cust.has(k)), lost=[...p.cust.keys()].filter(k=>!c.cust.has(k)), sum=(m,ks)=>ks.reduce((s,k)=>s+m.get(k),0);
     A.wow={c,p,dG:c.gmv-p.gmv,pct:p.gmv?(c.gmv-p.gmv)/p.gmv:null,volume:(c.orders-p.orders)*p.aov,value:(c.aov-p.aov)*c.orders,
-      family:delta(c.family,p.family),region:delta(c.region,p.region),pic:delta(c.pic,p.pic),app:delta(c.app,p.app),cat:delta(c.cat,p.cat),
+      family:delta(c.family,p.family),tier:delta(c.tier,p.tier),region:delta(c.region,p.region),pic:delta(c.pic,p.pic),app:delta(c.app,p.app),cat:delta(c.cat,p.cat),
       retained:{n:ret.length,cur:sum(c.cust,ret),prev:sum(p.cust,ret),down:ret.filter(k=>c.cust.get(k)<p.cust.get(k)).length,up:ret.filter(k=>c.cust.get(k)>p.cust.get(k)).length},gained:{n:gain.length,gmv:sum(c.cust,gain)},lost:{n:lost.length,gmv:sum(p.cust,lost),top:lost.map(k=>p.cust.get(k)).sort((a,b)=>b-a)[0]||0},
       exTop:{cur:c.gmv-c.top,prev:p.gmv-p.top},start:A.weekStart,prevStart:A.prevStart}; }
 
@@ -565,7 +565,7 @@ function weekSummary(L){
   const by=f=>{ const m=new Map(); L.forEach(l=>{ const k=f(l); if(k) m.set(k,(m.get(k)||0)+(l.gmv||0)); }); return m; };
   return {orders:O.length,gmv,aov:O.length?gmv/O.length:0,customers:cust.size,cust,top:Math.max(0,...O.map(o=>o.gmv)),
     newOrders:O.filter(o=>o.lines.some(l=>/new/i.test(l.custStatus||""))).length,
-    family:by(l=>l.family),region:by(l=>l.region),pic:by(l=>l.pic),app:by(l=>l.app),cat:by(l=>l.category||(L.some(x=>x.category)?"(no category)":null)),
+    family:by(l=>l.family),tier:by(l=>priceTierOf(l.category)),region:by(l=>l.region),pic:by(l=>l.pic),app:by(l=>l.app),cat:by(l=>l.category||(L.some(x=>x.category)?"(no category)":null)),
     days:by(l=>l.date?String((l.date.getDay()+6)%7):null)};
 }
 
