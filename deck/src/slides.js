@@ -921,7 +921,10 @@ function teamSpecs(A,N,pre){
       {cards:[{title:"Leads still in play",sub:`${A.warm.length>rows.length?`${rows.length} of ${A.warm.length} shown. `:""}Names and phone numbers are left out; look leads up by ID in the CRM`,
         table:{head:["ID","PIC","Channel","Status","What they asked or said"],rows:rows.map(r=>[r.id||"–",r.pic||"–",r.channel||"–",{v:r.status,pill:true},r.signals.map(s=>SL[s]).join("; ")||r.reason||"–"])}}]}]});
   }
-  return S;
+  // Fixed order in every team section (the user's request): sales vs the week before and the other sales slides,
+  // then the success stories, then the rejection reasons, then everything else. The sort is stable.
+  const rank=k=>{ k=k.slice(pre.length); return /^Sales last week · vs/.test(k)?0:/^Sales /.test(k)?1:/^Success story/.test(k)?2:/^Rejection reasons|^Customer service/.test(k)?3:4; };
+  return S.map((s,i)=>[rank(s.kicker||""),i,s]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).map(x=>x[2]);
 }
 function teamSlides(A,N,pre,S,next){ teamSpecs(A,N,pre).forEach(sp=>S.push(panelSlide(next(),sp))); }
 

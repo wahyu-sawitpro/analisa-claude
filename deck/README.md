@@ -171,6 +171,9 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
+- **Slide order in each team section is fixed:** sales vs the week before (then the other sales slides), success
+  stories, rejection reasons (incl. customers chasing orders), then the rest (winners, team performance, recoverable
+  demand). `teamSpecs` in `src/slides.js` sorts by kicker; new slides fall into place by their kicker prefix.
 - `tools/make_sample.js`: rebuilds `src/sample-data.json` from CSV exports with the deck's own column detection,
   anonymising names and phones (`node deck/tools/make_sample.js file1.csv file2.csv ...`). `--real --out <file>` keeps
   them for the private published deck (`SAMPLE=<file> python3 deck/build.py`); that file is never committed.
