@@ -114,6 +114,17 @@ Duta 4 (−4) from 3 internal-team Dutas (Rudi 2, Satria K 1, Sazali Wandana 1);
 are internal team. Organic −95 explains 92%
 of the drop ("organic" campaign 111 → 47); GADN +10 and App-Register-Campaign-DG +36 grew. 28% of farmers have no phone.
 
+## Weekly registration refresh (every Tuesday, 10:00 WIB)
+A scheduled routine refreshes the farmer-registration review from `Farmer register for weekly farmer.csv` on `main`:
+1. `python3 deck/tools/weekly_registrations.py <scratch dir>`: checks the file covers last week (Monday-Sunday before
+   today, WIB). Exit 3 = not yet (stale file, nothing rebuilt), exit 2 = file missing (the `clean-old-csv` workflow on
+   `main` deletes CSVs older than 7 days, so upload the new export before Tuesday). Exit 0 = it writes the hashed sample
+   and rebuilds `deck/index.html` (committed), builds `<scratch dir>/index.html` from the real rows (published privately,
+   never committed) and prints the reference numbers the deck must match.
+2. `node deck/tools/export_pptx.js <scratch dir>/index.html <out.pptx>` (with `PW` and `LIBS` set) renders the deck,
+   fails on page errors and saves the PPTX.
+3. The private build is published to the SawitPRO Deck artifact and the PPTX is sent to the user with a short summary.
+
 ## Stock forecast (sales history + price list)
 Upload a sales history (e.g. `history sales Jan - Oct 2026 per 14 Oct.csv`) together with a price list (e.g.
 `Price per 14 Oct 2026.csv`, detected as **Price list**; a title row above the headers is skipped). A **Monthly target
