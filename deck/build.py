@@ -14,6 +14,7 @@ sample = json.loads(pathlib.Path(os.environ.get("SAMPLE") or root / "src/sample-
 html = html.replace("/*SAMPLE_DATA*/null", json.dumps(sample, ensure_ascii=False))
 # DECK_MODE=registrations builds the published Farmer Registrations deck (registration export only, nothing kept in the browser)
 html = html.replace('/*DECK_MODE*/"all"', json.dumps(os.environ.get("DECK_MODE") or "all"))
+if os.environ.get("DECK_MODE") == "registrations": html = html.replace("<title>SawitPRO Deck</title>", "<title>SawitPRO Farmer Acquisition Deck</title>", 1)
 # TITLE=<name> renames the page (the sales deck and the registration deck are published as separate artifacts)
 if os.environ.get("TITLE"): html = html.replace("<title>SawitPRO Deck</title>", f"<title>{os.environ['TITLE']}</title>", 1)
 out = pathlib.Path(os.environ.get("OUT") or root / "index.html"); out.write_text(html)

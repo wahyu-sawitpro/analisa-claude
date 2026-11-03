@@ -123,7 +123,8 @@ A scheduled routine refreshes the farmer-registration review from `Farmer regist
    never committed) and prints the reference numbers the deck must match.
 2. `node deck/tools/export_pptx.js <scratch dir>/index.html <out.pptx>` (with `PW` and `LIBS` set) renders the deck,
    fails on page errors and saves the PPTX.
-   The private build uses `DECK_MODE=registrations`: the published SawitPRO Deck is the Farmer Registrations deck only. It
+   The private build uses `DECK_MODE=registrations`: the published artifact is named "SawitPRO Farmer Acquisition Deck"
+   (the sales review has its own artifact, "SawitPRO Sales Deck") and shows registrations only. It
    ignores files saved in the browser and turns away any upload that is not the farmer-register export.
 3. The private build is published to the SawitPRO Deck artifact and the PPTX is sent to the user with a short summary.
 

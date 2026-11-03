@@ -9,7 +9,7 @@ function analyzeNow(){
   const T=analyseTeams(on).map(t=>({...t,N:t.A.acq||t.A.dop?null:narrative(t.A),NC:t.C?narrative(t.C):null})), X=deckNarrative(T);
   state.T=T; state.X=X; state.A=T[0].A; state.N=T[0].N; renderSources();
   // the page title follows what was analysed (acquisition, stock forecast, sales review, ...)
-  document.getElementById("deckTopic").textContent=X.eyebrow||""; document.title=`${X.eyebrow?`${X.eyebrow}: ${X.title} · `:""}SawitPRO Deck`;
+  document.getElementById("deckTopic").textContent=DECK_MODE==="registrations"?"":X.eyebrow||""; document.title=`${X.eyebrow?`${X.eyebrow}: ${X.title} · `:""}${DECK_NAME}`;
   SLIDES=buildDeck(T,X);
   deckEl.innerHTML=SLIDES.map((s,i)=>`<section class="frame" aria-label="Slide ${i+1}">${s}</section>`).join("");
   const files=new Set(on.map(x=>x.name)).size;

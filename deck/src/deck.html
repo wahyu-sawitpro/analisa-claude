@@ -224,7 +224,7 @@ svg.chart{display:block;overflow:visible;font-family:inherit}svg.chart rect[data
 </style>
 
 <header class="bar">
-  <div class="brand"><img src="{{IMG:logo.png}}" alt=""><span>SawitPRO Deck<em id="deckTopic"></em></span></div>
+  <div class="brand"><img src="{{IMG:logo.png}}" alt=""><span><b id="deckName" style="font-weight:inherit">SawitPRO Deck</b><em id="deckTopic"></em></span></div>
   <div class="src"><span>Data source</span><b id="srcName">–</b></div>
   <div class="actions">
     <button class="btn primary" id="uploadBtn" type="button" title="CRM or sales exports: CSV, XLSX, XLS, ODS, TSV or JSON">
@@ -271,6 +271,7 @@ const IMG={frame:"{{IMG:frame26.jpg}}",cover26:"{{IMG:cover26.jpg}}",closing26:"
 const SAMPLE=/*SAMPLE_DATA*/null;
 // "registrations" = the published Farmer Registrations deck: only the farmer-register export, no files kept in the browser
 const DECK_MODE=/*DECK_MODE*/"all";
+const DECK_NAME=DECK_MODE==="registrations"?"SawitPRO Farmer Acquisition Deck":"SawitPRO Deck";
 /*INCLUDE:analysis.js*/
 /*INCLUDE:viz.js*/
 /*INCLUDE:slides.js*/
@@ -278,6 +279,7 @@ const DECK_MODE=/*DECK_MODE*/"all";
 /*INCLUDE:export-pptx.js*/
 
 /* ================= Boot ================= */
+document.getElementById("deckName").textContent=DECK_NAME; document.title=DECK_NAME;
 try{ localStorage.removeItem("sp-deck-data-v6"); }catch(e){}  // files saved by older versions of the page
 let saved=null; try{ if(DECK_MODE==="registrations") localStorage.removeItem("sp-deck-data-v7"); else saved=JSON.parse(localStorage.getItem("sp-deck-data-v7")||"null") }catch(e){}
 if(saved&&Array.isArray(saved.sources)&&saved.sources.some(d=>d.rows?.length)){
