@@ -269,6 +269,8 @@ svg.chart{display:block;overflow:visible;font-family:inherit}svg.chart rect[data
 <script>
 const IMG={frame:"{{IMG:frame26.jpg}}",cover26:"{{IMG:cover26.jpg}}",closing26:"{{IMG:closing26.jpg}}",divider26:"{{IMG:divider26.jpg}}",cover:"{{IMG:cover.jpg}}",closing:"{{IMG:closing.jpg}}",logo:"{{IMG:logo.png}}",wm:"{{IMG:wordmark.png}}",palm:"{{IMG:palm.png}}",divider:"{{IMG:divider.jpg}}",panel:"{{IMG:panel.jpg}}"};
 const SAMPLE=/*SAMPLE_DATA*/null;
+// "registrations" = the published Farmer Registrations deck: only the farmer-register export, no files kept in the browser
+const DECK_MODE=/*DECK_MODE*/"all";
 /*INCLUDE:analysis.js*/
 /*INCLUDE:viz.js*/
 /*INCLUDE:slides.js*/
@@ -277,7 +279,7 @@ const SAMPLE=/*SAMPLE_DATA*/null;
 
 /* ================= Boot ================= */
 try{ localStorage.removeItem("sp-deck-data-v6"); }catch(e){}  // files saved by older versions of the page
-let saved=null; try{ saved=JSON.parse(localStorage.getItem("sp-deck-data-v7")||"null") }catch(e){}
+let saved=null; try{ if(DECK_MODE==="registrations") localStorage.removeItem("sp-deck-data-v7"); else saved=JSON.parse(localStorage.getItem("sp-deck-data-v7")||"null") }catch(e){}
 if(saved&&Array.isArray(saved.sources)&&saved.sources.some(d=>d.rows?.length)){
   state.sources=saved.sources; state.sample=false;
   if(saved.dirty){ state.dirty=true; renderSources(); deckEl.innerHTML=`<div class="card"><div class="empty">Your files are loaded. Click <b>&nbsp;Analyze&nbsp;</b> to build the deck.</div></div>`; }

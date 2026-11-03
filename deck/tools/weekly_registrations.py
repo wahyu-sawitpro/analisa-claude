@@ -70,7 +70,7 @@ def main():
     (out / "real-sample.json").write_text(json.dumps(src(real), ensure_ascii=False))
     subprocess.run([sys.executable, str(ROOT / "deck/build.py")], check=True, stdout=subprocess.DEVNULL)
     subprocess.run([sys.executable, str(ROOT / "deck/build.py")], check=True, stdout=subprocess.DEVNULL,
-                   env={**os.environ, "SAMPLE": str(out / "real-sample.json"), "OUT": str(out / "index.html")})
+                   env={**os.environ, "SAMPLE": str(out / "real-sample.json"), "OUT": str(out / "index.html"), "DECK_MODE": "registrations"})
 
     # reference numbers for last week vs the week before
     def stat(mon):

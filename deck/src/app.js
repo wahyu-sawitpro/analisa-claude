@@ -52,13 +52,16 @@ async function readFile(file){
   if(wb.SheetNames.length===1) keep.forEach(d=>d.sheet=null);
   return keep;
 }
-const save=()=>{ try{ state.sample?localStorage.removeItem("sp-deck-data-v7"):localStorage.setItem("sp-deck-data-v7",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
+const save=()=>{ if(DECK_MODE==="registrations") return; try{ state.sample?localStorage.removeItem("sp-deck-data-v7"):localStorage.setItem("sp-deck-data-v7",JSON.stringify({sources:state.sources,dirty:state.dirty})); }catch(e){} };
 // Upload files / drag and drop: the new files replace what the deck showed. "+ Add files": they join the current files.
 let addMode=false;
 async function loadFiles(list,add=addMode){
   addMode=false; const files=[...list]; if(!files.length) return;
   note(""); const failed=[], added=[];
   for(const f of files){ try{ added.push(...await readFile(f)); }catch(e){ failed.push(`“${f.name}”: ${e.message}`); } }
+  // the Farmer Registrations deck only takes the farmer-register export
+  if(DECK_MODE==="registrations"){ const other=added.filter(d=>detectRole(d.headers)!=="acq"); other.forEach(d=>failed.push(`“${d.name}”: this deck only analyses the farmer register export (Farmer register for weekly farmer.csv)`));
+    for(let i=added.length-1;i>=0;i--) if(other.includes(added[i])) added.splice(i,1); }
   if(added.length){
     if(state.sample||!add){ state.sources=[]; state.sample=false; }
     for(const d of added){ const i=state.sources.findIndex(x=>x.name===d.name&&x.sheet===d.sheet); if(i>=0) state.sources[i]=d; else state.sources.push(d); }
