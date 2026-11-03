@@ -1,0 +1,106 @@
+name: Release Announcement (email)
+
+# Automatic run: when "Release Note Sprint.md" changes on main, build the announcement
+# and email a [PREVIEW] to ANNOUNCE_PREVIEW_TO.
+# Manual run (Actions tab -> Run workflow):
+#   mode=preview -> rebuild and send the preview again
+#   mode=final   -> rebuild and send to ANNOUNCE_TO (the real recipients)
+#
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   SMTP_USER            Gmail address that sends the email
+#   SMTP_PASSWORD        Gmail App Password for that address (not the normal password)
+#   ANNOUNCE_PREVIEW_TO  comma-separated preview recipients
+#   ANNOUNCE_TO          comma-separated final recipients
+#   ANTHROPIC_API_KEY    optional; without it the email uses the release-note wording as-is
+# Optional variables: ANNOUNCE_PAGE_URL_ID, ANNOUNCE_PAGE_URL_EN (links to the illustrated web pages)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Release Note Sprint.md"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "preview = kirim ke saya dulu, final = kirim ke semua penerima"
+        type: choice
+        options: [preview, final]
+        default: preview
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-announcement
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Jakarta
+      MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'preview' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install anthropic pydantic
+
+      - name: Check release note
+        run: |
+          if [ ! -f "Release Note Sprint.md" ]; then
+            echo "::error::File 'Release Note Sprint.md' tidak ditemukan di repo."
+            exit 1
+          fi
+
+      - name: Build announcement
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANNOUNCE_PAGE_URL_ID: ${{ vars.ANNOUNCE_PAGE_URL_ID }}
+          ANNOUNCE_PAGE_URL_EN: ${{ vars.ANNOUNCE_PAGE_URL_EN }}
+        run: |
+          python reporting/release_announcement.py build --notes "Release Note Sprint.md" --out output/announcement
+          cat output/announcement/quality_notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep email as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-announcement
+          path: output/announcement/
+          retention-days: 30
+
+      - name: Send preview
+        if: env.MODE == 'preview'
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: >
+          python reporting/release_announcement.py send
+          --html output/announcement/email.html
+          --subject-file output/announcement/subject.txt
+          --prefix "[PREVIEW]"
+          --to "${{ secrets.ANNOUNCE_PREVIEW_TO }}"
+
+      - name: Send final
+        if: env.MODE == 'final'
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: >
+          python reporting/release_announcement.py send
+          --html output/announcement/email.html
+          --subject-file output/announcement/subject.txt
+          --to "${{ secrets.ANNOUNCE_TO }}"
+
+      - name: Next step
+        if: env.MODE == 'preview'
+        run: |
+          {
+            echo ""
+            echo "### Langkah berikutnya"
+            echo "Cek email [PREVIEW]. Kalau sudah oke: Actions → Release Announcement (email) → Run workflow → mode **final**."
+          } >> "$GITHUB_STEP_SUMMARY"
