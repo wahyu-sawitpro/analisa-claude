@@ -5,7 +5,7 @@
 const CAT=["#3E7B27","#D9A21B","#2B7BB0","#B85A28","#7B4FB0"];      // categorical order, validated for colour-blind separation on white
 const RAMP=["#274E13","#3F6B2B","#5E8C47","#86AD6C","#B3CC9F"];     // ordinal green ramp (funnel steps, size bands)
 const OUTC={won:"#274E13",warm:"#D9A21B",lost:"#8E9C84",none:"#C9CFC3"};
-const THEME_C={"Just asking":"#D9A21B","Stock & delivery":"#B85A28","Price":"#2B7BB0","Timing":"#7B4FB0","Other":"#C9CFC3","Locked in elsewhere":"#5F6B57","Not a fit":"#A9B2A0"};
+const THEME_C={"Still inquiring":"#D9A21B","Stock & delivery":"#B85A28","Price":"#2B7BB0","Timing":"#7B4FB0","Other":"#C9CFC3","Locked in elsewhere":"#5F6B57","Not a fit":"#A9B2A0"};
 const CINK="#2B2F28", CMUTE="#7A8373", CGRID="#E3E8DE", CTRACK="#E9EDE5", CBASE="#B9C2B0";
 
 const tw=(s,z)=>String(s).length*z*.56;

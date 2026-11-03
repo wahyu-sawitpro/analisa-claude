@@ -171,6 +171,25 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - `src/deck.html`: page shell and styles; `src/analysis.js`: detection, cleaning, linking and analysis;
   `src/slides.js`: narrative and HTML slides; `src/app.js`: upload, Analyze flow, present mode;
   `src/export-pptx.js`: PPTX builder and Google Drive upload
+- **Slide order in each team section is fixed:** sales vs the week before (then the other sales slides), success
+  stories, rejection reasons (incl. customers chasing orders), then the rest (winners, team performance, recoverable
+  demand). `teamSpecs` in `src/slides.js` sorts by kicker; new slides fall into place by their kicker prefix.
+- **Price tiers** (`priceTiers` in `src/analysis.js`): sales by product_cat tier, cheapest to most expensive (Khusus Petani,
+  Toling, Grosir, Retail), the same product's average price in each tier with a check when the order is inverted, and
+  farmers who paid the Retail price. Slide "Sales last week · price tiers".
+- **Rejection notes** (`reasonNotes`): per reason, what the "Detail Pembahasan" notes show (asked the price, price sent
+  and no reply, template "catalogue sent" notes, HKP, shop buyers, waiting for Toling, shipping, pick-up, stock,
+  documents, will decide later, TikTok comment, unreachable), products and quantities named, and a next step. Slide
+  "Rejection reasons · what the notes say". "Belum ketertarikan yang jelas" is labelled "Still inquiring, no clear
+  interest to buy now".
+- `tools/make_sample.js`: rebuilds `src/sample-data.json` from CSV exports with the deck's own column detection,
+  anonymising names and phones (`node deck/tools/make_sample.js file1.csv file2.csv ...`). `--real --out <file>` keeps
+  them for the private published deck (`SAMPLE=<file> python3 deck/build.py`); that file is never committed.
+- **Weekly sales routine:** every Monday 13:00 WIB a scheduled Claude session reads the six weekly exports on `main`
+  (sales last two weeks, success story and rejection reasons, both teams), rebuilds the sample, updates the findings
+  here, pushes to `claude/deck-slide-data-upload-c45lkx` and republishes "SawitPRO Sales Deck"
+  (https://claude.ai/artifact/WFkx8cUiCoSgwT3Y5ooSEn), built with `TITLE="SawitPRO Sales Deck"`. The registration
+  review keeps its own artifact ("SawitPRO Deck") and Tuesday routine.
 - `src/sample-data.json`: the six weekly exports for 19–25 Oct (sales and CRM, both teams), with phone numbers and names replaced by anonymous tokens
 - Built PPTX files, `audit.csv` and `DECISIONS.md` for the forecast, acquisition, DO pipeline and Jul–Sep reviews are on branch `claude/pensive-ritchie-9d38qh` under `deck/output/`
 - `build.py`: run `python3 deck/build.py` to regenerate `index.html`

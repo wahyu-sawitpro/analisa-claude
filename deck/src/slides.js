@@ -46,7 +46,7 @@ function narrative(A){
   // What leads who didn't buy said they need (as logged), live viewers, success stories reconciled with sales
   const ND=A.need, tons=kg=>`${(Math.round(kg/100)/10).toLocaleString("en-US")} t`, VW=A.viewers||[];
   const rejTotal=VW.length+A.notWon.length+A.service.length;
-  if(ND){ const bs=ND.barriers.filter(([b])=>!/just asking/i.test(b));
+  if(ND){ const bs=ND.barriers.filter(([b])=>!/still inquiring/i.test(b));
     N.needTitle=ND.nPot||ND.nNeed?`Leads who didn't buy logged ${[ND.nPot&&`${rp(ND.pot)} of potential sales`,ND.kg&&`~${tons(ND.kg)} of fertilizer need`].filter(Boolean).join(" and ")}`
       :`None of the ${ND.leads.length} leads who didn't buy has potential sales or fertilizer need filled`;
     N.needNotes=[
@@ -85,7 +85,7 @@ function narrative(A){
   N.tplWho=andList(A.templated.map(t=>t.p)); N.tplN=A.tplRows.length||A.templated.reduce((s,t)=>s+t.n,0); N.tplSrc=andList([...new Set(A.templated.map(t=>lc(t.src.v||"these")))]);
   N.tplDominant=A.tplRows.length>=Math.max(5,A.notWon.length*.5);
   // Rejection reasons in detail
-  const sp=A.reasonSplit[0], TL={"Locked in elsewhere":"locked into a shop, KUD or agent","Just asking":"just asking","Stock & delivery":"stalled on stock or delivery","Price":"put off by price","Not a fit":"not a fit","Timing":"not buying yet"};
+  const sp=A.reasonSplit[0], TL={"Locked in elsewhere":"locked into a shop, KUD or agent","Still inquiring":"still inquiring","Stock & delivery":"stalled on stock or delivery","Price":"put off by price","Not a fit":"not a fit","Timing":"not buying yet"};
   if(A.reasonRows.length){
     const r0=A.reasonList[0];
     const uni=new Set([...(A.uniform||[]).map(x=>x.p),...A.templated.map(t=>t.p)]), spG=sp?sp.groups.filter(g=>!(sp.k==="pic"&&uni.has(g.g))):[];
@@ -96,7 +96,7 @@ function narrative(A){
       VW.length&&`<b>${VW.length} TikTok live viewers are left out of the reasons:</b> ${esc((A.viewerSessions||[]).map(([k,n])=>`${k} ${n}`).join(", "))}. Each is an account name with no phone number.`,
       spG.length&&`<b>${esc(LABEL[sp.k])} predicts the reason.</b> ${esc(spG.slice(0,5).map(g=>`${g.g} (${g.n}): mostly ${TL[g.theme]||lc(g.theme)}`).join("; "))}. The answer depends on which list is being worked, so fix the list, not the pitch.`,
       !A.templated.length&&A.uniform?.length&&`<b>Check the entries of ${esc(andList(A.uniform.map(x=>`${x.p} (${x.same} of ${x.n})`)))}:</b> nearly all have the same status and reason, which looks like a form default rather than what each lead said.`,
-      A.askTotal>=3&&A.askUnreach&&`<b>“Just asking” is partly a logging habit.</b> ${A.askUnreach} of ${A.askTotal} were recorded when the call didn't connect, so no reason was actually heard.`,
+      A.askTotal>=3&&A.askUnreach&&`<b>“Still inquiring” is partly a logging habit.</b> ${A.askUnreach} of ${A.askTotal} were recorded when the call didn't connect, so no reason was actually heard.`,
       A.templated.length&&`<b>${esc(N.tplWho)}: ${N.tplN} engagements look templated</b>: one status, one reason${A.templated.every(t=>t.loc.s>=.9)?` and one location (${esc(A.templated[0].loc.v)})`:""}, no notes${A.templated.some(t=>t.perDay)?` (${A.templated.filter(t=>t.perDay).map(t=>`${esc(t.p.split(" ")[0])} exactly ${t.perDay} a day`).join(", ")})`:""}. They can't say why ${esc(N.tplSrc)} leads say no.`,
       A.service.length>=2&&`<b>${A.service.length} more engagements were customers asking where their order is</b>${A.svcRefs.length?` (${A.svcRefs.length} orders named${A.svcSla?`, ${A.svcSla} past the delivery SLA`:""})`:""}; they are left out of the reasons above.`,
       A.locHot&&!A.templated.some(t=>t.loc.v===A.locHot.g)&&`<b>${esc(A.locHot.g)}</b>: ${A.locHot.tn} of ${A.locHot.n} engagements there are ${esc(TL[A.locHot.theme]||lc(A.locHot.theme))}.`
@@ -209,7 +209,7 @@ function narrative(A){
     N.cbTitle=`${A.recovN} of ${nw} leads who didn't order can still be won back${cTop&&cTop[1]>=2?`; ${cTop[1]} are ${TL[cTop[0]]||lc(cTop[0])}`:""}`;
     if(N.tplDominant) N.cbTitle=`No real call-back list yet: ${A.tplRows.length} of ${nw} leads carry the same templated reason; ${A.warm.length} ${A.warm.length===1?"is":"are"} genuinely in play`;
     const PLAN={"Locked in elsewhere":["Closed for now","Offer payment terms or a KUD / agent partnership; drop from this season's cold-call lists","Next season"],
-      "Just asking":["Recoverable","Send the price list and warehouse location on WhatsApp, then call to ask what they need","Within 48 hours"],
+      "Still inquiring":["Recoverable","Send the price list and warehouse location on WhatsApp, then call to ask what they need","Within 48 hours"],
       "Stock & delivery":["Recoverable","Call back the day the product is in stock; offer warehouse pickup","When stock lands"],
       "Price":["Recoverable","Quote bulk or bundle prices and the landed cost including delivery","This week"],
       "Timing":["Recoverable","Log the next fertilizing month and book a call two weeks before","Before next application"],
@@ -328,7 +328,7 @@ function narrative(A){
   if(A.has.sales&&A.outstanding>=A.gmv*.1) F.push([`${rp(A.outstanding)} of last week's sales is still unpaid`,`${A.partial.length} partially paid order${A.partial.length>1?"s":""} worth ${rp(A.partial.reduce((s,o)=>s+o.gmv,0))}; ${A.openOrders.length} of ${A.orders.length} orders are still open.`]);
   if(false) F.push(["The CRM misses most of the sales story",`${A.noCrm.length} of ${A.orders.length} orders (${rp(A.noCrm.reduce((s,o)=>s+o.gmv,0))}) have no CRM engagement${A.notLogging.length?`; ${A.notLogging.length} seller${A.notLogging.length>1?"s":""} logged none at all`:A.crmMap.potential?", and CRM wins carry no sales":""}.`]);
   if(A.stockRows.length>=2) F.push(["Stock-outs cost real orders",`${A.stockRows.length} leads stalled because the product wasn't available or delivery was too slow.`]);
-  if(!A.has.sales&&!won&&nw){ const ca=A.notWon.filter(r=>r.theme==="Just asking").length; if(ca/nw>=.5) F.push(["We don't know why leads say no",`${pct(ca,nw)}% of reasons are a catch-all, so the team can't fix the pitch.`]); }
+  if(!A.has.sales&&!won&&nw){ const ca=A.notWon.filter(r=>r.theme==="Still inquiring").length; if(ca/nw>=.5) F.push(["We don't know why leads say no",`${pct(ca,nw)}% of reasons are a catch-all, so the team can't fix the pitch.`]); }
   if(won&&A.has.sales&&false) F.push([`${A.wonLinked.length} of ${won} CRM wins confirmed in sales`,`They became ${A.linkedOrders.length} order${A.linkedOrders.length===1?"":"s"} worth ${rp(A.linkedGmv)}${A.matchCounts.find(m=>m[0]==="value and date")?"; one is matched only by value and date":""}.`]);
   if(A.has.sales&&A.byFamily[0]) F.push([`${A.byFamily[0].k} is ${pct(A.byFamily[0].gmv,A.gmv)}% of sales`,`${rp(A.gmv)} from ${A.orders.length} orders${A.topOrderShare>=.5?`; one order alone is ${pct(A.orders[0].gmv,A.gmv)}% of sales`:""}.`]);
   if(A.missingRefs.length) F.splice(1,0,[`${A.missingRefs.length} CRM closing${A.missingRefs.length>1?"s":""}${A.missingVal?` (${rp(A.missingVal)})`:""} missing from sales`,`Their order numbers (${A.missingRefs.slice(0,3).map(x=>x.ref).join(", ")}${A.missingRefs.length>3?", …":""}) are not in the sales export.`]);
@@ -336,12 +336,12 @@ function narrative(A){
   if(A.wow){ const W=A.wow; F.unshift([W.flat?"Sales flat vs the week before":`Sales ${W.up?"up":"down"} ${W.pc!=null?W.pc+"%":""} vs the week before`,`${rp(W.p.gmv)} → ${rp(W.c.gmv)}, mostly from ${W.drv}${W.lead?`; ${W.lead.k} moved most`:""}.`]); }
   if(false) F.splice(1,0,["Most CRM “wins” are logged after the sale",`${N.kindNote.replace(/^./,c=>c.toUpperCase())} So the CRM can't yet show what turns a lead into an order.`]);
   if(PL&&PL.total>=Math.max(1e7,(A.gmv||0)*.1)) F.splice(1,0,[`${rp(PL.total)} of named demand didn't convert`,`${PL.valued.length} leads said what they needed but didn't order${PL.fix?`; ${rp(PL.fix)} of it was blocked on our side (stock-outs, payment terms)`:""}. ${PL.unval} more leads have no quantity logged.`]);
-  if(ND&&(ND.nPot||ND.nNeed)) F.splice(1,0,[[ND.nPot&&`${rp(ND.pot)} of potential sales`,ND.kg&&`~${tons(ND.kg)} of need`].filter(Boolean).join(" and ")+" didn't convert",`${ND.nPot+ND.nNeed} of ${ND.leads.length} leads logged a value or a quantity${ND.barriers.filter(([b])=>!/just asking/i.test(b))[0]?`; the most common blocker is ${lc(ND.barriers.filter(([b])=>!/just asking/i.test(b))[0][0])}`:""}.`]);
+  if(ND&&(ND.nPot||ND.nNeed)) F.splice(1,0,[[ND.nPot&&`${rp(ND.pot)} of potential sales`,ND.kg&&`~${tons(ND.kg)} of need`].filter(Boolean).join(" and ")+" didn't convert",`${ND.nPot+ND.nNeed} of ${ND.leads.length} leads logged a value or a quantity${ND.barriers.filter(([b])=>!/still inquiring/i.test(b))[0]?`; the most common blocker is ${lc(ND.barriers.filter(([b])=>!/still inquiring/i.test(b))[0][0])}`:""}.`]);
   if(VW.length>=20) F.splice(2,0,[`${VW.length} “rejections” are TikTok live viewers`,`Logged as leads with an account name and no phone number; ${A.notWon.length} real leads remain.`]);
   if(A.dupOrders&&A.dupOrders.length) F.splice(1,0,[`Possible duplicate order${A.dupOrders.length>1?"s":""}`,A.dupOrders.map(x=>`${x.map(o=>o.no).join(" and ")} (same customer, day and products, ${rp(x[0].gmv)} each)`).join("; ")+"."]);
   if(A.service.length>=3) F.splice(A.service.length>=3&&PL&&PL.total>=Math.max(1e7,(A.gmv||0)*.1)?2:1,0,[`${A.service.length} customers chased late orders`,`They were logged as leads but asked where their order is${A.svcRefs.length?`: ${A.svcRefs.length} orders named${A.svcSla?`, ${A.svcSla} engagements mention the SLA or a queue`:""}`:""}. Late deliveries put the next order at risk.`]);
   if(A.templated.length){ const t=A.templated[0], f=[`${N.tplN} leads are logged from a template`,`${N.tplWho}: one status, one reason${t.loc.s>=.9?`, one location (${t.loc.v})`:""} and no notes${t.perDay?`; ${t.p.split(" ")[0]} logs exactly ${t.perDay} a day`:""}. The ${N.tplSrc} results can't be judged.`];
-    if(N.tplDominant){ const i=F.findIndex(x=>/rejection theme|just asking|loyalty/i.test(x[0])); if(i>=0) F.splice(i,1); F.splice(1,0,f); } else F.push(f); }
+    if(N.tplDominant){ const i=F.findIndex(x=>/rejection theme|still inquiring|loyalty/i.test(x[0])); if(i>=0) F.splice(i,1); F.splice(1,0,f); } else F.push(f); }
   if(A.trend){ const T=A.trend; F.splice(A.wow?1:0,0,[T.flat?`Sales flat from ${T.F.label} to ${T.Z.label}`:`Sales ${T.up?"up":"down"} ${T.pc}% from ${T.F.label} to ${T.Z.label}`,
     `${rp(T.F.gmv)} → ${rp(T.Z.gmv)}${T.explains?`; ${T.acc} that stopped ordering explain the drop, all other customers grew ${Math.round(T.restPct*100)}%`:`; orders ${T.F.orders} → ${T.Z.orders}`}.`]); }
   { const i=F.findIndex(f=>/didn't convert$/.test(f[0])); if(i>1) F.splice(1,0,F.splice(i,1)[0]); }
@@ -363,7 +363,7 @@ function narrative(A){
   if(A.has.sales&&A.outstanding>=A.gmv*.05) act.push({t:`Collect ${rp(A.outstanding)} still unpaid`,d:`${A.partial.length} order${A.partial.length>1?"s are":" is"} only partially paid. Confirm payment dates before the next delivery to these customers.`,o:"Finance + order PIC",w:"This week"});
   if(false) act.push({t:"Log every order in the CRM",d:`${A.noCrm.length} of ${A.orders.length} orders have no engagement record${A.notLogging.length?`, including every order from ${andList(A.notLogging.map(g=>g.p))}`:""}. Log engagements on the same day and add the order number, so wins carry their sales.`,o:"Sales ops",w:"Next form update"});
   if(warm&&!A.intentWarm.length) act.push({t:`Book dated follow-ups for ${warm} leads in play`,d:"Agree a concrete next step with each lead and log a follow-up date.",o:warmPic||"Lead PIC",w:"This week"});
-  if(nw&&A.notWon.filter(r=>r.theme==="Just asking").length/nw>=.3) act.push({t:"Replace the catch-all reason",d:"Make the reason a required dropdown: price, no need yet (with a revisit month), has a supplier, tied to KUD, out of stock, unreachable. Drop “just asking”.",o:"Sales ops",w:"Next form update"});
+  if(nw&&A.notWon.filter(r=>r.theme==="Still inquiring").length/nw>=.3) act.push({t:"Replace the catch-all reason",d:"Make the reason a required dropdown: price, no need yet (with a revisit month), has a supplier, tied to KUD, out of stock, unreachable. Drop “still inquiring”.",o:"Sales ops",w:"Next form update"});
   const tests=A.byFamily?.find(f=>/test/i.test(f.k));
   if(tests) act.push({t:`Turn ${tests.cust} test customer${tests.cust>1?"s":""} into fertilizer orders`,d:`Leaf and soil tests (${rp(tests.gmv)}) end in a fertilizer recommendation. Book a follow-up when results are ready and quote the recommended products.`,o:countBy(A.orders.filter(o=>o.lines.some(l=>l.family===tests.k)),o=>o.pic)[0]?.[0]||"Test PIC",w:"When results are in"});
   if(A.has.sales&&A.topOrderShare>=.5&&A.orders.length>1) act.push({t:"Widen the base beyond one large order",d:`One order is ${pct(A.orders[0].gmv,A.gmv)}% of sales. Line up repeat orders from the other ${A.orders.length-1} customers so next week doesn't depend on a single deal.`,o:"Team lead",w:"Next 2 weeks"});
@@ -730,16 +730,32 @@ function teamSpecs(A,N,pre){
       rows:[{cards:[
         {w:1,title:"Sales by customer location",sub:"Regency or city; customers in grey",chart:{type:"hbar",items:R.slice(0,6).map(x=>({k:x.k,v:x.g,r:pl(new Set(x.os.map(o=>o.ph||o.nk||o.no)).size,"cust.")})),fmt:rpM}},
         {w:1.3,title:"Who the buyers are",sub:"Share of the week's sales, %",chart:{type:"stack100",rows}}]}],notes});
-    const ord=O.slice(0,8);
-    S.push({kicker:pre+"Success story · the orders",title:`${nw?`${pl(nw.os.length,"new customer")} and ${pl(O.length-nw.os.length,"repeat order")}`:pl(O.length,"order")}; the largest is ${rp(top.gmv)} (${catOf(top)}, ${regionOf(top)})`,
-      rows:[{cards:[{title:O.length>8?`Top 8 of ${O.length} orders by sales`:"Every order this week",sub:O.some(o=>o.lines.some(l=>/^P[0-9a-f]{8}$/.test(l.phone||"")))?"Sample data: customer names and phones are anonymised; upload the sales export to see them. PIC is the seller on the order":"Customer name and phone from the sales export (CRM if missing); PIC is the seller on the order",
-        table:(()=>{ const ut=O.some(o=>typeOf(o)!=="Not recorded");
-          const anon=v=>/^P[0-9a-f]{8}$/.test(v||"")||/^Customer [0-9A-F]{5}$/.test(v||""), shown=v=>!v?"–":anon(v)?"Hidden (sample)":v;
-          const who=o=>{ const l=o.lines.find(x=>x.name||x.phone)||{}, c=crmOf(o)||{}; return [shown(l.name||c.name),...(hid?[]:[shown(l.phone||c.phone)])]; };
-          const hid=O.some(o=>o.lines.some(l=>anon(l.phone)||anon(l.name))), picOf=o=>o.lines.find(l=>l.pic)?.pic||"–";
-          return {colW:[9,13,...(hid?[]:[10]),11,10,10,19,8,7,...(ut?[9]:[]),11],head:["Order","Customer name",...(hid?[]:["Phone"]),"PIC","Location","Category","Products (qty)","Sales","Status",...(ut?["User type"]:[]),"CRM engagement"],align:["l","l",...(hid?[]:["l"]),"l","l","l","l","r","l","l","l"],
-          rows:ord.map(o=>{ const c=crmOf(o); return [o.no,...who(o),picOf(o),regionOf(o),catOf(o),qtyTxt(o),rp(o.gmv),custOf(o),...(ut?[typeOf(o)]:[]),c?[c.channel,c.source].filter(Boolean).join(" · ")||"Logged":"–"]; })}; })()}]}],
-      notes:[`<b>PIC:</b> ${esc(A.byPic.slice(0,4).map(x=>`${x.p} ${rp(x.g)} (${pl(x.n,"order")})`).join(", "))}.`,
+    // Which orders make the story: every order of Rp50M+ (else the top 3), customers with more than one invoice this
+    // week, and CRM successes that came from an interesting source (ads, social media, referral...) rather than Toling.
+    const ckey=o=>o.ph||o.nk||null, BIG=50e6, big=O.filter(o=>o.gmv>=BIG), main=(big.length?big:O.slice(0,3)).slice(0,6);
+    const multi=(()=>{ const m=new Map(); O.forEach(o=>{ const k=ckey(o); if(k) (m.get(k)||m.set(k,[]).get(k)).push(o); }); return [...m.values()].filter(os=>os.length>=2).sort((a,b)=>sumG(b)-sumG(a)); })();
+    const OUTL=/ads|iklan|tiktok|instagram|facebook|\bfb\b|social|sosmed|referral|referensi|rekomendasi|webinar|event|\blive\b|komunitas|group/i, srcTxt=r=>[r.source,r.channel,r.detail].filter(Boolean).join(" ");
+    const hi=ST.filter(x=>x.state==="matched"&&x.orders.length&&OUTL.test(srcTxt(x.r))).sort((a,b)=>b.sales-a.sales);
+    const srcLabel=r=>{ const t=srcTxt(r); const m=t.match(/tiktok|instagram|facebook|ads|iklan|social media|sosmed|referral|referensi|rekomendasi|webinar|event|live|komunitas/i); return m?({iklan:"Ads",sosmed:"Social media",referensi:"Referral",rekomendasi:"Referral"}[m[0].toLowerCase()]||m[0].replace(/^./,c=>c.toUpperCase())):(r.source||r.channel); };
+    const story=new Map(), add=(key,os,why,crm)=>{ const x=story.get(key); if(x){ if(!x.why.includes(why)) x.why.push(why); if(crm&&!x.crm) x.crm=crm; return; } story.set(key,{os,why:[why],crm}); };
+    main.forEach(o=>add(ckey(o)&&multi.some(os=>ckey(os[0])===ckey(o))?"c:"+ckey(o):"o:"+o.no,multi.find(os=>ckey(os[0])===ckey(o))||[o],o.gmv>=BIG?"Rp50M+ order":"Top 3 order"));
+    multi.forEach(os=>add("c:"+ckey(os[0]),os,`${os.length} invoices this week`));
+    hi.forEach(x=>{ const o=x.orders[0], k=ckey(o)&&multi.some(os=>ckey(os[0])===ckey(o))?"c:"+ckey(o):"o:"+o.no; add(k,story.get(k)?.os||x.orders,`CRM: from ${srcLabel(x.r)}`,x.r); });
+    const SR=[...story.values()].slice(0,9), bigG=sumG(big);
+    const title=[big.length?`${pl(big.length,"order")} of Rp50M+ (${rp(bigG)}, ${share(bigG)}% of sales)`:`No order reached Rp50M; the top 3 bring ${rp(sumG(main))} (${share(sumG(main))}%)`,
+      multi.length&&`${pl(multi.length,"customer")} bought more than once (${rp(multi.reduce((s,os)=>s+sumG(os),0))})`,
+      hi.length&&`${hi.length} CRM ${hi.length===1?"win":"wins"} from ${andList([...new Set(hi.map(x=>srcLabel(x.r)))])}`].filter(Boolean).join("; ");
+    S.push({kicker:pre+"Success story · the orders",title,
+      rows:[{cards:[{title:"The stories behind this week's sales",sub:"Rp50M+ orders (else the top 3), repeat buyers, CRM wins from ads, social media or referrals"+(O.some(o=>o.lines.some(l=>/^P[0-9a-f]{8}$/.test(l.phone||"")))?". Sample: names hidden":""),
+        table:(()=>{ const anon=v=>/^P[0-9a-f]{8}$/.test(v||"")||/^Customer [0-9A-F]{5}$/.test(v||""), shown=v=>!v?"–":anon(v)?"Hidden (sample)":v;
+          const hid=O.some(o=>o.lines.some(l=>anon(l.phone)||anon(l.name))), picOf=os=>[...new Set(os.flatMap(o=>o.lines.map(l=>l.pic)).filter(Boolean))].join(", ")||"–";
+          const who=(os,c)=>{ const l=os.flatMap(o=>o.lines).find(x=>x.name||x.phone)||{}; c=c||crmOf(os[0])||{}; return [shown(l.name||c.name),...(hid?[]:[shown(l.phone||c.phone)])]; };
+          return {colW:[13,11,12,...(hid?[]:[9]),10,9,9,16,8,6,11],head:["Why it's a story","Order(s)","Customer name",...(hid?[]:["Phone"]),"PIC","Location","Category","Products (qty)","Sales","Status","CRM / source"],
+            align:["l","l","l",...(hid?[]:["l"]),"l","l","l","l","r","l","l"],
+            rows:SR.map(x=>{ const os=x.os, o=os[0], c=x.crm||crmOf(o); return [{v:x.why.join(" · "),bold:true},os.map(y=>y.no).join(", "),...who(os,c),picOf(os),regionOf(o),[...new Set(os.map(catOf))].join(", "),os.map(qtyTxt).join("; "),rp(sumG(os)),custOf(o),c?[c.id,srcLabel(c)||c.channel].filter(Boolean).join(" · "):"–"]; })}; })()}]}],
+      notes:[hi.length&&`<b>CRM wins worth telling:</b> ${esc(hi.slice(0,3).map(x=>`${x.r.id} (${x.r.pic||"–"}) from ${srcLabel(x.r)}${x.r.channel?` via ${lc(x.r.channel)}`:""}, ${rp(x.sales)}`).join("; "))}.`,
+        multi.length&&`<b>Repeat buyers this week:</b> ${esc(multi.slice(0,3).map(os=>`${os.length} invoices, ${rp(sumG(os))} (${regionOf(os[0])})`).join("; "))}.`,
+        `<b>PIC:</b> ${esc(A.byPic.slice(0,4).map(x=>`${x.p} ${rp(x.g)} (${pl(x.n,"order")})`).join(", "))}.`,
         A.partial.length&&`<b>${rp(A.outstanding||A.partial.reduce((s,o)=>s+o.gmv,0))} still to collect</b> on ${pl(A.partial.length,"partly paid order")}; ${A.openOrders.length} of ${O.length} orders are still open.`].filter(Boolean)});
   }
 
@@ -821,6 +837,28 @@ function teamSpecs(A,N,pre){
     if(A.byCat.length) cards.push({w:1.1,title:"Sales by product category",sub:"“product_cat”; orders under each column",chart:{type:"column",cats:A.byCat.slice(0,6).map(x=>`${x.k}\n${pl(x.orders,"order")}`),series:[{name:"Sales",color:CAT[2],values:A.byCat.slice(0,6).map(x=>x.gmv)}],fmt:rpM,lblH:46},foot:N.catLine||null});
     cards.push({w:.85,kpis:k3});
     S.push({kicker:pre+`${N.sk} · what sold`,title:N.soldTitle,rows:[{cards}]});
+    // price tiers, cheapest to most expensive (Khusus Petani, Toling, Grosir, Retail)
+    const PT=A.tiers;
+    if(PT&&(PT.rows.length>=2||PT.gmv>=A.gmv*.5)){
+      const R=PT.rows, top=R.slice().sort((a,b)=>b.gmv-a.gmv)[0], C=PT.cmp, cp=k=>C&&C.prices.find(p=>p.k===k), rt=R.find(r=>r.k==="Retail");
+      // last week vs the week before, per tier (all four tiers, so a tier that dropped to zero still shows)
+      const W=A.wow, TN=["Khusus Petani","Toling","Grosir","Retail"], pv=k=>W?W.p.tier.get(k)||0:0, cv=k=>W?W.c.tier.get(k)||0:(R.find(r=>r.k===k)||{}).gmv||0;
+      const TT=TN.filter(k=>cv(k)||pv(k)), lead=k=>TT.slice().sort((a,b)=>k(b)-k(a))[0], cL=lead(cv), pL=W?lead(pv):null;
+      const shift=W&&cL&&pL&&cL!==pL?`${cL} outsold ${pL} last week (${rp(cv(cL))} vs ${rp(cv(pL))}); the week before ${pL} led (${rp(pv(pL))} vs ${rp(pv(cL))})`
+        :W&&cL?`${cL} led both weeks (${rp(pv(cL))} → ${rp(cv(cL))})${TT.length>1?`; ${TT.filter(k=>k!==cL).map(k=>`${k} ${rp(pv(k))} → ${rp(cv(k))}`).join(", ")}`:""}`:null;
+      N.tierShift=shift;
+      if(shift&&Array.isArray(N.wowNotes)&&!N.wowNotes.some(x=>/Price tiers:/.test(x))) N.wowNotes.push(`<b>Price tiers:</b> ${shift}.`);
+      S.push({kicker:pre+`${N.sk} · price tiers`,title:shift||`${top.k} brings ${pct(top.gmv,A.gmv)}% of sales${R.length>1?`; ${R.length} price tiers, from ${R[0].k} (cheapest) to ${R[R.length-1].k}`:""}`,
+        rows:[{cards:[
+          {w:.9,title:"Sales by price tier",sub:`Cheapest at the top; ${W?"change vs the week before":"orders and customers"} in grey`,chart:{type:"hbar",items:TT.map(k=>{ const r=R.find(x=>x.k===k); return {k:`${TN.indexOf(k)+1}. ${k}`,v:cv(k),r:W?`${cv(k)>=pv(k)?"+":"−"}${rp(Math.abs(cv(k)-pv(k)))} (was ${rp(pv(k))})`:`${pl(r?r.orders:0,"order")} · ${r?r.cust:0} cust.`}; }),fmt:rpM}},
+          {w:1.25,title:"The tiers, cheapest to most expensive",sub:C?`Avg price = average price per unit of ${C.item}, before shipping, this week`:"Last week",
+            table:{colW:[13,27,8,8,12,...(W?[12]:[]),...(C?[12]:[])],head:["Tier","What it is","Orders","Cust.","Sales",...(W?["Week before"]:[]),...(C?["Avg price"]:[])],align:["l","l","r","r","r","r","r"],
+              rows:TT.map(k=>{ const r=R.find(x=>x.k===k)||{orders:0,cust:0,desc:PRICE_TIERS.find(t=>t[0]===k)[2]}; return [{v:k,bold:true},r.desc,String(r.orders),String(r.cust),rp(cv(k)),...(W?[rp(pv(k))]:[]),...(C?[cp(k)?rp(cp(k).avg):"–"]:[])]; })}}]}],
+        notes:[W&&TT.length>1&&`<b>Tier mix:</b> ${TT.map(k=>`${k} ${pct(pv(k),W.p.gmv)}% → ${pct(cv(k),W.c.gmv)}%`).join(", ")} of sales (week before → last week).`,`<b>Tier order, cheapest to most expensive:</b> Khusus Petani (farmer price, close to the subsidised price), Toling (mobile shop: sells at set stops, so the customer pays no shipping), Grosir (wholesale) and Retail.${PT.gmv<A.gmv*.98?` ${pct(A.gmv-PT.gmv,A.gmv)}% of sales is outside these tiers (seeds, crop protection, services).`:""}`,
+          C&&C.inverted.length&&`<b>Price check:</b> ${esc(C.item)} sold for more in ${andList(C.inverted.map(x=>x[0]))} than in ${andList(C.inverted.map(x=>x[1]))} (${C.prices.map(p=>`${p.k} ${rp(p.avg)}`).join(", ")}), against the tier order. Check the price list or the category on those orders.`,
+          C&&!C.inverted.length&&`<b>Same product across tiers (${esc(C.item)}):</b> ${C.prices.map(p=>`${p.k} ${rp(p.avg)}`).join(" → ")}.`,
+          rt&&rt.farmersRetail&&`<b>${pl(rt.farmersRetail,"farmer")} bought at the Retail price.</b> Khusus Petani is cheaper for them; help them qualify (farm location, KTP) or point them to the next Toling stop.`].filter(Boolean)});
+    }
 
   }
 
@@ -856,6 +894,38 @@ function teamSpecs(A,N,pre){
       chart:{type:"hbar",items:pics.slice(0,6).map(([p,n])=>({k:p,v:n,r:countBy(A.reasonRows.filter(r=>r.pic===p),r=>r.source)[0]?.[0]||"–"})),color:"#8E9C84"}}); }
     S.push({kicker:pre+N.rk,title:N.rrTitle,rows:[{cards}],notes:N.rrNotes});
   }
+  // Rejection reasons: what the "Detail Pembahasan" notes say behind each reason
+  if(A.reasonNotes&&A.reasonNotes.some(g=>g.notes)){
+    const G=A.reasonNotes.filter(g=>g.notes).slice(0,6), all=A.reasonNotes.reduce((s,g)=>s+g.n,0), withN=A.reasonNotes.reduce((s,g)=>s+g.notes,0);
+    const NOTE_ACT={"Asked the price":"Reply with the tier price that fits (Khusus Petani for farmers, Toling where the mobile shop stops, Grosir for shops), then ask quantity and timing",
+      "Price sent, no reply":"Follow up within 48 hours with one concrete offer (tier price and delivery date), not the whole catalogue",
+      "Template note (catalogue sent)":"Log what the lead actually asked; a catalogue-only note can't be followed up",
+      "Khusus Petani price (HKP)":"Help the farmer finish HKP eligibility (farm location, KTP) so the cheapest price applies",
+      "Shop / wholesale buyer":"Hand over to the Grosir offer with minimum order and margin",
+      "Waiting for the mobile shop":"Share the next Toling date for that area, or the HKP price with delivery if no stop is planned",
+      "Shipping cost or delivery":"Quote the landed cost; point to a Toling stop (no shipping) where there is one",
+      "Warehouse pick-up":"Confirm the warehouse address and stock for pick-up",
+      "Out of stock or SKU unavailable":"Call back when stock lands; fix products priced Rp0 in the app",
+      "Payment terms or documents":"Explain payment options and document steps once, in writing",
+      "Will decide later":"Book a follow-up date in the CRM",
+      "Came from a TikTok comment":"Move the chat to WhatsApp to get a phone number and the need",
+      "Could not be reached":"Retry at another time; log a reason only once the lead is reached"};
+    const lead=G[0], t0=lead.themes[0], short=k=>k.replace(/, no clear interest to buy now/," (no clear interest)");
+    const rows=G.map(g=>{ const t=g.themes.filter(([k])=>k!=="Asked the price"||g.themes.length===1).concat(g.themes.filter(([k])=>k==="Asked the price"&&g.themes.length>1)).slice(0,3);
+      const pr=productsIn(g.rows).slice(0,3);
+      return [{v:short(g.k),bold:true},`${g.n}${g.notes<g.n?` (${g.notes} with notes)`:""}`,t.length?t.map(([k,n])=>`${k} ${n}`).join(" · "):"No clear pattern",pr.length?pr.join(", "):"–",
+        g.qtyN?`${g.qtyN} lead${g.qtyN>1?"s":""}, ~${(Math.round(g.qtyKg/100)/10).toLocaleString("en-US")} t`:"–",t.length?NOTE_ACT[t[0][0]]||"–":"Re-read and log a specific reason"]; });
+    const askAll=A.reasonNotes.reduce((s,g)=>s+((g.themes.find(([k])=>k==="Asked the price")||[0,0])[1]),0), noRep=A.reasonNotes.reduce((s,g)=>s+((g.themes.find(([k])=>k==="Price sent, no reply")||[0,0])[1]),0);
+    const tpl=A.reasonNotes.reduce((s,g)=>s+((g.themes.find(([k])=>k==="Template note (catalogue sent)")||[0,0])[1]),0), tok=A.reasonNotes.reduce((s,g)=>s+((g.themes.find(([k])=>k==="Waiting for the mobile shop")||[0,0])[1]),0);
+    S.push({kicker:pre+"Rejection reasons · what the notes say",
+      title:t0?`“${short(lead.k)}”: ${lc(t0[0])} in ${t0[1]} of ${lead.n} notes${askAll&&t0[0]!=="Asked the price"?`; ${askAll} leads asked the price`:""}`:`${withN} of ${all} rejection notes read`,
+      rows:[{cards:[{title:"What the discussion notes show, by reason",sub:`Read from “Detail Pembahasan” for ${withN} of ${all} leads who didn't order; a note can show several things`,
+        table:{colW:[15,11,27,13,9,25],head:["Reason","Leads","What the notes show","Products named","Need named","Next step"],align:["l","r","l","l","l","l"],rows}}]}],
+      notes:[askAll&&`<b>${askAll} of ${withN} leads asked the price${noRep?` and ${noRep} went quiet after the price was sent`:""}.</b> These are open enquiries, not refusals: answer with the cheapest tier that fits the buyer and a delivery date.`,
+        tok&&`<b>${tok} ${tok===1?"lead is":"leads are"} waiting for the mobile shop (Toling).</b> Publish the Toling schedule per area; Toling has no shipping cost, which is often the deciding point.`,
+        tpl&&`<b>${tpl} notes only say a catalogue was sent.</b> They don't say what the lead needs, so they can't be followed up or sized.`,
+        withN<all&&`<b>${all-withN} of ${all} leads have no discussion notes.</b>`].filter(Boolean)});
+  }
 
   const LOSS_SHORT={"Out of stock or slow delivery":"Stock / delivery","Price or payment terms":"Price / terms","Still deciding, no reason given":"Still deciding","No clear reason":"No clear reason","Not buying yet":"Not buying yet","Buys elsewhere (shop, KUD, agent)":"Buys elsewhere","Not a fit":"Not a fit"};
   // Rejection reasons: potential sales or stated need of leads who didn't buy (as logged; nothing estimated)
@@ -870,7 +940,7 @@ function teamSpecs(A,N,pre){
     S.push({kicker:pre+"Rejection reasons · potential",title:N.needTitle,rows:[{h:84,cards:[{kpiRow:[
         {v:rpParts(ND.pot)[0]||"0",u:rpParts(ND.pot)[1],l:`potential sales logged (${pl(ND.nPot,"lead")})`,hot:true},
         {v:ND.kg?`~${tons(ND.kg).replace(" t","")}`:"0",u:" t",l:`fertilizer need filled for ${pl(ND.nNeed,"more lead")}`},
-        ND.seeds?{v:nf.format(ND.seeds),u:"",l:"Topaz seeds requested"}:{v:String(ND.barriers.filter(([b])=>!/just asking/i.test(b)).reduce((s,[,n])=>s+n,0)),u:"",l:"leads with a named blocker"},
+        ND.seeds?{v:nf.format(ND.seeds),u:"",l:"Topaz seeds requested"}:{v:String(ND.barriers.filter(([b])=>!/still inquiring/i.test(b)).reduce((s,[,n])=>s+n,0)),u:"",l:"leads with a named blocker"},
         {v:String(ND.none),u:`/${ND.leads.length}`,l:"leads with neither field filled"}]}]},{cards}],notes:N.needNotes});
   }
 
@@ -889,7 +959,7 @@ function teamSpecs(A,N,pre){
   if(N.plan){
     const grp=[["Can be won back",A.notWon.filter(r=>r.recov)],["Closed for now",A.notWon.filter(r=>!r.recov)]];
     const groups=grp.flatMap(([g,rs])=>countBy(rs,r=>r.theme||"No reason given").map(([t,n])=>({k:t,n,grp:g,color:THEME_C[t]||OUTC.none})));
-    const ser=[["Just asking",r=>r.theme==="Just asking",THEME_C["Just asking"]],["Locked in elsewhere",r=>r.theme==="Locked in elsewhere",THEME_C["Locked in elsewhere"]],["Other reasons",r=>r.theme!=="Just asking"&&r.theme!=="Locked in elsewhere",CAT[2]]];
+    const ser=[["Still inquiring",r=>r.theme==="Still inquiring",THEME_C["Still inquiring"]],["Locked in elsewhere",r=>r.theme==="Locked in elsewhere",THEME_C["Locked in elsewhere"]],["Other reasons",r=>r.theme!=="Still inquiring"&&r.theme!=="Locked in elsewhere",CAT[2]]];
     const row1=[{w:1.15,title:"Every lead that didn't order",sub:"One square per engagement, by reason",chart:{type:"waffle",groups,legendW:220}}];
     if(A.contacts.length>=2) row1.push({w:.9,title:"Contact outcome",sub:"Reasons by whether we actually talked",chart:{type:"column",stacked:true,cats:A.contacts,series:ser.map(([n,f,c])=>({name:n,color:c,values:A.contacts.map(k=>A.notWon.filter(r=>r.contact===k&&f(r)).length)})),lblH:30}});
     if(A.signals.length) row1.push({w:1,title:"What the notes say",sub:"Signals read from the discussion notes",chart:{type:"hbar",legend:[NI,WM],items:A.signals.slice(0,5).map(x=>({k:x.label,segs:[[x.lost,OUTC.lost,`not interested: ${x.lost}`],[x.warm,OUTC.warm,`considering / prospect: ${x.warm}`]]})),rowH:40}});
@@ -921,7 +991,10 @@ function teamSpecs(A,N,pre){
       {cards:[{title:"Leads still in play",sub:`${A.warm.length>rows.length?`${rows.length} of ${A.warm.length} shown. `:""}Names and phone numbers are left out; look leads up by ID in the CRM`,
         table:{head:["ID","PIC","Channel","Status","What they asked or said"],rows:rows.map(r=>[r.id||"–",r.pic||"–",r.channel||"–",{v:r.status,pill:true},r.signals.map(s=>SL[s]).join("; ")||r.reason||"–"])}}]}]});
   }
-  return S;
+  // Fixed order in every team section (the user's request): sales vs the week before and the other sales slides,
+  // then the success stories, then the rejection reasons, then everything else. The sort is stable.
+  const rank=k=>{ k=k.slice(pre.length); return /^Sales last week · vs/.test(k)?0:/^Sales /.test(k)?1:/^Success story/.test(k)?2:/^Rejection reasons|^Customer service/.test(k)?3:4; };
+  return S.map((s,i)=>[rank(s.kicker||""),i,s]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).map(x=>x[2]);
 }
 function teamSlides(A,N,pre,S,next){ teamSpecs(A,N,pre).forEach(sp=>S.push(panelSlide(next(),sp))); }
 
@@ -980,9 +1053,9 @@ function deckNarrative0(T){
   const won=all.reduce((s,A)=>s+A.won.length,0), wonL=all.reduce((s,A)=>s+A.wonLinked.length,0);
   X.eyebrow="Weekly Sales Review"; X.title=`${andList(T.map(t=>t.name))} Last Week`;
   X.meta=[orders&&`${orders} orders`,crm&&`${crm} CRM engagements`,`${T.length} teams`].filter(Boolean).join(" · ");
-  X.headline=gmv?`${rp(gmv)} in sales last week: ${T.map(t=>`${t.name} ${rp(t.A.gmv)}${t.A.wow&&t.A.wow.pc!=null?` (${t.A.wow.flat?"flat":(t.A.wow.up?"+":"−")+t.A.wow.pc+"%"})`:""}`).join(", ")}`:`${crm} CRM engagements across ${T.length} teams`;
+  X.headline=gmv?`${rp(gmv)} in sales last week: ${T.map(t=>!t.A.has.sales?`${t.name} no sales file`:`${t.name} ${rp(t.A.gmv)}${t.A.wow&&t.A.wow.pc!=null?` (${t.A.wow.flat?"flat":(t.A.wow.up?"+":"−")+t.A.wow.pc+"%"})`:""}`).join(", ")}`:`${crm} CRM engagements across ${T.length} teams`;
   X.kpis=[{v:rpParts(gmv)[0],u:rpParts(gmv)[1],l:`Total sales from ${orders} orders`,hot:true},
-    ...T.slice(0,2).map(t=>({v:rpParts(t.A.gmv)[0],u:rpParts(t.A.gmv)[1],l:`${t.name}: ${t.A.orders.length} orders, ${pct(t.A.gmv,gmv)}% of sales`})),
+    ...T.slice(0,2).map(t=>t.A.has.sales?{v:rpParts(t.A.gmv)[0],u:rpParts(t.A.gmv)[1],l:`${t.name}: ${t.A.orders.length} orders, ${pct(t.A.gmv,gmv)}% of sales`}:{v:"–",u:"",l:`${t.name}: no sales file uploaded`}),
     (()=>{ const c=all.reduce((s,A)=>s+(A.customers||0),0), nw=all.reduce((s,A)=>s+new Set((A.orders||[]).filter(o=>o.isNew).map(o=>o.ph||o.nk||o.no)).size,0); return {v:String(c),u:"",l:`customers bought${nw?`, ${nw} of them new`:""}`}; })()];
   // two findings per team, labelled with the team
   X.findings=T.flatMap(t=>t.N.findings.slice(0,T.length>2?1:2).map(f=>[`${t.name}: ${f[0]}`,f[1]])).slice(0,4);
@@ -995,7 +1068,7 @@ function deckNarrative0(T){
   const cov=t=>t.A.orders.length?(t.A.orders.length-t.A.noCrm.length)/t.A.orders.length:null;
   const withCov=T.filter(t=>t.A.has.crm&&t.A.has.sales&&t.A.orders.length), best=withCov.slice().sort((a,b)=>cov(b)-cov(a));
   const lead=T.slice().sort((a,b)=>b.A.gmv-a.A.gmv)[0];
-  X.cmpTitle=`${lead.name} drives ${pct(lead.A.gmv,gmv)}% of sales`+(false
+  X.cmpTitle=(T.some(t=>!t.A.has.sales)?`${T.filter(t=>t.A.has.sales).map(t=>t.name).join(", ")||"No team"} has sales data; ${T.filter(t=>!t.A.has.sales).map(t=>t.name).join(", ")} has CRM only`:`${lead.name} drives ${pct(lead.A.gmv,gmv)}% of sales`)+(false
     ?`; ${best[0].name} records ${best[0].A.orders.length-best[0].A.noCrm.length} of ${best[0].A.orders.length} orders in the CRM vs ${best[best.length-1].A.orders.length-best[best.length-1].A.noCrm.length} of ${best[best.length-1].A.orders.length}`:"");
   const F=(t)=>t.A.byFamily?.[0];
   X.cmpRows=[
