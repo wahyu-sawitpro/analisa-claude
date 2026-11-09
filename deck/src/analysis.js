@@ -237,6 +237,7 @@ function canonCrm(r,map,src,defStatus){ const o={_raw:r,_src:src};
       :k==="channel"?trChannel(v):k==="reason"?trReason(v):k==="custType"||k==="userType"?(clean(v)||"").replace(/[^\p{L}\p{N} \/-]/gu,"").trim()||null:clean(v); }
   if(o.reason==="Other"&&o.reasonOther) o.reason=trReason(o.reasonOther);
   o.reasonRaw=map.reason?clean(r[map.reason]):null;
+  o.respRaw=map.status&&/respon\s*pengguna/i.test(map.status)?clean(r[map.status]):null; // Smallholder "Respon Pengguna"
   o.ph=phoneKey(o.phone); o.nk=nameKey(o.name);
   const refOf=v=>(String(v||"").match(/#?B2[BC]\d{3,}/i)||[])[0]?.replace(/^#?/,"#").toUpperCase()||null;
   o.ref=refOf(o.orderRef)||refOf(o.detail); o.refs=o.ref?[o.ref]:[]; o.refVal=o.ref?{[o.ref]:o.potential||0}:{};
@@ -631,12 +632,14 @@ function monthTrend(L){
 
 // What real leads said they need, as logged: the potential sales the PIC entered, else the fertilizer need (kg)
 // field. Nothing is priced or estimated.
-const BARRIERS=[["Payment terms (COD / tempo)",(d,r)=>/tempo|\bcod\b|kredit|cicil/.test(d+" "+r)],["Tied to a KUD or agent",(d,r)=>/terikat|kud|agen/.test(r)],
-  ["No need yet",(d,r)=>/belum ada kebutuhan|waktu dekat/.test(r)||/stok di gudangnya|jika ada kebutuhan/.test(d)],
-  ["No mobile-shop route or long wait",(d,r)=>/(tokling|toko keliling).*(kapan|tidak ada yang kearah)|kapan tokling|belum ada jadwal|antrian/.test(d)||/datang lebih lama/.test(r)],
-  ["Price or shipping cost",(d,r)=>/harga mahal/.test(r)||/ongkir|pengiriman ke|pengantaran/.test(d)],["Out of stock",(d,r)=>/tidak tersedia/.test(r)||/kosong|tidak tersedia/.test(d)],
-  ["Wants warehouse pick-up",d=>/gudang|jemput/.test(d)],["Decision by family",d=>/orang ?tua|suami|istri/.test(d)&&!/topaz/.test(d)],["Topaz rules or documents",d=>/topaz|benih/.test(d)]];
-const barrierOf=r=>{ const d=norm(r.detail), rs=norm(r.reasonRaw||r.reason); const b=BARRIERS.find(([,f])=>f(d,rs)); return b?b[0]:"Still inquiring / catalogue sent"; };
+// "What holds it back" comes from the CRM fields, not guessed from the notes: Smallholder = "Alasan customer tidak
+// tertarik" + "Respon Pengguna"; Plantation = "Alasan tidak tertarik" (with "Alasan lainnya" when the reason is Other).
+const RESP_EN=[[/pikir|pertimbang|consider/i,"Considering"],[/unable|tidak bisa dihubungi|tidak (aktif|diangkat)/i,"Could not be reached"],
+  [/status\s*pesanan|order\s*status/i,"Asking about an order"],[/high\s*prospect|segera\s*transaksi/i,"High prospect, buying soon"],
+  [/prospe[ck]|transaksi\s*dalam/i,"Prospect, buying within a month"],[/already\s*order|sudah\s*(order|beli|membeli)/i,"Already ordered"],
+  [/tidak\s*tertarik|not\s*interest|tolak/i,"Not interested"],[/tertarik|interest/i,"Interested"]];
+const respLabel=v=>{ const m=RESP_EN.find(([re])=>re.test(v||"")); return m?m[1]:clean(v); };
+const barrierOf=r=>[r.reason||(r.reasonRaw&&trReason(r.reasonRaw))||"No reason logged",r.respRaw&&respLabel(r.respRaw)].filter(Boolean).join(" · ");
 // SawitPRO price tiers (product_cat), cheapest to most expensive, as the user defined them:
 // Khusus Petani (farmer price, close to the subsidised price), Toling (mobile shop: sells at set stops, so the
 // customer pays no shipping), Grosir (wholesale) and Retail (the standard app price).

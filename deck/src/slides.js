@@ -46,7 +46,7 @@ function narrative(A){
   // What leads who didn't buy said they need (as logged), live viewers, success stories reconciled with sales
   const ND=A.need, tons=kg=>`${(Math.round(kg/100)/10).toLocaleString("en-US")} t`, VW=A.viewers||[];
   const rejTotal=VW.length+A.notWon.length+A.service.length;
-  if(ND){ const bs=ND.barriers.filter(([b])=>!/still inquiring/i.test(b));
+  if(ND){ const bs=ND.barriers.filter(([b])=>!/^(still inquiring|no reason logged)/i.test(b));
     N.needTitle=ND.nPot||ND.nNeed?`Leads who didn't buy logged ${[ND.nPot&&`${rp(ND.pot)} of potential sales`,ND.kg&&`~${tons(ND.kg)} of fertilizer need`].filter(Boolean).join(" and ")}`
       :`None of the ${ND.leads.length} leads who didn't buy has potential sales or fertilizer need filled`;
     N.needNotes=[
@@ -336,7 +336,7 @@ function narrative(A){
   if(A.wow){ const W=A.wow; F.unshift([W.flat?"Sales flat vs the week before":`Sales ${W.up?"up":"down"} ${W.pc!=null?W.pc+"%":""} vs the week before`,`${rp(W.p.gmv)} → ${rp(W.c.gmv)}, mostly from ${W.drv}${W.lead?`; ${W.lead.k} moved most`:""}.`]); }
   if(false) F.splice(1,0,["Most CRM “wins” are logged after the sale",`${N.kindNote.replace(/^./,c=>c.toUpperCase())} So the CRM can't yet show what turns a lead into an order.`]);
   if(PL&&PL.total>=Math.max(1e7,(A.gmv||0)*.1)) F.splice(1,0,[`${rp(PL.total)} of named demand didn't convert`,`${PL.valued.length} leads said what they needed but didn't order${PL.fix?`; ${rp(PL.fix)} of it was blocked on our side (stock-outs, payment terms)`:""}. ${PL.unval} more leads have no quantity logged.`]);
-  if(ND&&(ND.nPot||ND.nNeed)) F.splice(1,0,[[ND.nPot&&`${rp(ND.pot)} of potential sales`,ND.kg&&`~${tons(ND.kg)} of need`].filter(Boolean).join(" and ")+" didn't convert",`${ND.nPot+ND.nNeed} of ${ND.leads.length} leads logged a value or a quantity${ND.barriers.filter(([b])=>!/still inquiring/i.test(b))[0]?`; the most common blocker is ${lc(ND.barriers.filter(([b])=>!/still inquiring/i.test(b))[0][0])}`:""}.`]);
+  if(ND&&(ND.nPot||ND.nNeed)) F.splice(1,0,[[ND.nPot&&`${rp(ND.pot)} of potential sales`,ND.kg&&`~${tons(ND.kg)} of need`].filter(Boolean).join(" and ")+" didn't convert",`${ND.nPot+ND.nNeed} of ${ND.leads.length} leads logged a value or a quantity${ND.barriers.filter(([b])=>!/^(still inquiring|no reason logged)/i.test(b))[0]?`; the most common blocker is ${lc(ND.barriers.filter(([b])=>!/^(still inquiring|no reason logged)/i.test(b))[0][0])}`:""}.`]);
   if(VW.length>=20) F.splice(2,0,[`${VW.length} “rejections” are TikTok live viewers`,`Logged as leads with an account name and no phone number; ${A.notWon.length} real leads remain.`]);
   if(A.dupOrders&&A.dupOrders.length) F.splice(1,0,[`Possible duplicate order${A.dupOrders.length>1?"s":""}`,A.dupOrders.map(x=>`${x.map(o=>o.no).join(" and ")} (same customer, day and products, ${rp(x[0].gmv)} each)`).join("; ")+"."]);
   if(A.service.length>=3) F.splice(A.service.length>=3&&PL&&PL.total>=Math.max(1e7,(A.gmv||0)*.1)?2:1,0,[`${A.service.length} customers chased late orders`,`They were logged as leads but asked where their order is${A.svcRefs.length?`: ${A.svcRefs.length} orders named${A.svcSla?`, ${A.svcSla} engagements mention the SLA or a queue`:""}`:""}. Late deliveries put the next order at risk.`]);
@@ -391,7 +391,7 @@ function narrative(A){
     const rec=act.filter(x=>/at stake|payment terms/.test(x.t)).sort((a,b)=>val(b)-val(a)); rec.forEach(x=>act.splice(act.indexOf(x),1)); act.splice(1,0,...rec);
     N.bottom={p:`Fix what's on our side: ${rp(PL.fix)} of named demand stalled on stock and payment terms.`,s:N.bottom.s}; }
   if(ND&&ND.rows.length) act.splice(1,0,{t:`Follow up ${ND.rows.length} lead${ND.rows.length>1?"s":""} with a stated need`,d:`${[ND.nPot&&rp(ND.pot)+" potential sales logged",ND.kg&&"~"+tons(ND.kg)+" of need stated"].filter(Boolean).join(", ")}. Call each this week with a landed price and delivery date (IDs on the potential slide).`,o:andList([...new Set(ND.rows.map(r=>r.pic).filter(Boolean))].map(p=>p.split(" ")[0]))||"Lead PIC",w:"This week"});
-  if(ND){ const pt=ND.barriers.find(([b])=>/payment terms/i.test(b)); if(pt&&pt[1]>=2) act.splice(2,0,{t:`Decide on COD / tempo for ${pt[1]} leads`,d:"They asked to pay on delivery or in instalments. Agree a rule with finance and reply, so the PIC can close or drop them.",o:"Sales lead + Finance",w:"Next 2 weeks"}); }
+  if(ND){ const pt=ND.barriers.find(([b])=>/payment terms|credit terms/i.test(b)); if(pt&&pt[1]>=2) act.splice(2,0,{t:`Decide on COD / tempo for ${pt[1]} leads`,d:"They asked to pay on delivery or in instalments. Agree a rule with finance and reply, so the PIC can close or drop them.",o:"Sales lead + Finance",w:"Next 2 weeks"}); }
   if(VW.length>=20) act.push({t:"Log leads, not live viewers",d:`${VW.length} TikTok live viewers were logged as leads with no phone number. Count viewers separately; log a lead only with a phone number and a stated need.`,o:andList([...new Set(VW.map(r=>r.pic).filter(Boolean))].map(p=>p.split(" ")[0])),w:"This week"});
   if(A.dupOrders&&A.dupOrders.length) act.splice(1,0,{t:`Check possible duplicate order${A.dupOrders.length>1?"s":""}`,d:`${A.dupOrders.map(x=>x.map(o=>o.no).join(" and ")).join("; ")}: same customer, day, products and amount. Cancel one if it was entered twice.`,o:A.dupOrders[0][0].pic||"Order PIC",w:"This week"});
   if(stX.length) act.push({t:`Enter the sale for ${stX.map(x=>x.r.id).join(", ")}`,d:"The team put it on the CRM as closed, but the sales export doesn't reflect it yet. Enter the order or correct the CRM.",o:andList([...new Set(stX.map(x=>x.r.pic))]),w:"This week"});
@@ -933,14 +933,14 @@ function teamSpecs(A,N,pre){
     const ND=A.need, tons=kg=>`${(Math.round(kg/100)/10).toLocaleString("en-US")} t`;
     const prod=r=>r.product?prodShort(r.product)+(String(r.product).split(/,(?![^(]*\))/).length>1?` +${String(r.product).split(/,(?![^(]*\))/).length-1}`:""):productsIn([r]).slice(0,3).join(", ")||(r.need&&r.need.seeds?"Topaz seeds":"–");
     const cards=[];
-    cards.push(ND.rows.length?{w:1,title:"Leads with potential sales or fertilizer need filled in",sub:"Only leads whose CRM potential sales or fertilizer need (kg) field is filled. Nothing is estimated",
+    cards.push(ND.rows.length?{w:1,title:"Leads with potential sales or fertilizer need filled in",sub:"Leads whose CRM potential sales or fertilizer need (kg) is filled; what holds it back = the CRM reason"+(ND.rows.some(r=>r.respRaw)?" and Respon Pengguna":""),
       table:{colW:[9,12,16,9,10,17],head:["CRM ID","PIC","Product","Potential sales","Fertilizer need","What holds it back"],align:["l","l","l","r","l","l"],
         rows:ND.rows.slice(0,7).map(r=>[r.id||"–",r.pic||"–",prod(r),r.potential>0?rp(r.potential):"–",r.need?r.need.text:"–",r.barrier])},foot:ND.rows.length>7?`Top 7 of ${ND.rows.length}.`:null}
       :{w:1,title:"No potential or need logged",sub:"No lead has the potential sales or fertilizer need (kg) field filled",kpis:[{v:String(ND.leads.length),u:"",l:"leads who didn't buy have no potential sales and no fertilizer need filled",hot:true},{v:String(ND.zeroPot),u:"",l:"carry a potential of Rp0"}]});
     S.push({kicker:pre+"Rejection reasons · potential",title:N.needTitle,rows:[{h:84,cards:[{kpiRow:[
         {v:rpParts(ND.pot)[0]||"0",u:rpParts(ND.pot)[1],l:`potential sales logged (${pl(ND.nPot,"lead")})`,hot:true},
         {v:ND.kg?`~${tons(ND.kg).replace(" t","")}`:"0",u:" t",l:`fertilizer need filled for ${pl(ND.nNeed,"more lead")}`},
-        ND.seeds?{v:nf.format(ND.seeds),u:"",l:"Topaz seeds requested"}:{v:String(ND.barriers.filter(([b])=>!/still inquiring/i.test(b)).reduce((s,[,n])=>s+n,0)),u:"",l:"leads with a named blocker"},
+        ND.seeds?{v:nf.format(ND.seeds),u:"",l:"Topaz seeds requested"}:{v:String(ND.barriers.filter(([b])=>!/^(still inquiring|no reason logged)/i.test(b)).reduce((s,[,n])=>s+n,0)),u:"",l:"leads with a named blocker"},
         {v:String(ND.none),u:`/${ND.leads.length}`,l:"leads with neither field filled"}]}]},{cards}],notes:N.needNotes});
   }
 

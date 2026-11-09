@@ -17,6 +17,8 @@ added to this deck, not built as separate decks.
 - **Rejection reasons: read the notes.** For every rejection reason, analyse the "Detail Pembahasan" notes (what was
   asked, price sent and no reply, products and quantities named, waiting for Toling, shipping, stock, documents) and
   give a next step per reason ("Rejection reasons · what the notes say" slide).
+- **"What holds it back" comes from the CRM fields:** Plantation = "Alasan tidak tertarik"; Smallholder = "Alasan
+  customer tidak tertarik" + "Respon Pengguna" (e.g. "Product out of stock · Considering"). Don't guess it from notes.
 - **"Belum ketertarikan yang jelas (cek harga / nanya-nanya)" is not a refusal.** Label it "Still inquiring, no clear
   interest to buy now" and treat it as an open enquiry.
 - **SawitPRO price tiers, cheapest to most expensive:** Khusus Petani (farmer price, close to the subsidised price),
