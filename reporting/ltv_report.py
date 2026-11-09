@@ -68,6 +68,7 @@ DECK_TOP_N = 30                  # rows per list in the deck; the xlsx always ha
 DETAIL_FILE = "detail customer smallholder.csv"
 SALES_FILE = "Sales Smallholder.csv"
 CRM_FILE = "CRM Smallholder.csv"
+NO_LOC = "(no location)"          # label in the deck when no source has a location; blank in the xlsx
 REGION_MIN_CUSTOMERS = 5         # provinces with at least this many customers get their own slide
 REGION_TOP_N = 15                # top customers per region slide
 
@@ -435,6 +436,10 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
     bar_chart(s, xr, yb, wr, int(2.75 * IN), seg.index.tolist(), [("LTV (IDR million)", (seg["ltv"] / 1e6).round(0).tolist())],
               [GREEN], title="LTV by tier (IDR million)")
 
+    # ---------------------------------------------------------- 2b. glossary + tiers
+    glossary_slide(deck, d, b)
+    platinum_slide(deck, d)
+
     # ---------------------------------------------------------- 3. segmentation
     s = deck.new()
     header(deck, s, "LTV Segmentation — Tier × Activity",
@@ -457,7 +462,10 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
     legend = [[("Priority:  ", {"bold": True}), ("High", {"bold": True, "color": GREEN}), (" = active ≤90d   ", {}),
                ("Medium", {"bold": True, "color": ORANGE}), (" = at risk 91–180d   ", {}),
                ("Low", {"bold": True, "color": MUTED}), (" = dormant >180d (win back first)   ", {}),
-               ("Verify", {"bold": True, "color": RED}), (f" = area > {AREA_MAX_PLAUSIBLE} ha, check data before offering", {})]]
+               ("Verify", {"bold": True, "color": RED}), (f" = area > {AREA_MAX_PLAUSIBLE} ha, check data before offering", {})],
+              [("MRR", {"bold": True}), (f" = monthly KebunPRO fee = ha × IDR {KEBUNPRO_PRICE:,}   ", {}),
+               ("ARR", {"bold": True}), (" = yearly = MRR × 12   ", {}),
+               ("LTV", {"bold": True}), (" = customer's total sales to date", {})]]
 
     def kp_rows(df, area_col):
         return [[r["customer_name"][:24], r["account_manager"][:22], (r["kp_priority"], prio_col[r["kp_priority"]]),
@@ -516,7 +524,7 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
     src = d["loc_source"].value_counts()
     src_txt = (f"Location from: farm {fmt_int(src.get('Farm', 0))} • same-phone farm {fmt_int(src.get('Farm (same phone)', 0))}"
                f" • delivery {fmt_int(src.get('Delivery', 0) + src.get('Delivery (same phone)', 0))}"
-               f" • CRM kecamatan {fmt_int(src.get('CRM kecamatan', 0))} • unknown {fmt_int(src.get('Unknown', 0))}")
+               f" • CRM kecamatan {fmt_int(src.get('CRM kecamatan', 0))} • no location {fmt_int(src.get('Unknown', 0))}")
 
     s = deck.new()
     header(deck, s, "Breakdown by Province", src_txt)
@@ -529,9 +537,9 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
         oth["active_pct"] = oth["active"] / max(oth["cust"], 1)
         lp = pd.concat([lp, pd.DataFrame([oth], index=[f"Others ({int(small.sum())} prov.)"])])
     if (loc_p.index == "Unknown").any():
-        lp = pd.concat([lp, loc_p[loc_p.index == "Unknown"]])
+        lp = pd.concat([lp, loc_p[loc_p.index == "Unknown"].rename(index={"Unknown": NO_LOC})])
     cw = int((W - 2 * MX) * 0.30)
-    chart_p = lp[lp.index != "Unknown"]
+    chart_p = lp[lp.index != NO_LOC]
     bar_chart(s, MX, y, cw, int(2.3 * IN), chart_p.index.tolist()[::-1],
               [("LTV (IDR million)", (chart_p["ltv"] / 1e6).round(0).tolist()[::-1])], [GREEN],
               title="LTV by province (IDR million)", kind=XL_CHART_TYPE.BAR_CLUSTERED)
@@ -577,7 +585,7 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
         text(s, MX, yl + int(0.25 * IN), cw, int(1.1 * IN),
              [[("•  ", {"bold": True, "color": GREEN}), (t, {})] for t in lines], size=8)
 
-    rr = [[rg if rg != "Unknown" else "(unknown regency)", pv, fmt_int(r["cust"]), fmt_idr(r["ltv"]), fmt_idr(r["avg_ltv"]), f"{r['active_pct'] * 100:.0f}%",
+    rr = [[rg if rg != "Unknown" else "–", pv, fmt_int(r["cust"]), fmt_idr(r["ltv"]), fmt_idr(r["avg_ltv"]), f"{r['active_pct'] * 100:.0f}%",
            fmt_int(r["area_ha"]) if r["area_ha"] else "–", fmt_int(r["kp_n"]), fmt_idr(r["kp_mrr"]) if r["kp_mrr"] else "–",
            fmt_int(r["up_n"]), fmt_int(r["wb_n"])]
           for (pv, rg), r in loc_r[loc_r.index.get_level_values(0) != "Unknown"].head(DECK_TOP_N).iterrows()]
@@ -639,7 +647,8 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
         "Win-back: Platinum/Gold customers that are At risk or Dormant. Full lists incl. phone numbers are in the xlsx.",
         "Location: (1) largest registered farm; (2) farm of another account with the same phone; (3) most frequent "
         "delivery province in Sales for the same customer_id; (4) same phone; (5) CRM 'Kecamatan' for that phone, "
-        "mapped via known farm locations; else 'Unknown'. Sales rows without a location are listed in xlsx 'Location fixes'.",
+        "mapped via known farm locations; if still not found the location is left empty. "
+        "Sales rows without a location are listed in xlsx 'Location fixes'.",
     ]
     text(s, MX, TOP + int(0.6 * IN), W - 2 * MX, int(3.9 * IN),
          [[("•  ", {"color": GREEN, "bold": True}), (t, {})] for t in defs], size=9)
@@ -653,6 +662,74 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
     return dict(customers=len(d), data_date=data_date, kebunpro_area=len(kp_area), kebunpro_sales_based=len(kp_sales),
                 kebunpro_mrr_excl_verify=round(kp_ok["kp_mrr"].sum()), upsell=len(up), winback=len(wb),
                 bench_sales_per_ha=round(b["bench_med"]), bench_p75_per_ha=round(b["bench_p75"]))
+
+
+TIER_RULE = {"Platinum": "Top 10%", "Gold": "Next 20%", "Silver": "Next 30%", "Bronze": "Bottom 40%"}
+TIER_ACTION = {"Platinum": "Keep close: priority service, KebunPRO first, protect from churn",
+               "Gold": "Grow to Platinum: bundles, repeat orders, KebunPRO if ≥ 50 ha",
+               "Silver": "Increase frequency: next-product offers, seasonal reminders",
+               "Bronze": "Activate: second order, low-cost follow-up (WA / broadcast)"}
+
+
+def glossary_slide(deck, d, b):
+    W = deck.W
+    gap = int(0.3 * IN)
+    y = TOP + int(0.62 * IN)
+    lw = int((W - 2 * MX - gap) * 0.47)
+    s = deck.new()
+    header(deck, s, "How to Read This Report — Terms & LTV Tiers")
+    terms = [
+        ("LTV", "Lifetime value = total sales (IDR) of the customer in the data period."),
+        ("AOV", "Average order value = LTV ÷ number of invoices."),
+        ("MRR", f"Monthly recurring revenue = KebunPRO subscription per month = hectares × IDR {KEBUNPRO_PRICE:,}. "
+                "Example: 100 ha → IDR 2.0M / month."),
+        ("ARR", "Annual recurring revenue = MRR × 12. Example: 100 ha → IDR 24.0M / year."),
+        ("KebunPRO candidate", f"Farm area ≥ {KEBUNPRO_MIN_HA} ha. 'est.' = no farm data; area estimated from LTV ÷ "
+                               f"{fmt_idr(b['bench_med'])} per ha → confirm farm size first."),
+        ("Verify", f"Registered area > {AREA_MAX_PLAUSIBLE} ha — likely input error; not counted in MRR."),
+        ("Upsell", f"Active customer (Platinum/Gold or ≥ 2 invoices): sell more / other products."),
+        ("Wallet gap", f"Farm ha × {fmt_idr(b['bench_p75'])} per ha (P75) – LTV = room to grow spend."),
+        ("Win-back", f"Platinum/Gold customer with no order for > {ACTIVE_DAYS} days."),
+        ("Status", f"Active ≤ {ACTIVE_DAYS} days since last order • At risk {ACTIVE_DAYS + 1}–{AT_RISK_DAYS} • "
+                   f"Dormant > {AT_RISK_DAYS}."),
+    ]
+    text(s, MX, y, lw, int(0.25 * IN), "Terms", size=11, bold=True, color=GREEN)
+    text(s, MX, y + int(0.3 * IN), lw, int(3.6 * IN),
+         [[(f"{k}: ", {"bold": True, "color": GREEN}), (v, {})] for k, v in terms], size=8)
+
+    x2 = MX + lw + gap
+    w2 = W - MX - x2
+    order = ["Platinum", "Gold", "Silver", "Bronze"]
+    g = d.groupby("tier").agg(n=("customer_id", "size"), lo=("total_sales", "min"), hi=("total_sales", "max"),
+                              ltv=("total_sales", "sum")).reindex(order)
+    tot = max(d["total_sales"].sum(), 1)
+    tier_col = {"Platinum": GREEN, "Gold": ORANGE, "Silver": INK, "Bronze": MUTED}
+    rows = [[(t, tier_col[t]), TIER_RULE[t], f"{fmt_idr(r['lo'])} – {fmt_idr(r['hi'])}", fmt_int(r["n"]),
+             f"{r['ltv'] / tot * 100:.0f}%"] for t, r in g.iterrows()]
+    text(s, x2, y, w2, int(0.25 * IN), "LTV tiers (ranked by LTV, recalculated every run)", size=11, bold=True,
+         color=GREEN)
+    table(s, x2, y + int(0.3 * IN), w2, ["Tier", "Rule", "LTV range (this run)", "Cust.", "Share of LTV"],
+          rows, [0.8, 1.0, 2.4, 0.55, 0.85], row_h=int(0.3 * IN))
+    ya = y + int(0.3 * IN) + int(0.3 * IN) * 5 + int(0.15 * IN)
+    text(s, x2, ya, w2, int(0.22 * IN), "What to do per tier", size=10, bold=True, color=GREEN)
+    text(s, x2, ya + int(0.26 * IN), w2, int(1.3 * IN),
+         [[(f"{t}: ", {"bold": True, "color": tier_col[t]}), (TIER_ACTION[t], {})] for t in order], size=8)
+
+
+def platinum_slide(deck, d):
+    st_col = {"Active": GREEN, "At risk": ORANGE, "Dormant": RED}
+    pl = d[d["tier"] == "Platinum"].sort_values("total_sales", ascending=False)
+    rows = [[f"{i}. {r['customer_name'][:22]}", r["account_manager"][:20],
+             ("" if r["province"] == "Unknown" else r["province"]), fmt_idr(r["total_sales"]), fmt_int(r["total_invoice"]),
+             fmt_idr(r["avg_sales"]), (r["status"], st_col[r["status"]]), fmt_int(r["days_since_last_order"]),
+             (r["opportunity"] or "–", GREEN if r["opportunity"] else MUTED)]
+            for i, (_, r) in enumerate(pl.iterrows(), start=1)]
+    lo = pl["total_sales"].min() if len(pl) else 0
+    paged_table(deck, f"Platinum Customers — Top 10% by LTV ({fmt_int(len(pl))})",
+                f"LTV ≥ {fmt_idr(lo)}  •  {pl['total_sales'].sum() / max(d['total_sales'].sum(), 1) * 100:.0f}% of total LTV  •  "
+                "Gold/Silver/Bronze lists: xlsx 'All customers' (column LTV tier)",
+                ["Customer", "Account Manager", "Province", "LTV", "Inv.", "AOV", "Status", "Days", "Opportunity"],
+                rows, [1.9, 1.75, 1.2, 0.95, 0.45, 0.95, 0.75, 0.5, 2.3], highlight_col=3, per_page=14)
 
 
 def region_slides(deck, d, loc_p):
@@ -737,6 +814,7 @@ def write_xlsx(path: Path, d, kp_area, kp_sales, up, wb, per_am, b, loc_p, loc_r
             "loc_source": "Location source"}
 
     def loc_cols(df):
+        df = df.replace({"province": {"Unknown": NO_LOC}, "regency": {"Unknown": ""}})
         return df.rename(columns={
             "province": "Province", "regency": "Regency", "cust": "Customers", "ltv": "LTV (IDR)",
             "avg_ltv": "Avg LTV (IDR)", "active": "Active", "active_pct": "Active %", "area_ha": "Farm area (ha)",
@@ -753,6 +831,9 @@ def write_xlsx(path: Path, d, kp_area, kp_sales, up, wb, per_am, b, loc_p, loc_r
         for c in ("kp_mrr", "kp_arr", "wallet_gap"):
             if c in out:
                 out[c] = out[c].round(-3)
+        for c in ("province", "regency", "loc_source"):
+            if c in out:
+                out[c] = out[c].replace("Unknown", "")
         return out.rename(columns=cols)
 
     kp_cols = {"kp_priority": "Priority", "kp_flag": "Note", "total_kebun": "Farms", "kp_ha": "Area / est. area (ha)",
@@ -771,7 +852,8 @@ def write_xlsx(path: Path, d, kp_area, kp_sales, up, wb, per_am, b, loc_p, loc_r
              .sort_values(["province", "total_sales"], ascending=[True, False]),
             {"rank_in_province": "Rank in province", "opportunity": "Opportunity",
              "kp_mrr": "KebunPRO MRR (IDR)", "wallet_gap": "Wallet gap (IDR)", "upsell_action": "Suggested action"}),
-        "Location fixes": fixes,
+        "Location fixes": fixes.replace({"Resolved province": {"Unknown": ""}, "Resolved regency": {"Unknown": ""},
+                                         "Found via": {"Unknown": ""}}) if len(fixes) else fixes,
         "Per AM": per_am.reset_index().rename(columns={
             "account_manager": "Account Manager", "cust": "Customers", "ltv": "LTV (IDR)", "active": "Active",
             "pg": "Platinum/Gold", "kp_n": "KebunPRO candidates", "kp_mrr": "KebunPRO MRR (IDR)",
