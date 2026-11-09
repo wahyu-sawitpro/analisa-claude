@@ -82,7 +82,7 @@ REGION_MIN_CUSTOMERS = 5         # provinces with at least this many customers g
 REGION_TOP_N = 10                # top customers per region slide
 REGION_OFFER_N = 12              # 'who to offer' rows per region (full sentences)
 UPSELL_DECK_N = 18               # upsell rows in the deck (full sentences)
-SENT_PER_PAGE = 8                # rows per slide (6 after the legend) when a column holds full sentences
+SENT_PER_PAGE = 12               # rows per slide (10 after the legend) when a column holds sentences
 
 
 # ================================================================ data
@@ -300,71 +300,50 @@ def mix_label(r) -> str:
 
 
 def full_offer(r) -> str:
-    """Full sentence for the region 'what to offer' column: KebunPRO pitch (if eligible) + upsell suggestion."""
+    """Short 'what to offer' text for the region slide: KebunPRO pitch (if eligible) + main upsell sentence."""
     out = []
-    if r["kp_basis"] == "Area":
-        out.append(f"Farm of {r['kp_ha']:,.0f} ha qualifies for KebunPRO (min. {KEBUNPRO_MIN_HA} ha): offer the "
-                   f"subscription at {fmt_idr(r['kp_mrr'])}/month ({fmt_idr(r['kp_arr'])}/year).")
-    elif r["kp_basis"] == "Sales-based":
-        out.append(f"No farm data, but purchases suggest about {r['kp_ha']:,.0f} ha: confirm the farm size; if ≥ "
-                   f"{KEBUNPRO_MIN_HA} ha offer KebunPRO at about {fmt_idr(r['kp_mrr'])}/month.")
     if r["status"] != "Active" and r["kp_basis"]:
-        out.append(f"Last order was {int(r['days_since_last_order'])} days ago, so open with a win-back call "
-                   "before pitching the subscription.")
+        out.append(f"No order for {int(r['days_since_last_order'])} days: call first.")
+    if r["kp_basis"] == "Area":
+        out.append(f"{r['kp_ha']:,.0f} ha farm: offer KebunPRO ({fmt_idr(r['kp_mrr'])}/month).")
+    elif r["kp_basis"] == "Sales-based":
+        out.append(f"Est. {r['kp_ha']:,.0f} ha: confirm farm size, then offer KebunPRO (≈ {fmt_idr(r['kp_mrr'])}/month).")
     if r["upsell_action"]:
-        first = r["upsell_action"].split(". ")[0].rstrip(".") + "."
-        out.append(first if r["kp_basis"] else r["upsell_action"])
+        sentences = [x.strip().rstrip(".") for x in r["upsell_action"].split(". ") if x.strip()]
+        out += [x + "." for x in sentences[:1 if r["kp_basis"] else 2]]
     return " ".join(out)
 
 
 def suggest(r, toling_regs) -> str:
-    """Full-sentence upsell suggestion for an AM, following the product-channel rules (max 3 sentences).
+    """Short upsell suggestion for an AM (max 2 short sentences), following the product-channel rules.
     Margin order: retail Pupuk > Pupuk Grosir > Toling > Khusus Petani (subsidised, sold at a loss)."""
     out = []
     reg = r["regency"] if r["regency"] != "Unknown" else "their area"
     kp_heavy = r["sh_kp"] >= KP_HEAVY_SHARE
-    normal = r["sh_ret"] + r["sh_gro"]            # share bought at normal (retail / wholesale) price
+    normal = r["sh_ret"] + r["sh_gro"]
     truck_here = reg in toling_regs
-    # 1. Khusus Petani cap / dependency
     if r["kp_mt_max"] >= KP_CAP_MT * KP_NEAR_CAP:
-        out.append(f"Already took {r['kp_mt_max']:.1f} MT of subsidised Khusus Petani in {r['kp_max_month']} "
-                   f"(limit {KP_CAP_MT} MT per month), so any extra need has to be sold at normal price: offer retail "
-                   f"Pupuk{' (or Pupuk Grosir if the volume is large)' if r['total_sales'] >= 1e8 else ''} for the "
-                   "volume above the quota.")
+        out.append(f"Reached the Khusus Petani quota ({r['kp_mt_max']:.0f} of {KP_CAP_MT} MT in {r['kp_max_month']}): "
+                   "sell extra volume as retail Pupuk.")
     elif kp_heavy:
-        out.append(f"{r['sh_kp'] * 100:.0f}% of purchases are subsidised Khusus Petani, which SawitPRO sells at a loss: "
-                   f"keep it within the {KP_CAP_MT} MT/month quota and move the next order to retail Pupuk"
-                   f"{' or the Toling truck' if truck_here else ''} so the account becomes profitable.")
-    # 2. farm size vs spend
+        out.append(f"{r['sh_kp'] * 100:.0f}% Khusus Petani (sold at a loss): move the next order to retail Pupuk.")
     if r["wallet_gap"] == r["wallet_gap"] and r["wallet_gap"] > 0:
-        out.append(f"The {r['total_area_hectare']:,.0f} ha farm can absorb about {fmt_idr(r['wallet_gap'])} more "
-                   "fertilizer than bought so far: propose a full-area fertilizing plan with retail Pupuk for the "
-                   "next application round.")
-    # 3. loyal normal-price buyer -> secure the season
+        out.append(f"{r['total_area_hectare']:,.0f} ha farm, room to grow {fmt_idr(r['wallet_gap'])}: "
+                   "offer a full-farm plan with retail Pupuk.")
     if normal >= 0.5 and not kp_heavy:
-        out.append(f"Buys mostly at normal price ({normal * 100:.0f}% retail / wholesale Pupuk, "
-                   f"{int(r['total_invoice'])} orders): offer a season contract or volume price for the next "
-                   "application so the full-season need is ordered from SawitPRO.")
-    # 4. Toling (low price, truck visits an area for one day)
+        out.append(f"Retail buyer ({normal * 100:.0f}%): offer a season contract or volume price.")
     if r["sh_tol"] >= 0.5:
-        out.append(f"Buys mainly from the Toling truck ({r['sh_tol'] * 100:.0f}%): share the next truck date for "
-                   f"{reg} and pre-book the order; for urgent needs between truck visits offer retail Pupuk with "
-                   "direct delivery.")
+        out.append(f"Toling buyer ({r['sh_tol'] * 100:.0f}%): pre-book the next truck visit in {reg}.")
     elif r["sh_tol"] == 0 and truck_here and normal < 0.3 and not kp_heavy:
-        out.append(f"The Toling truck already serves {reg}: invite the customer to the next one-day truck visit "
-                   "to add an extra order between their regular purchases.")
-    # 5. complementary products
+        out.append(f"Toling truck serves {reg}: invite them to the next visit.")
     cats = r.get("cats") if isinstance(r.get("cats"), list) else []
-    if len(out) < 3 and "Racun" not in cats:
-        out.append("Add Racun (herbicide / weed control) to the next fertilizer order so the fertilizer works "
-                   "better and the basket grows.")
-    if len(out) < 3 and "Benih" not in cats and r["total_area_hectare"] >= 10:
-        out.append("Ask about replanting plans and offer Benih Topaz seedlings for old or empty blocks.")
-    # 6. repeat order
-    if len(out) < 3 and r["total_invoice"] < 3:
-        out.append(f"Only {int(r['total_invoice'])} order(s) so far, last one {int(r['days_since_last_order'])} days "
-                   "ago: call before the next fertilizing round to lock in the repeat order.")
-    return " ".join(out[:3]) or "Offer a volume bundle (retail Pupuk + Racun) for the next fertilizing round."
+    if "Racun" not in cats:
+        out.append("Add Racun to the next order.")
+    if "Benih" not in cats and r["total_area_hectare"] >= 10:
+        out.append("Offer Benih Topaz for replanting.")
+    if r["total_invoice"] < 3:
+        out.append(f"Only {int(r['total_invoice'])} order(s): call before the next fertilizing round.")
+    return " ".join(out[:2]) or "Offer retail Pupuk + Racun for the next fertilizing round."
 
 
 def offer_short(r, toling_regs) -> str:
