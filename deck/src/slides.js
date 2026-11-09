@@ -890,13 +890,16 @@ function teamSpecs(A,N,pre){
       chart:{type:"hbar",legend:[NI,WM,...(RL.some(r=>r.other)?[NS]:[])],items:RL.map(r=>({k:r.k,segs:[[r.lost,OUTC.lost,`${r.raw} · not interested: ${r.lost}`],[r.warm,OUTC.warm,`${r.raw} · considering / prospect: ${r.warm}`],[r.other,OUTC.none,`${r.raw} · no status: ${r.other}`]]})),rowH:44}}];
     if(cols.length) cards.push({w:1.05,title:`Reason by ${andList(dims.map(k=>lc(LABEL[k])))}`,sub:"Engagements per reason; darker = more",chart:{type:"heat",rows:RL.map(r=>r.k),cols:cols.map(c=>c.lab),rowW:170,headH:44,
       val:(r,lab)=>{ const c=cols.find(x=>x.lab===lab); return A.reasonRows.filter(x=>x.reason===r&&x[c.k]===c.g).length; }}});
+    { const PP=A.notWon.filter(r=>r.kind==="lead"||!r.kind), pc=countBy(PP,r=>purposeLabel(r.purpose));
+      if(pc.length) cards.push({w:.8,title:"Purpose of the engagement",sub:"Why the team reached out; top reason in grey",
+        chart:{type:"hbar",items:pc.slice(0,6).map(([k,n])=>{ const rr=countBy(PP.filter(r=>purposeLabel(r.purpose)===k),r=>r.reason||"No reason logged")[0]; return {k,v:n,r:rr?`${rr[0].replace(/, no clear interest to buy now/,"")} ${rr[1]}`:""}; }),color:CAT[1]}}); }
     if(N.tplDominant){ const pics=countBy(A.reasonRows,r=>r.pic); cards.push({w:.9,title:"Who logged these",sub:"Engagements that did not order, by PIC; lead source in grey",
       chart:{type:"hbar",items:pics.slice(0,6).map(([p,n])=>({k:p,v:n,r:countBy(A.reasonRows.filter(r=>r.pic===p),r=>r.source)[0]?.[0]||"–"})),color:"#8E9C84"}}); }
     S.push({kicker:pre+N.rk,title:N.rrTitle,rows:[{cards}],notes:N.rrNotes});
   }
   // Rejection reasons: what the "Detail Pembahasan" notes say behind each reason
   if(A.reasonNotes&&A.reasonNotes.some(g=>g.notes)){
-    const G=A.reasonNotes.filter(g=>g.notes).slice(0,6), all=A.reasonNotes.reduce((s,g)=>s+g.n,0), withN=A.reasonNotes.reduce((s,g)=>s+g.notes,0);
+    const GA=A.reasonNotes.filter(g=>g.notes), G=GA.slice(0,4), all=A.reasonNotes.reduce((s,g)=>s+g.n,0), withN=A.reasonNotes.reduce((s,g)=>s+g.notes,0);
     const NOTE_ACT={"Asked the price":"Reply with the tier price that fits (Khusus Petani for farmers, Toling where the mobile shop stops, Grosir for shops), then ask quantity and timing",
       "Price sent, no reply":"Follow up within 48 hours with one concrete offer (tier price and delivery date), not the whole catalogue",
       "Template note (catalogue sent)":"Log what the lead actually asked; a catalogue-only note can't be followed up",
@@ -913,17 +916,18 @@ function teamSpecs(A,N,pre){
     const lead=G[0], t0=lead.themes[0], short=k=>k.replace(/, no clear interest to buy now/," (no clear interest)");
     const rows=G.map(g=>{ const t=g.themes.filter(([k])=>k!=="Asked the price"||g.themes.length===1).concat(g.themes.filter(([k])=>k==="Asked the price"&&g.themes.length>1)).slice(0,3);
       const pr=productsIn(g.rows).slice(0,3);
-      return [{v:short(g.k),bold:true},`${g.n}${g.notes<g.n?` (${g.notes} with notes)`:""}`,t.length?t.map(([k,n])=>`${k} ${n}`).join(" · "):"No clear pattern",pr.length?pr.join(", "):"–",
+      return [{v:short(g.k),bold:true},`${g.n}${g.notes<g.n?` (${g.notes} with notes)`:""}`,countBy(g.rows,r=>purposeLabel(r.purpose)).slice(0,2).map(([k,n])=>`${k} ${n}`).join(" · ")||"–",t.length?t.map(([k,n])=>`${k} ${n}`).join(" · "):"No clear pattern",pr.length?pr.join(", "):"–",
         g.qtyN?`${g.qtyN} lead${g.qtyN>1?"s":""}, ~${(Math.round(g.qtyKg/100)/10).toLocaleString("en-US")} t`:"–",t.length?NOTE_ACT[t[0][0]]||"–":"Re-read and log a specific reason"]; });
     const askAll=A.reasonNotes.reduce((s,g)=>s+((g.themes.find(([k])=>k==="Asked the price")||[0,0])[1]),0), noRep=A.reasonNotes.reduce((s,g)=>s+((g.themes.find(([k])=>k==="Price sent, no reply")||[0,0])[1]),0);
     const tpl=A.reasonNotes.reduce((s,g)=>s+((g.themes.find(([k])=>k==="Template note (catalogue sent)")||[0,0])[1]),0), tok=A.reasonNotes.reduce((s,g)=>s+((g.themes.find(([k])=>k==="Waiting for the mobile shop")||[0,0])[1]),0);
     S.push({kicker:pre+"Rejection reasons · what the notes say",
       title:t0?`“${short(lead.k)}”: ${lc(t0[0])} in ${t0[1]} of ${lead.n} notes${askAll&&t0[0]!=="Asked the price"?`; ${askAll} leads asked the price`:""}`:`${withN} of ${all} rejection notes read`,
       rows:[{cards:[{title:"What the discussion notes show, by reason",sub:`Read from “Detail Pembahasan” for ${withN} of ${all} leads who didn't order; a note can show several things`,
-        table:{colW:[15,11,27,13,9,25],head:["Reason","Leads","What the notes show","Products named","Need named","Next step"],align:["l","r","l","l","l","l"],rows}}]}],
+        table:{colW:[14,11,12,23,12,8,22],head:["Reason","Leads","Purpose","What the notes show","Products named","Need named","Next step"],align:["l","r","l","l","l","l","l"],rows}}]}],
       notes:[askAll&&`<b>${askAll} of ${withN} leads asked the price${noRep?` and ${noRep} went quiet after the price was sent`:""}.</b> These are open enquiries, not refusals: answer with the cheapest tier that fits the buyer and a delivery date.`,
         tok&&`<b>${tok} ${tok===1?"lead is":"leads are"} waiting for the mobile shop (Toling).</b> Publish the Toling schedule per area; Toling has no shipping cost, which is often the deciding point.`,
         tpl&&`<b>${tpl} notes only say a catalogue was sent.</b> They don't say what the lead needs, so they can't be followed up or sized.`,
+        GA.length>G.length&&`<b>Also:</b> ${esc(GA.slice(G.length).map(g=>`${short(g.k).toLowerCase()} ${g.n}`).join(", "))}.`,
         withN<all&&`<b>${all-withN} of ${all} leads have no discussion notes.</b>`].filter(Boolean)});
   }
 
@@ -934,8 +938,8 @@ function teamSpecs(A,N,pre){
     const prod=r=>r.product?prodShort(r.product)+(String(r.product).split(/,(?![^(]*\))/).length>1?` +${String(r.product).split(/,(?![^(]*\))/).length-1}`:""):productsIn([r]).slice(0,3).join(", ")||(r.need&&r.need.seeds?"Topaz seeds":"–");
     const cards=[];
     cards.push(ND.rows.length?{w:1,title:"Leads with potential sales or fertilizer need filled in",sub:"Leads whose CRM potential sales or fertilizer need (kg) is filled; what holds it back = the CRM reason"+(ND.rows.some(r=>r.respRaw)?" and Respon Pengguna":""),
-      table:{colW:[9,12,16,9,10,17],head:["CRM ID","PIC","Product","Potential sales","Fertilizer need","What holds it back"],align:["l","l","l","r","l","l"],
-        rows:ND.rows.slice(0,7).map(r=>[r.id||"–",r.pic||"–",prod(r),r.potential>0?rp(r.potential):"–",r.need?r.need.text:"–",r.barrier])},foot:ND.rows.length>7?`Top 7 of ${ND.rows.length}.`:null}
+      table:{colW:[9,11,10,15,9,9,17],head:["CRM ID","PIC","Purpose","Product","Potential sales","Fertilizer need","What holds it back"],align:["l","l","l","l","r","l","l"],
+        rows:ND.rows.slice(0,7).map(r=>[r.id||"–",r.pic||"–",purposeLabel(r.purpose)||"–",prod(r),r.potential>0?rp(r.potential):"–",r.need?r.need.text:"–",r.barrier])},foot:ND.rows.length>7?`Top 7 of ${ND.rows.length}.`:null}
       :{w:1,title:"No potential or need logged",sub:"No lead has the potential sales or fertilizer need (kg) field filled",kpis:[{v:String(ND.leads.length),u:"",l:"leads who didn't buy have no potential sales and no fertilizer need filled",hot:true},{v:String(ND.zeroPot),u:"",l:"carry a potential of Rp0"}]});
     S.push({kicker:pre+"Rejection reasons · potential",title:N.needTitle,rows:[{h:84,cards:[{kpiRow:[
         {v:rpParts(ND.pot)[0]||"0",u:rpParts(ND.pot)[1],l:`potential sales logged (${pl(ND.nPot,"lead")})`,hot:true},

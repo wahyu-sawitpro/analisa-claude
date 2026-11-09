@@ -109,6 +109,7 @@ function canonStatus(v){ const s=norm(v); if(!s) return null;
 const REASON_EN=[
   [/belum\s*(ada\s*)?ketertarikan|cek harga|nanya|no clear interest/,"Still inquiring, no clear interest to buy now"],
   [/belum\s*ada\s*kebutuhan|kebutuhan\s*dalam\s*waktu/,"No need in the near term"],
+  [/(lihat|melihat)\s*(gudang|pupuk|barang|produk)|lihat\s*dulu/,"Wants to see the warehouse or product first"],
   [/tempo|kredit|cicil|hutang|credit\s*terms/,"Wants credit terms"],
   [/datang\s*lebih\s*lama|pengiriman\s*lama|slow\s*delivery|delivery\s*too\s*slow/,"Delivery too slow"],
   [/supplier|toko langganan|langganan/,"Already has a supplier / shop"],
@@ -638,6 +639,10 @@ const RESP_EN=[[/pikir|pertimbang|consider/i,"Considering"],[/unable|tidak bisa 
   [/status\s*pesanan|order\s*status/i,"Asking about an order"],[/high\s*prospect|segera\s*transaksi/i,"High prospect, buying soon"],
   [/prospe[ck]|transaksi\s*dalam/i,"Prospect, buying within a month"],[/already\s*order|sudah\s*(order|beli|membeli)/i,"Already ordered"],
   [/tidak\s*tertarik|not\s*interest|tolak/i,"Not interested"],[/tertarik|interest/i,"Interested"]];
+// Why the team reached out: Plantation "Tujuan Melakukan Engagement", Smallholder "Objective"
+const PURPOSE_EN=[[/aku?i?sisi|acquisition/i,"Acquisition"],[/pupuk|fertili[sz]er/i,"Fertilizer"],[/benih|seed|topaz/i,v=>/topaz/i.test(v)?"Topaz seeds":"Seeds"],
+  [/event|acara/i,"Event"],[/kebunpro/i,"KebunPRO"],[/dokter|uji|leaf|soil|tanah|daun/i,"Leaf / soil test"],[/drone|pemetaan|mapping/i,"Drone / mapping"]];
+const purposeLabel=v=>{ const c=clean(v); if(!c) return null; const m=PURPOSE_EN.find(([re])=>re.test(c)); return m?(typeof m[1]==="function"?m[1](c):m[1]):c; };
 const respLabel=v=>{ const m=RESP_EN.find(([re])=>re.test(v||"")); return m?m[1]:clean(v); };
 const barrierOf=r=>[r.reason||(r.reasonRaw&&trReason(r.reasonRaw))||"No reason logged",r.respRaw&&respLabel(r.respRaw)].filter(Boolean).join(" · ");
 // SawitPRO price tiers (product_cat), cheapest to most expensive, as the user defined them:
