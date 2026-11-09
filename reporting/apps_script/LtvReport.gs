@@ -6,7 +6,7 @@
  * project as Code.gs without name clashes (or in its own project — it is self-contained).
  *
  * Every Monday 16:00 WIB GitHub Actions builds the artifact "ltv-report"
- * (ltv_report.pptx + ltv_report.xlsx). This script runs Monday 17:00–18:00 WIB,
+ * (ltv_report.pptx + ltv_report.xlsx). This script runs Monday 19:00–20:00 WIB,
  * downloads the newest artifact and overwrites TWO fixed Drive files, so the shared
  * links never change (Drive keeps previous weeks as version history).
  *
@@ -16,7 +16,7 @@
  *  3. Upload one .pptx and one .xlsx to Drive once (any content) and paste their
  *     file IDs into LTV_PPTX_FILE_ID / LTV_XLSX_FILE_ID below.
  *  4. Run ltvSetup() once and approve the permissions.
- *  5. Run ltvInstallTrigger() once (weekly Monday 17:00 WIB trigger for LTV only).
+ *  5. Run ltvInstallTrigger() once (weekly Monday 19:00 WIB trigger for LTV only).
  *  Optional: run ltvPullLatestReport() manually any time to test.
  */
 
@@ -53,10 +53,10 @@ function ltvInstallTrigger() {
   ScriptApp.newTrigger('ltvPullLatestReport')
     .timeBased()
     .onWeekDay(ScriptApp.WeekDay.MONDAY)
-    .atHour(17)
+    .atHour(19)
     .inTimezone('Asia/Jakarta')
     .create();
-  Logger.log('LTV trigger installed: every Monday 17:00–18:00 WIB');
+  Logger.log('LTV trigger installed: every Monday 19:00–20:00 WIB');
 }
 
 function ltvPullLatestReport() {
