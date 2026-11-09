@@ -1,0 +1,48 @@
+name: LTV & Upsell / Cross-sell Report Smallholder (build deck)
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"    # Monday 09:00 UTC = 16:00 WIB (same slot as the AM report)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Jakarta
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r reporting/requirements.txt
+
+      - name: Check input files
+        run: |
+          for f in "detail customer smallholder.csv" "deck slide.pptx"; do
+            if [ ! -f "$f" ]; then
+              echo "::error::File '$f' tidak ditemukan di repo. Upload export terbaru dulu."
+              exit 1
+            fi
+          done
+          if [ ! -f "Sales Smallholder.csv" ]; then
+            echo "::warning::'Sales Smallholder.csv' tidak ada — rekomendasi produk upsell dilewati."
+          fi
+
+      - name: Build deck + xlsx
+        run: python reporting/ltv_report.py --data-dir . --template "deck slide.pptx" --out "output/ltv_report.pptx" --xlsx "output/ltv_report.xlsx"
+
+      - name: Keep outputs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ltv-report
+          path: |
+            output/ltv_report.pptx
+            output/ltv_report.xlsx
+          retention-days: 14
