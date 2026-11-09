@@ -67,6 +67,9 @@ DECK_TOP_N = 30                  # rows per list in the deck; the xlsx always ha
 
 DETAIL_FILE = "detail customer smallholder.csv"
 SALES_FILE = "Sales Smallholder.csv"
+CRM_FILE = "CRM Smallholder.csv"
+REGION_MIN_CUSTOMERS = 5         # provinces with at least this many customers get their own slide
+REGION_TOP_N = 15                # top customers per region slide
 
 
 # ================================================================ data
@@ -136,6 +139,7 @@ def load_detail(path: Path) -> pd.DataFrame:
     d["last_order"] = pd.to_datetime(d["last_order_date"], format="%d/%m/%Y", errors="coerce")
     d["n_farms"] = d["area_hectare"].map(lambda s: len(_parse_list(s)))
     d["location"] = d["farm_location"].map(_first_location)
+    d["phone_key"] = d["customer_phone"].map(norm_phone)
     mf = d.apply(_main_farm, axis=1)
     d["farm_regency"] = mf.map(lambda t: norm_regency(t[0]))
     d["farm_province"] = mf.map(lambda t: norm_province(t[1]))
@@ -165,7 +169,99 @@ def load_categories(path: Path) -> pd.DataFrame | None:
     return g
 
 
-def analyse(d: pd.DataFrame, cats: pd.DataFrame | None):
+def load_location_context(data_dir: Path):
+    """Sales rows + CRM kecamatan, used to fill customers/rows without a location."""
+    ctx = {"sales": None, "crm": None}
+    sp = data_dir / SALES_FILE
+    if sp.exists():
+        s = pd.read_csv(sp, dtype=str)
+        s["phone"] = s["customer_phone"].map(norm_phone)
+        s["prov_n"] = s["province"].map(norm_province)
+        s["reg_n"] = s["city"].map(norm_regency)
+        ctx["sales"] = s
+    cp = data_dir / CRM_FILE
+    if cp.exists():
+        c = pd.read_csv(cp, dtype=str, encoding="utf-8-sig", usecols=lambda x: x in ("cleaned phone", "Kecamatan"))
+        if {"cleaned phone", "Kecamatan"} <= set(c.columns):
+            c["phone"] = c["cleaned phone"].map(norm_phone)
+            c["kec"] = c["Kecamatan"].fillna("").str.strip()
+            ctx["crm"] = c[(c["kec"] != "") & c["phone"].notna()]
+    return ctx
+
+
+def resolve_locations(d: pd.DataFrame, ctx) -> pd.DataFrame:
+    """Province/regency per customer. Order of sources:
+    1 Farm (own)  2 Farm (same phone, other account)  3 Delivery (same customer_id)
+    4 Delivery (same phone, other account)  5 CRM kecamatan (same phone)  6 Unknown"""
+    d = d.copy()
+    d["province"], d["regency"], d["loc_source"] = "", "", ""
+
+    def fill(mask_prov, prov, reg, label):
+        m = (d["province"] == "") & mask_prov
+        d.loc[m, "province"] = prov[m]
+        d.loc[m, "regency"] = reg[m]
+        d.loc[m, "loc_source"] = label
+
+    has = d["farm_province"] != ""
+    fill(has, d["farm_province"], d["farm_regency"], "Farm")
+
+    farm_by_phone = d[has & d["phone_key"].notna()].drop_duplicates("phone_key").set_index("phone_key")
+    fp = d["phone_key"].map(farm_by_phone["farm_province"]).fillna("")
+    fr = d["phone_key"].map(farm_by_phone["farm_regency"]).fillna("")
+    fill(fp != "", fp, fr, "Farm (same phone)")
+
+    s = ctx.get("sales")
+    if s is not None:
+        ok = s[s["prov_n"] != ""]
+        for key, col, label in (("customer_id", "customer_id", "Delivery"),
+                                ("phone", "phone_key", "Delivery (same phone)")):
+            g = ok.groupby(key).agg(p=("prov_n", _mode),
+                                    r=("reg_n", _mode))
+            pv = d[col].map(g["p"]).fillna("")
+            rg = d[col].map(g["r"]).fillna("")
+            fill(pv != "", pv, rg, label)
+
+    c = ctx.get("crm")
+    if c is not None:
+        # CRM 'Kecamatan' looks like "Kampar - Tapung Hilir" (regency - district).
+        # regency -> province is learnt from registered farm locations and Sales addresses.
+        pairs = [(norm_regency(loc[-2]), norm_province(loc[-1]))
+                 for v in d["farm_location"] for loc in _split_locations(v) if len(loc) >= 2]
+        if s is not None:
+            pairs += list(zip(s["reg_n"], s["prov_n"]))
+        rp = pd.DataFrame(pairs, columns=["reg", "prov"])
+        rp = rp[(rp["reg"] != "") & (rp["prov"] != "")].groupby("reg")["prov"].agg(_mode)
+        ck = c.assign(reg=c["kec"].str.split(" - ").str[0].map(norm_regency))
+        ck["prov"] = ck["reg"].map(rp)
+        ck = ck.dropna(subset=["prov"]).groupby("phone").agg(p=("prov", _mode), r=("reg", _mode))
+        pv = d["phone_key"].map(ck["p"]).fillna("")
+        rg = d["phone_key"].map(ck["r"]).fillna("")
+        fill(pv != "", pv, rg, "CRM kecamatan")
+
+    d["province"] = d["province"].replace("", "Unknown")
+    d["regency"] = d["regency"].replace("", "Unknown")
+    d.loc[d["loc_source"] == "", "loc_source"] = "Unknown"
+    return d
+
+
+def location_fixes(d: pd.DataFrame, ctx) -> pd.DataFrame:
+    """Sales rows that had no province/city, with the location found via the same customer_id / phone."""
+    s = ctx.get("sales")
+    if s is None:
+        return pd.DataFrame()
+    bad = s[s["prov_n"] == ""]
+    look = d.set_index("customer_id")[["province", "regency", "loc_source"]]
+    res = look.reindex(bad["customer_id"]).reset_index(drop=True)
+    out = pd.DataFrame({
+        "Order date": bad["sale_order_date"].values, "Invoice": bad["main_invoice_no"].values,
+        "Customer": bad["customer_name"].values, "Phone": bad["customer_phone"].values,
+        "AM (PIC)": bad["pic_name"].values, "Province in Sales": bad["province"].values,
+        "City in Sales": bad["city"].values, "Resolved province": res["province"].values,
+        "Resolved regency": res["regency"].values, "Found via": res["loc_source"].values})
+    return out
+
+
+def analyse(d: pd.DataFrame, cats: pd.DataFrame | None, ctx=None):
     d = d.copy()
     # ---- LTV tier (by rank so ties don't collapse tiers)
     pct = d["total_sales"].rank(ascending=False, method="first") / len(d)
@@ -219,14 +315,8 @@ def analyse(d: pd.DataFrame, cats: pd.DataFrame | None):
     else:
         d["bought"] = d["next_product"] = ""
         d["sales_province"] = d["sales_regency"] = ""
-    # ---- location: largest farm's province/regency; fallback = delivery address in Sales; else Unknown
-    sp = d["sales_province"].fillna("")
-    sr = d["sales_regency"].fillna("")
-    d["province"] = d["farm_province"].where(d["farm_province"] != "", sp).replace("", "Unknown")
-    d["regency"] = d["farm_regency"].where(d["farm_province"] != "", sr).replace("", "Unknown")
-    d["loc_source"] = "Farm"
-    d.loc[d["farm_province"] == "", "loc_source"] = "Delivery"
-    d.loc[d["province"] == "Unknown", "loc_source"] = "Unknown"
+    # ---- location (farm -> same phone farm -> delivery by id -> delivery by phone -> CRM kecamatan)
+    d = resolve_locations(d, ctx or {})
 
     def upsell_action(r):
         if not r["upsell"]:
@@ -244,6 +334,21 @@ def analyse(d: pd.DataFrame, cats: pd.DataFrame | None):
     # ---- win-back
     d["winback"] = d["tier"].isin(["Platinum", "Gold"]) & d["status"].isin(["At risk", "Dormant"])
 
+    def opp(r):
+        o = []
+        if r["kp_basis"] == "Area" and r["kp_priority"] != "Verify":
+            o.append(f"KebunPRO {r['kp_ha']:,.0f} ha")
+        elif r["kp_basis"] == "Area":
+            o.append("KebunPRO (verify area)")
+        elif r["kp_basis"] == "Sales-based":
+            o.append(f"KebunPRO est. {r['kp_ha']:,.0f} ha")
+        if r["upsell"]:
+            o.append("Upsell")
+        if r["winback"]:
+            o.append("Win-back")
+        return " + ".join(o)
+    d["opportunity"] = d.apply(opp, axis=1)
+
     return d, dict(bench_med=bench_med, bench_p75=bench_p75, n_bench=len(known))
 
 
@@ -251,7 +356,9 @@ def analyse(d: pd.DataFrame, cats: pd.DataFrame | None):
 def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: dt.date):
     d0 = load_detail(data_dir / DETAIL_FILE)
     cats = load_categories(data_dir / SALES_FILE)
-    d, b = analyse(d0, cats)
+    ctx = load_location_context(data_dir)
+    d, b = analyse(d0, cats, ctx)
+    fixes = location_fixes(d, ctx)
     data_date = d["last_order"].max().date() if d["last_order"].notna().any() else today
 
     kp = d[d["kp_basis"] != ""].copy()
@@ -407,9 +514,9 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
     loc_p = location_table(d, kp_ok, kp, up, wb, "province")
     loc_r = location_table(d, kp_ok, kp, up, wb, ["province", "regency"])
     src = d["loc_source"].value_counts()
-    src_txt = (f"Location = province of the customer's largest farm ({fmt_int(src.get('Farm', 0))}); "
-               f"no farm data -> delivery address in Sales ({fmt_int(src.get('Delivery', 0))}); "
-               f"unknown {fmt_int(src.get('Unknown', 0))}")
+    src_txt = (f"Location from: farm {fmt_int(src.get('Farm', 0))} • same-phone farm {fmt_int(src.get('Farm (same phone)', 0))}"
+               f" • delivery {fmt_int(src.get('Delivery', 0) + src.get('Delivery (same phone)', 0))}"
+               f" • CRM kecamatan {fmt_int(src.get('CRM kecamatan', 0))} • unknown {fmt_int(src.get('Unknown', 0))}")
 
     s = deck.new()
     header(deck, s, "Breakdown by Province", src_txt)
@@ -482,6 +589,9 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
                 rr, [1.5, 1.4, 0.55, 1, 0.95, 0.65, 0.8, 0.8, 0.95, 0.65, 0.75], highlight_col=3,
                 empty_row=["(no location data)"] + [""] * 10)
 
+    # ---------------------------------------------------------- 7c. per region: who to call
+    region_slides(deck, d, loc_p)
+
     # ---------------------------------------------------------- 8. per AM
     g = d.groupby("account_manager").agg(
         cust=("customer_id", "size"), ltv=("total_sales", "sum"), active=("status", lambda x: (x == "Active").sum()),
@@ -527,8 +637,9 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
         "Suggested products = core categories (Pupuk, Pupuk Grosir, Khusus Petani, Toling, Benih, Racun) not yet bought, "
         "ordered by how common they are among repeat customers.",
         "Win-back: Platinum/Gold customers that are At risk or Dormant. Full lists incl. phone numbers are in the xlsx.",
-        "Location: province/regency of the customer's largest registered farm; if no farm data, the most frequent "
-        "delivery province/city in Sales Smallholder.csv; otherwise 'Unknown'.",
+        "Location: (1) largest registered farm; (2) farm of another account with the same phone; (3) most frequent "
+        "delivery province in Sales for the same customer_id; (4) same phone; (5) CRM 'Kecamatan' for that phone, "
+        "mapped via known farm locations; else 'Unknown'. Sales rows without a location are listed in xlsx 'Location fixes'.",
     ]
     text(s, MX, TOP + int(0.6 * IN), W - 2 * MX, int(3.9 * IN),
          [[("•  ", {"color": GREEN, "bold": True}), (t, {})] for t in defs], size=9)
@@ -537,11 +648,59 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
     deck.finalize(out)
 
     if xlsx:
-        write_xlsx(xlsx, d, kp_area, kp_sales, up, wb, g, b, loc_p, loc_r)
+        write_xlsx(xlsx, d, kp_area, kp_sales, up, wb, g, b, loc_p, loc_r, fixes)
 
     return dict(customers=len(d), data_date=data_date, kebunpro_area=len(kp_area), kebunpro_sales_based=len(kp_sales),
                 kebunpro_mrr_excl_verify=round(kp_ok["kp_mrr"].sum()), upsell=len(up), winback=len(wb),
                 bench_sales_per_ha=round(b["bench_med"]), bench_p75_per_ha=round(b["bench_p75"]))
+
+
+def region_slides(deck, d, loc_p):
+    """Per province (>= REGION_MIN_CUSTOMERS): slide A = top customers by LTV, slide B = who to offer
+    (KebunPRO cross-sell first, then upsell)."""
+    tier_col = {"Platinum": GREEN, "Gold": ORANGE, "Silver": INK, "Bronze": MUTED}
+    st_col = {"Active": GREEN, "At risk": ORANGE, "Dormant": RED}
+    reg = lambda r: "–" if r["regency"] == "Unknown" else r["regency"][:15]
+    am = lambda r: r["account_manager"][:19]
+    m = lambda v: fmt_idr(v).replace("IDR ", "")
+    for prov, pr in loc_p.iterrows():
+        if prov == "Unknown" or pr["cust"] < REGION_MIN_CUSTOMERS:
+            continue
+        sub = d[d["province"] == prov]
+        summary = (f"{fmt_int(pr['cust'])} customers  •  LTV {fmt_idr(pr['ltv'])}  •  active {pr['active_pct'] * 100:.0f}%  •  "
+                   f"KebunPRO MRR {fmt_idr(pr['kp_mrr'])}  •  {fmt_int(pr['up_n'])} upsell  •  {fmt_int(pr['wb_n'])} win-back")
+
+        top = sub.sort_values("total_sales", ascending=False).head(REGION_TOP_N)
+        rows = [[f"{i}. {r['customer_name'][:21]}", reg(r), am(r), (r["tier"], tier_col[r["tier"]]),
+                 (r["status"], st_col[r["status"]]), m(r["total_sales"]), fmt_int(r["total_invoice"]),
+                 fmt_int(r["days_since_last_order"]), (r["opportunity"] or "–", GREEN if r["opportunity"] else MUTED)]
+                for i, (_, r) in enumerate(top.iterrows(), start=1)]
+        paged_table(deck, f"{prov} — Top {len(rows)} Customers by LTV", summary,
+                    ["Customer", "Regency", "Account Manager", "Tier", "Status", "LTV (IDR)", "Inv.", "Days", "Opportunity"],
+                    rows, [2, 1.3, 1.9, 0.75, 0.75, 0.9, 0.45, 0.5, 2.4], highlight_col=5, per_page=REGION_TOP_N)
+
+        kp_t = sub[(sub["kp_basis"] != "") & (sub["kp_priority"] != "Verify")].sort_values("kp_mrr", ascending=False)
+        up_t = sub[sub["upsell"] & ~sub.index.isin(kp_t.index)].sort_values("total_sales", ascending=False)
+        if not len(kp_t) + len(up_t):
+            continue                      # nothing to offer here -> no empty slide
+        tg = pd.concat([kp_t, up_t]).head(DECK_TOP_N)
+        trows = []
+        for _, r in tg.iterrows():
+            if r["kp_basis"]:
+                what = (f"KebunPRO {'est. ' if r['kp_basis'] == 'Sales-based' else ''}{r['kp_ha']:,.0f} ha"
+                        + (" + Upsell" if r["upsell"] else ""))
+                val, col = f"MRR {m(r['kp_mrr'])}", GREEN
+            else:
+                what = f"Upsell: {r['next_product']}" if r["next_product"] else "Upsell: repeat order / bundle"
+                gap_ok = r["wallet_gap"] == r["wallet_gap"] and r["wallet_gap"] > 0
+                val, col = (f"Gap {m(r['wallet_gap'])}" if gap_ok else "–"), INK
+            trows.append([r["customer_name"][:21], reg(r), am(r), (what[:34], col), val,
+                          m(r["total_sales"]), (r["status"], st_col[r["status"]]), fmt_int(r["days_since_last_order"])])
+        more = f"  •  top {DECK_TOP_N} shown, full list in xlsx" if len(kp_t) + len(up_t) > DECK_TOP_N else ""
+        paged_table(deck, f"{prov} — Who to Offer: KebunPRO & Upsell ({fmt_int(len(kp_t))} + {fmt_int(len(up_t))})",
+                    f"KebunPRO candidates first (by MRR, excl. 'Verify'), then upsell candidates (by LTV){more}",
+                    ["Customer", "Regency", "Account Manager", "Offer", "Value (IDR)", "LTV (IDR)", "Status", "Days"],
+                    trows, [2, 1.3, 1.9, 2.6, 1.05, 0.9, 0.75, 0.5], highlight_col=4)
 
 
 def tile(slide, x, y, w, h, label, value):
@@ -570,7 +729,7 @@ def location_table(d, kp_ok, kp, up, wb, by):
 
 
 # ================================================================ xlsx
-def write_xlsx(path: Path, d, kp_area, kp_sales, up, wb, per_am, b, loc_p, loc_r):
+def write_xlsx(path: Path, d, kp_area, kp_sales, up, wb, per_am, b, loc_p, loc_r, fixes):
     path.parent.mkdir(parents=True, exist_ok=True)
     base = {"customer_name": "Customer", "phone": "Phone", "account_manager": "Account Manager", "tier": "LTV tier",
             "status": "Status", "total_sales": "LTV (IDR)", "total_invoice": "Invoices", "avg_sales": "AOV (IDR)",
@@ -607,6 +766,12 @@ def write_xlsx(path: Path, d, kp_area, kp_sales, up, wb, per_am, b, loc_p, loc_r
         "Win-back": pick(wb, {"kp_basis": "KebunPRO basis", "bought": "Categories bought"}),
         "Per Province": loc_cols(loc_p.reset_index()),
         "Per Regency": loc_cols(loc_r.reset_index()),
+        "Customers by Region": pick(
+            d.assign(rank_in_province=d.groupby("province")["total_sales"].rank(ascending=False, method="first"))
+             .sort_values(["province", "total_sales"], ascending=[True, False]),
+            {"rank_in_province": "Rank in province", "opportunity": "Opportunity",
+             "kp_mrr": "KebunPRO MRR (IDR)", "wallet_gap": "Wallet gap (IDR)", "upsell_action": "Suggested action"}),
+        "Location fixes": fixes,
         "Per AM": per_am.reset_index().rename(columns={
             "account_manager": "Account Manager", "cust": "Customers", "ltv": "LTV (IDR)", "active": "Active",
             "pg": "Platinum/Gold", "kp_n": "KebunPRO candidates", "kp_mrr": "KebunPRO MRR (IDR)",
