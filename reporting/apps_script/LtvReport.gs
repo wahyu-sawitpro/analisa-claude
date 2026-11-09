@@ -22,8 +22,8 @@
 
 const LTV_REPO = 'wahyu-sawitpro/analisa-claude';
 const LTV_ARTIFACT_NAME = 'ltv-report';
-const LTV_PPTX_FILE_ID = 'PASTE_LTV_PPTX_FILE_ID';
-const LTV_XLSX_FILE_ID = 'PASTE_LTV_XLSX_FILE_ID';
+const LTV_PPTX_FILE_ID = '1VIO1pjQJQkd5TIwwJKV2v7YIk7OSTbQc';
+const LTV_XLSX_FILE_ID = '1qlsD9_NgZxtcZwUsYRtrnREUGWx7U6wx';
 const LTV_MAX_AGE_HOURS = 30; // ignore artifacts older than this (e.g. workflow failed this week)
 const LTV_LAST_ID_PROP = 'LAST_ARTIFACT_ID_LTV'; // separate from the AM report's LAST_ARTIFACT_ID
 
