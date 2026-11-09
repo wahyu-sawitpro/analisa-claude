@@ -304,7 +304,7 @@ def kpi_tile(slide, x, y, w, h, label, value, delta=None):
         text(slide, x + pad, y + h - pad - int(0.18 * IN), w - 2 * pad, int(0.18 * IN), delta[0], size=8, color=delta[1])
 
 
-def table(slide, x, y, w, cols, rows, widths, row_h=int(0.215 * IN), font=8, highlight_col=None):
+def table(slide, x, y, w, cols, rows, widths, row_h=int(0.215 * IN), font=8, highlight_col=None, left_cols=()):
     n = len(rows) + 1
     gt = slide.shapes.add_table(n, len(cols), Emu(x), Emu(y), Emu(w), Emu(row_h * n)).table
     tot = sum(widths)
@@ -324,7 +324,7 @@ def table(slide, x, y, w, cols, rows, widths, row_h=int(0.215 * IN), font=8, hig
             cell.margin_top = cell.margin_bottom = Emu(int(0.02 * IN))
             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
             p = cell.text_frame.paragraphs[0]
-            p.alignment = PP_ALIGN.LEFT if c == 0 else PP_ALIGN.RIGHT
+            p.alignment = PP_ALIGN.LEFT if c == 0 or c in left_cols else PP_ALIGN.RIGHT
             f = p.runs[0].font
             f.name, f.size = FONT, Pt(font)
             cell.fill.solid()
@@ -343,7 +343,7 @@ ROWS_PER_PAGE = 15
 
 def paged_table(deck, title, subtitle, cols, rows, widths, *, footer_rows=None, highlight_col=None,
                 x=None, w=None, y=None, per_page=ROWS_PER_PAGE, legend=None, first_extra=None, label=None,
-                empty_row=None):
+                empty_row=None, font=8, left_cols=()):
     """Render ALL rows; continue onto extra slides ("cont.") when they don't fit on one slide."""
     x = MX if x is None else x
     w = (deck.W - 2 * MX) if w is None else w
@@ -371,7 +371,7 @@ def paged_table(deck, title, subtitle, cols, rows, widths, *, footer_rows=None, 
             yy += int(0.26 * IN)
         body = chunk + (footer_rows if i == len(chunks) - 1 else [])
         if body:
-            table(s, x, yy, w, cols, body, widths, highlight_col=highlight_col)
+            table(s, x, yy, w, cols, body, widths, highlight_col=highlight_col, font=font, left_cols=left_cols)
         if i == 0 and first_extra:
             first_extra(s)
         slides.append(s)
