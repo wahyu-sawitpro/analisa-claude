@@ -79,7 +79,7 @@ SALES_FILE = "Sales Smallholder.csv"
 CRM_FILE = "CRM Smallholder.csv"
 NO_LOC = "(no location)"          # label in the deck when no source has a location; blank in the xlsx
 REGION_MIN_CUSTOMERS = 5         # provinces with at least this many customers get their own slide
-REGION_TOP_N = 15                # top customers per region slide
+REGION_TOP_N = 10                # top customers per region slide
 REGION_OFFER_N = 12              # 'who to offer' rows per region (full sentences)
 UPSELL_DECK_N = 18               # upsell rows in the deck (full sentences)
 SENT_PER_PAGE = 8                # rows per slide (6 after the legend) when a column holds full sentences
@@ -368,22 +368,44 @@ def suggest(r, toling_regs) -> str:
 
 
 def offer_short(r, toling_regs) -> str:
-    """Short label of the main suggestion (for narrow table columns)."""
-    reg = r["regency"] if r["regency"] != "Unknown" else ""
+    """Main upsell offer as a short phrase (verb first), used in the Opportunity column and xlsx 'Main offer'."""
+    reg = r["regency"] if r["regency"] != "Unknown" else "their area"
     normal = r["sh_ret"] + r["sh_gro"]
     if r["kp_mt_max"] >= KP_CAP_MT * KP_NEAR_CAP:
-        return "Above KP quota → retail Pupuk"
+        return f"sell retail Pupuk for the volume above the {KP_CAP_MT} MT/month Khusus Petani quota"
     if r["sh_kp"] >= KP_HEAVY_SHARE:
-        return "Shift KP → retail Pupuk"
+        return "move purchases from subsidised Khusus Petani to retail Pupuk"
     if r["wallet_gap"] == r["wallet_gap"] and r["wallet_gap"] > 0:
-        return "Full-area plan (retail Pupuk)"
+        return f"propose a fertilizing plan for the whole farm (room to grow {fmt_idr(r['wallet_gap'])})"
     if normal >= 0.5:
-        return "Season contract / volume price"
+        return "offer a season contract or volume price for retail Pupuk"
     if r["sh_tol"] >= 0.5:
-        return "Next Toling visit + retail"
+        return f"pre-book their order on the next Toling truck visit in {reg}"
     if r["sh_tol"] == 0 and reg in toling_regs and normal < 0.3:
-        return "Invite to Toling truck"
-    return "Retail Pupuk + Racun bundle"
+        return f"invite them to the next Toling truck visit in {reg}"
+    return "bundle retail Pupuk with Racun for the next fertilizing round"
+
+
+def opportunity_text(r) -> str:
+    """Clear sentence(s) describing what to do with the customer (win-back, KebunPRO, upsell)."""
+    out = []
+    if r["winback"]:
+        out.append(f"Call to win back — no order for {int(r['days_since_last_order'])} days.")
+    kp = ""
+    if r["kp_basis"] == "Area" and r["kp_priority"] != "Verify":
+        kp = f"offer KebunPRO for the {r['kp_ha']:,.0f} ha farm ({fmt_idr(r['kp_mrr'])}/month)"
+    elif r["kp_basis"] == "Area":
+        kp = (f"check the registered farm area first ({r['total_area_hectare']:,.0f} ha looks wrong), "
+              "then offer KebunPRO")
+    elif r["kp_basis"] == "Sales-based":
+        kp = (f"confirm the farm size (est. {r['kp_ha']:,.0f} ha from purchases), then offer KebunPRO "
+              f"(≈ {fmt_idr(r['kp_mrr'])}/month)")
+    up = r["offer_short"] if r["upsell"] else ""
+    main = "; also ".join(x for x in (kp, up) if x)
+    if main:
+        main = main[0].upper() + main[1:] + "."
+        out.append(("Then " + main[0].lower() + main[1:]) if r["winback"] else main)
+    return " ".join(out)
 
 
 def analyse(d: pd.DataFrame, cats: pd.DataFrame | None, ctx=None):
@@ -457,20 +479,7 @@ def analyse(d: pd.DataFrame, cats: pd.DataFrame | None, ctx=None):
     # ---- win-back
     d["winback"] = d["tier"].isin(["Platinum", "Gold"]) & d["status"].isin(["At risk", "Dormant"])
 
-    def opp(r):
-        o = []
-        if r["kp_basis"] == "Area" and r["kp_priority"] != "Verify":
-            o.append(f"KebunPRO {r['kp_ha']:,.0f} ha")
-        elif r["kp_basis"] == "Area":
-            o.append("KebunPRO (verify area)")
-        elif r["kp_basis"] == "Sales-based":
-            o.append(f"KebunPRO est. {r['kp_ha']:,.0f} ha")
-        if r["upsell"]:
-            o.append("Upsell")
-        if r["winback"]:
-            o.append("Win-back")
-        return " + ".join(o)
-    d["opportunity"] = d.apply(opp, axis=1)
+    d["opportunity"] = d.apply(opportunity_text, axis=1)
 
     return d, dict(bench_med=bench_med, bench_p75=bench_p75, n_bench=len(known))
 
@@ -845,16 +854,17 @@ def platinum_slide(deck, d):
     st_col = {"Active": GREEN, "At risk": ORANGE, "Dormant": RED}
     pl = d[d["tier"] == "Platinum"].sort_values("total_sales", ascending=False)
     rows = [[f"{i}. {r['customer_name'][:22]}", r["account_manager"][:20],
-             ("" if r["province"] == "Unknown" else r["province"]), fmt_idr(r["total_sales"]), fmt_int(r["total_invoice"]),
-             fmt_idr(r["avg_sales"]), (r["status"], st_col[r["status"]]), fmt_int(r["days_since_last_order"]),
-             (r["opportunity"] or "–", GREEN if r["opportunity"] else MUTED)]
+             ("" if r["province"] == "Unknown" else r["province"]), fmt_idr(r["total_sales"]).replace("IDR ", ""),
+             fmt_int(r["total_invoice"]), fmt_idr(r["avg_sales"]).replace("IDR ", ""), (r["status"], st_col[r["status"]]), fmt_int(r["days_since_last_order"]),
+             (r["opportunity"] or "–", INK if r["opportunity"] else MUTED)]
             for i, (_, r) in enumerate(pl.iterrows(), start=1)]
     lo = pl["total_sales"].min() if len(pl) else 0
     paged_table(deck, f"Platinum Customers — Top 10% by LTV ({fmt_int(len(pl))})",
                 f"LTV ≥ {fmt_idr(lo)}  •  {pl['total_sales'].sum() / max(d['total_sales'].sum(), 1) * 100:.0f}% of total LTV  •  "
                 "Gold/Silver/Bronze lists: xlsx 'All customers' (column LTV tier)",
-                ["Customer", "Account Manager", "Province", "LTV", "Inv.", "AOV", "Status", "Days", "Opportunity"],
-                rows, [1.9, 1.75, 1.2, 0.95, 0.45, 0.95, 0.75, 0.5, 2.3], highlight_col=3, per_page=14)
+                ["Customer", "Account Manager", "Province", "LTV (IDR)", "Inv.", "AOV (IDR)", "Status", "Days", "Opportunity"],
+                rows, [1.5, 1.45, 1.0, 0.75, 0.4, 0.75, 0.65, 0.45, 4.7], highlight_col=3, per_page=9, font=7,
+                left_cols=(8,))
 
 
 def region_slides(deck, d, loc_p):
@@ -875,11 +885,12 @@ def region_slides(deck, d, loc_p):
         top = sub.sort_values("total_sales", ascending=False).head(REGION_TOP_N)
         rows = [[f"{i}. {r['customer_name'][:21]}", reg(r), am(r), (r["tier"], tier_col[r["tier"]]),
                  (r["status"], st_col[r["status"]]), m(r["total_sales"]), fmt_int(r["total_invoice"]),
-                 fmt_int(r["days_since_last_order"]), (r["opportunity"] or "–", GREEN if r["opportunity"] else MUTED)]
+                 fmt_int(r["days_since_last_order"]), (r["opportunity"] or "–", INK if r["opportunity"] else MUTED)]
                 for i, (_, r) in enumerate(top.iterrows(), start=1)]
         paged_table(deck, f"{prov} — Top {len(rows)} Customers by LTV", summary,
                     ["Customer", "Regency", "Account Manager", "Tier", "Status", "LTV (IDR)", "Inv.", "Days", "Opportunity"],
-                    rows, [2, 1.3, 1.9, 0.75, 0.75, 0.9, 0.45, 0.5, 2.4], highlight_col=5, per_page=REGION_TOP_N)
+                    rows, [1.55, 1.0, 1.45, 0.65, 0.65, 0.75, 0.4, 0.45, 4.6], highlight_col=5, per_page=REGION_TOP_N + 1,
+                    font=7, left_cols=(8,))
 
         kp_t = sub[(sub["kp_basis"] != "") & (sub["kp_priority"] != "Verify")].sort_values("kp_mrr", ascending=False)
         up_t = sub[sub["upsell"] & ~sub.index.isin(kp_t.index)].sort_values("total_sales", ascending=False)
@@ -889,16 +900,16 @@ def region_slides(deck, d, loc_p):
         trows = []
         for _, r in tg.iterrows():
             if r["kp_basis"]:
-                val, col = f"KebunPRO MRR {m(r['kp_mrr'])}", GREEN
+                val, col = f"KebunPRO {m(r['kp_mrr'])}/month", GREEN
             else:
                 gap_ok = r["wallet_gap"] == r["wallet_gap"] and r["wallet_gap"] > 0
-                val, col = (f"Gap {m(r['wallet_gap'])}" if gap_ok else f"LTV {m(r['total_sales'])}"), INK
+                val, col = (f"Room to grow {m(r['wallet_gap'])}" if gap_ok else f"Bought {m(r['total_sales'])}"), INK
             trows.append([r["customer_name"][:20], am(r)[:18], reg(r), ((val), col), mix_label(r),
                           fmt_int(r["days_since_last_order"]), full_offer(r)])
         more = f"  •  top {REGION_OFFER_N} shown, full list in xlsx" if len(kp_t) + len(up_t) > REGION_OFFER_N else ""
         paged_table(deck, f"{prov} — Who to Offer: KebunPRO & Upsell ({fmt_int(len(kp_t))} + {fmt_int(len(up_t))})",
                     f"KebunPRO candidates first (by MRR, excl. 'Verify'), then upsell candidates (by LTV){more}",
-                    ["Customer", "Account Manager", "Regency", "Value (IDR)", "Product mix", "Days", "What to offer"],
+                    ["Customer", "Account Manager", "Regency", "Potential (IDR)", "Product mix", "Days", "What to offer"],
                     trows, [1.3, 1.25, 0.85, 1.05, 1.05, 0.45, 5.55], per_page=SENT_PER_PAGE, font=7,
                     legend=MIX_LEGEND, left_cols=(6,))
 
