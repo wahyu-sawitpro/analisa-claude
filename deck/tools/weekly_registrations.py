@@ -84,6 +84,11 @@ def main():
                 "above_100ha": len(big), "above_100ha_total_ha": round(sum(num(x[I["total_area_hectare"]]) for x in big)),
                 "ordered": sum(1 for x in w if "last_sale_order_date" in I and x[I["last_sale_order_date"]]),
                 "no_phone": sum(1 for x in w if not x[I["farmer_phone"]]),
+                "same_day_sales": {ch: {"farmers": len(u), "buyers": sum(1 for x in u if num(x[I["total_sales_register_date"]]) > 0),
+                                        "sales": round(sum(num(x[I["total_sales_register_date"]]) for x in u))}
+                                   for ch, u in (("Toko Keliling", [x for x in w if x[I["utm_source"]].lower() in ("toko keliling", "toling")]),
+                                                 ("Duta", [x for x in w if x[I["akuisisi_type"]] == "Under Duta" or x[I["utm_source"]] == "Duta"]))}
+                if "total_sales_register_date" in I else None,
                 "per_day": {str(d): sum(1 for x in w if joined(x).date() == d) for d in (mon + dt.timedelta(days=k) for k in range(7))}}
     info.update(status="ok", last=stat(last_mon), before=stat(prev_mon), private_html=str(out / "index.html"))
     print(json.dumps(info, indent=1, ensure_ascii=False)); return 0
