@@ -607,8 +607,11 @@ function acqProfileSpecs(Q,pre){
 // Toko Keliling, Duta and Purchase Masker registrations: did the farmer buy on the day they joined (total_sales_register_date)?
 function acqBuyDaySpec(Q,pre){
   const L=Q.L, P=Q.P, get=(w,k)=>w&&w.buyDay?w.buyDay.find(c=>c.k===k):{n:0,buyers:0,sales:0,users:[]};
-  const rows=ACQ_BUY_CH.map(c=>c[0]).flatMap(k=>{ const l=get(L,k), p=get(P,k);
-    return [[{v:k,bold:true},P?nf.format(p.n):"–",{v:nf.format(l.n),bold:true},P?sg(l.n-p.n):"–",P?`${p.buyers} / ${rp(p.sales)}`:"–",{v:`${l.buyers} / ${rp(l.sales)}`,bold:true}]]; });
+  // per channel and week: acquired, bought on the day they joined, did not buy, sales that day
+  const line=(lab,wk,c,bold)=>{ const b=v=>bold?{v,bold:true}:v; return [lab,b(wk),b(nf.format(c.n)),b(nf.format(c.buyers)),b(nf.format(c.n-c.buyers)),b(c.sales?rp(c.sales):"Rp0")]; };
+  const rows=ACQ_BUY_CH.map(c=>c[0]).flatMap(k=>[...(P?[line({v:k,bold:true},P.short,get(P,k),false)]:[]),line(P?"":{v:k,bold:true},L.short,get(L,k),true)]);
+  const tot=w=>ACQ_BUY_CH.map(c=>get(w,c[0])).reduce((a,c)=>({n:a.n+c.n,buyers:a.buyers+c.buyers,sales:a.sales+c.sales}),{n:0,buyers:0,sales:0});
+  if(P) rows.push(line({v:"Total",bold:true},P.short,tot(P),false)); rows.push(line(P?"":{v:"Total",bold:true},L.short,tot(L),true));
   const zero=ACQ_BUY_CH.map(c=>c[0]).map(k=>get(L,k)).filter(c=>c.n&&!c.buyers), some=ACQ_BUY_CH.map(c=>c[0]).map(k=>get(L,k)).filter(c=>c.buyers);
   const title=zero.length?`${zero.map(c=>`${c.n} farmer${c.n===1?"":"s"} via ${c.k}`).join(" and ")} last week, but none bought on the day they joined`
     :some.length?`${some.map(c=>`${c.buyers} of ${c.n} ${c.k} farmers bought on the day they joined (${rp(c.sales)})`).join("; ")}`:`No farmers joined via Toko Keliling, Duta or Purchase Masker last week`;
@@ -621,8 +624,8 @@ function acqBuyDaySpec(Q,pre){
     ...ACQ_BUY_CH.map(c=>c[0]).map(k=>({k,p:get(P,k)})).filter(o=>P&&o.p.n).map(o=>`<b>Week before, ${o.k}:</b> ${o.p.buyers} of ${o.p.n} bought on the day they joined (${rp(o.p.sales)}).`)];
   return {kicker:pre+"Registrations · Toko Keliling, Duta and Purchase Masker: did they buy on the day they joined?",title,
     rows:[{cards:[
-      {w:1,title:"Farmers and same-day sales",sub:"Sales on the registration date (buyers / amount)",table:{colW:[24,15,15,11,18,18],head:["Channel",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change",P?`Bought ${P.short}`:"Bought before",`Bought ${L.short}`],align:["l","r","r","r","r","r"],rows}},
-      {w:1.1,title:"Last week's Toko Keliling, Duta and Purchase Masker farmers",sub:grp.size>10?`First 10 of ${grp.size} rows (${users.length} farmers)`:`${users.length} farmers; identical rows grouped`,table:{colW:[20,24,18,20,18],head:["Channel","Joined","Duta","Regency","Sales that day"],align:["l","l","l","l","r"],rows:urows.length?urows:[["None last week","","","",""]]}}]}],
+      {w:1.25,title:"Acquired, bought on the day they joined, and sales",sub:`Week of ${P?P.short+" vs ":""}${L.short} (last week in bold)`,table:{colW:[22,13,13,14,14,18],head:["Channel","Week of","Acquired","Bought","Did not buy","Sales that day"],align:["l","l","r","r","r","r"],rows}},
+      {w:1.1,title:"Last week's farmers, one row each",sub:grp.size>10?`First 10 of ${grp.size} rows (${users.length} farmers)`:`${users.length} farmers; identical rows grouped`,table:{colW:[20,24,18,20,18],head:["Channel","Joined","Duta","Regency","Sales that day"],align:["l","l","l","l","r"],rows:urows.length?urows:[["None last week","","","",""]]}}]}],
     notes:notes.length?notes:undefined};
 }
 function acqNarrative(T){
