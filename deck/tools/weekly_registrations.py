@@ -1,12 +1,13 @@
 """Weekly farmer-registration refresh for SawitPRO Deck (run every Tuesday).
 
-Reads `Farmer register for weekly farmer.csv` from origin/main and:
+Reads `Farmer register for weekly farmer.csv` from the remote branch where it was last uploaded (origin/main, or the
+branch GitHub's upload page committed it to; --ref <remote branch> forces one) and:
   1. checks the file covers the whole of last week (Monday-Sunday before today, WIB);
   2. writes the hashed sample to deck/src/sample-data.json and rebuilds deck/index.html (committed);
   3. writes the real rows to <out_dir>/real-sample.json and builds <out_dir>/index.html (published privately, never committed);
   4. prints a JSON summary of last week vs the week before (the reference numbers the deck must match).
 
-Usage: python3 deck/tools/weekly_registrations.py <out_dir> [--today YYYY-MM-DD]
+Usage: python3 deck/tools/weekly_registrations.py <out_dir> [--today YYYY-MM-DD] [--ref origin/<branch>]
 Exit code 0 = fresh, 2 = file missing, 3 = file does not cover last week yet (nothing rebuilt).
 """
 import csv, datetime as dt, hashlib, io, json, os, pathlib, subprocess, sys
@@ -31,10 +32,17 @@ def main():
     out = pathlib.Path(sys.argv[1]).resolve(); out.mkdir(parents=True, exist_ok=True)
     today = dt.date.fromisoformat(sys.argv[sys.argv.index("--today") + 1]) if "--today" in sys.argv else dt.datetime.now(WIB).date()
     git("fetch", "-q", "origin", "main")
-    r = git("show", f"origin/main:{CSV}")
+    git("fetch", "-q", "origin")
+    if "--ref" in sys.argv: ref = sys.argv[sys.argv.index("--ref") + 1]
+    else:  # the newest upload of the file on any remote branch
+        refs = [b.strip() for b in git("branch", "-r", "--format=%(refname:short)").stdout.split() if b.strip() and not b.endswith("/HEAD")]
+        dated = [(git("log", "-1", "--format=%ct", b, "--", CSV).stdout.strip(), b) for b in refs]
+        dated = [(int(t), b) for t, b in dated if t]
+        ref = max(dated)[1] if dated else "origin/main"
+    r = git("show", f"{ref}:{CSV}")
     if r.returncode:
         print(json.dumps({"status": "missing", "file": CSV})); return 2
-    commit = git("log", "-1", "--format=%h %ci", "origin/main", "--", CSV).stdout.strip()
+    commit = ref + " " + git("log", "-1", "--format=%h %ci", ref, "--", CSV).stdout.strip()
     rows = list(csv.reader(io.StringIO(r.stdout.lstrip("﻿"))))
     H, body = rows[0], [x + [""] * (len(rows[0]) - len(x)) for x in rows[1:] if any(v.strip() for v in x)]
     I = {k: i for i, k in enumerate(H)}
@@ -43,7 +51,9 @@ def main():
     last_mon = today - dt.timedelta(days=today.weekday() + 7)
     prev_mon = last_mon - dt.timedelta(days=7)
     wk = lambda x: dt.datetime.strptime(x[I["minggu_register"]], "%d/%m/%Y").date()
-    joined = lambda x: dt.datetime.strptime(x[I["join_date_farmer"]], "%d/%m/%Y, %H:%M")
+    def joined(x):  # "10/11/2026, 19:05" or, in newer exports, "10/11/2026"
+        v = x[I["join_date_farmer"]].strip()
+        return dt.datetime.strptime(v, "%d/%m/%Y, %H:%M" if "," in v else "%d/%m/%Y")
     data_to = max(joined(x) for x in body)
     fresh = data_to.date() >= last_mon + dt.timedelta(days=6)
     info = {"file_commit": commit, "rows": len(body), "data_to": data_to.strftime("%Y-%m-%d %H:%M"),

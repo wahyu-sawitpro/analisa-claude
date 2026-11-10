@@ -120,7 +120,8 @@ flagged as a likely bulk sign-up or import.
 
 ## Weekly registration refresh (every Tuesday, 10:00 WIB)
 A scheduled routine refreshes the farmer-registration review from `Farmer register for weekly farmer.csv` on `main`:
-1. `python3 deck/tools/weekly_registrations.py <scratch dir>`: checks the file covers last week (Monday-Sunday before
+1. `python3 deck/tools/weekly_registrations.py <scratch dir>` (reads the file from the remote branch it was last uploaded
+   to; join dates with or without a time are accepted): checks the file covers last week (Monday-Sunday before
    today, WIB). Exit 3 = not yet (stale file, nothing rebuilt), exit 2 = file missing (the `clean-old-csv` workflow on
    `main` deletes CSVs older than 7 days, so upload the new export before Tuesday). Exit 0 = it writes the hashed sample
    and rebuilds `deck/index.html` (committed), builds `<scratch dir>/index.html` from the real rows (published privately,
