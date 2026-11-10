@@ -604,22 +604,25 @@ function acqProfileSpecs(Q,pre){
       notes:ci?[`<b>Note:</b> hectares are the area each user entered in the app; they have not yet been validated and need to be confirmed with the user.`]:[`<b>${us.length} users, ${haF(us.reduce((t,r)=>t+r.ha,0))} ha${multi.length?`; ${multi.length} with several farms, one row per farm`:""}.</b> Contact = phone number, or email when there is no phone.`,`<b>Note:</b> hectares are the area each user entered in the app; they have not yet been validated and need to be confirmed with the user.`]})); });
   return S;
 }
-// Toko Keliling and Duta registrations: did the farmer buy on the day they joined (total_sales_register_date)?
+// Toko Keliling, Duta and Purchase Masker registrations: did the farmer buy on the day they joined (total_sales_register_date)?
 function acqBuyDaySpec(Q,pre){
   const L=Q.L, P=Q.P, get=(w,k)=>w&&w.buyDay?w.buyDay.find(c=>c.k===k):{n:0,buyers:0,sales:0,users:[]};
-  const rows=["Toko Keliling","Duta"].flatMap(k=>{ const l=get(L,k), p=get(P,k);
+  const rows=ACQ_BUY_CH.map(c=>c[0]).flatMap(k=>{ const l=get(L,k), p=get(P,k);
     return [[{v:k,bold:true},P?nf.format(p.n):"–",{v:nf.format(l.n),bold:true},P?sg(l.n-p.n):"–",P?`${p.buyers} / ${rp(p.sales)}`:"–",{v:`${l.buyers} / ${rp(l.sales)}`,bold:true}]]; });
-  const zero=["Toko Keliling","Duta"].map(k=>get(L,k)).filter(c=>c.n&&!c.buyers), some=["Toko Keliling","Duta"].map(k=>get(L,k)).filter(c=>c.buyers);
+  const zero=ACQ_BUY_CH.map(c=>c[0]).map(k=>get(L,k)).filter(c=>c.n&&!c.buyers), some=ACQ_BUY_CH.map(c=>c[0]).map(k=>get(L,k)).filter(c=>c.buyers);
   const title=zero.length?`${zero.map(c=>`${c.n} farmer${c.n===1?"":"s"} via ${c.k}`).join(" and ")} last week, but none bought on the day they joined`
-    :some.length?`${some.map(c=>`${c.buyers} of ${c.n} ${c.k} farmers bought on the day they joined (${rp(c.sales)})`).join("; ")}`:`No farmers joined via Toko Keliling or Duta last week`;
-  const users=["Toko Keliling","Duta"].flatMap(k=>get(L,k).users.map(r=>({...r,ch:k})));
-  const urows=users.slice(0,10).map(r=>[r.ch,r.jraw||"–",r.under?(r.dname||"–"):"–",r.regency||"–",{v:r.regSales?rp(r.regSales):"Rp0",bold:!!r.regSales}]);
+    :some.length?`${some.map(c=>`${c.buyers} of ${c.n} ${c.k} farmers bought on the day they joined (${rp(c.sales)})`).join("; ")}`:`No farmers joined via Toko Keliling, Duta or Purchase Masker last week`;
+  const users=ACQ_BUY_CH.map(c=>c[0]).flatMap(k=>get(L,k).users.map(r=>({...r,ch:k})));
+  // identical rows (same channel, minute, Duta, regency and sales) are shown once with a count
+  const grp=new Map(); users.forEach(r=>{ const k=[r.ch,r.jraw,r.under?r.dname:"",r.regency,r.regSales].join("|"); const g=grp.get(k)||{r,n:0}; g.n++; grp.set(k,g); });
+  const urows=[...grp.values()].slice(0,10).map(({r,n})=>[n>1?`${r.ch} ×${n}`:r.ch,r.jraw||"–",r.under?(r.dname||"–"):"–",r.regency||"–",{v:r.regSales?rp(r.regSales*n):"Rp0",bold:!!r.regSales}]);
   const notes=[...zero.map(c=>`<b>${c.k}: acquisition happened but no sale.</b> ${c.n} farmer${c.n===1?"":"s"} joined through ${c.k} last week and spent Rp0 on the day they joined.${c.sameMin?` ${c.sameMin.n} of them were registered at the same minute (${c.sameMin.at}), so they were likely signed up in one batch.`:""}`),
-    ...["Toko Keliling","Duta"].map(k=>({k,p:get(P,k)})).filter(o=>P&&o.p.n).map(o=>`<b>Week before, ${o.k}:</b> ${o.p.buyers} of ${o.p.n} bought on the day they joined (${rp(o.p.sales)}).`)];
-  return {kicker:pre+"Registrations · Toko Keliling and Duta: did they buy on the day they joined?",title,
+    ...some.map(c=>`<b>${c.k}:</b> ${c.buyers} of ${c.n} farmer${c.n===1?"":"s"} bought on the day they joined (${rp(c.sales)}).`),
+    ...ACQ_BUY_CH.map(c=>c[0]).map(k=>({k,p:get(P,k)})).filter(o=>P&&o.p.n).map(o=>`<b>Week before, ${o.k}:</b> ${o.p.buyers} of ${o.p.n} bought on the day they joined (${rp(o.p.sales)}).`)];
+  return {kicker:pre+"Registrations · Toko Keliling, Duta and Purchase Masker: did they buy on the day they joined?",title,
     rows:[{cards:[
       {w:1,title:"Farmers and same-day sales",sub:"Sales on the registration date (buyers / amount)",table:{colW:[24,15,15,11,18,18],head:["Channel",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change",P?`Bought ${P.short}`:"Bought before",`Bought ${L.short}`],align:["l","r","r","r","r","r"],rows}},
-      {w:1.1,title:"Last week's Toko Keliling and Duta farmers",sub:users.length>10?`First 10 of ${users.length}`:"One row per farmer",table:{colW:[20,24,18,20,18],head:["Channel","Joined","Duta","Regency","Sales that day"],align:["l","l","l","l","r"],rows:urows.length?urows:[["None last week","","","",""]]}}]}],
+      {w:1.1,title:"Last week's Toko Keliling, Duta and Purchase Masker farmers",sub:grp.size>10?`First 10 of ${grp.size} rows (${users.length} farmers)`:`${users.length} farmers; identical rows grouped`,table:{colW:[20,24,18,20,18],head:["Channel","Joined","Duta","Regency","Sales that day"],align:["l","l","l","l","r"],rows:urows.length?urows:[["None last week","","","",""]]}}]}],
     notes:notes.length?notes:undefined};
 }
 function acqNarrative(T){

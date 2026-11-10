@@ -924,7 +924,7 @@ function forecastStock(lines,P,target){
 /* ================= Farmer acquisition (Duta vs non-Duta) ================= */
 const ACQ_BANDS=[["Up to 2 ha",0,2],["2–5 ha",2,5],["5–10 ha",5,10],["10–25 ha",10,25],["25–100 ha",25,100],["Over 100 ha",100,Infinity]];
 // channels where the farmer can buy on the spot: did they buy on the day they joined?
-const ACQ_BUY_CH=[["Toko Keliling",r=>/toko\s*keliling|^toling$/i.test(r.src||"")],["Duta",r=>r.under||/^duta$/i.test(r.src||"")]];
+const ACQ_BUY_CH=[["Toko Keliling",r=>/toko\s*keliling|^toling$/i.test(r.src||"")],["Duta",r=>r.under||/^duta$/i.test(r.src||"")],["Purchase Masker",r=>/purchase\s*masker|masker/i.test(r.src||"")]];
 const ACQ_SRC_ORDER=["Organic","GADN","Meta","Identified Campaigns","Duta"];
 // Duta display name: internal-team Duta accounts carry "Test" in the name; show the user name without it.
 const dutaLabel=v=>{ const t=(clean(v)||"").replace(/\btest\b/ig,"").replace(/\s+/g," ").trim(); return t?t.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase()):null; };

@@ -114,8 +114,8 @@ Duta 4 (−4) from 3 internal-team Dutas (Rudi 2, Satria K 1, Sazali Wandana 1);
 are internal team. Organic −95 explains 92%
 of the drop ("organic" campaign 111 → 47); GADN +10 and App-Register-Campaign-DG +36 grew. 28% of farmers have no phone.
 
-With `total_sales_register_date`, a slide checks whether farmers who joined through Toko Keliling or a Duta bought on
-the day they joined (Rp0 = acquired but no sale that day), and a one-hour batch of registrations with no campaign is
+With `total_sales_register_date`, a slide checks whether farmers who joined through Toko Keliling, a Duta or Purchase Masker bought on
+the day they joined (Rp0 = acquired but no sale that day); Purchase Masker is shown the same way. A one-hour batch of registrations with no campaign is
 flagged as a likely bulk sign-up or import.
 
 ## Weekly registration refresh (every Tuesday, 10:00 WIB)

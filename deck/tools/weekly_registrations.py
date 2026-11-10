@@ -87,7 +87,8 @@ def main():
                 "same_day_sales": {ch: {"farmers": len(u), "buyers": sum(1 for x in u if num(x[I["total_sales_register_date"]]) > 0),
                                         "sales": round(sum(num(x[I["total_sales_register_date"]]) for x in u))}
                                    for ch, u in (("Toko Keliling", [x for x in w if x[I["utm_source"]].lower() in ("toko keliling", "toling")]),
-                                                 ("Duta", [x for x in w if x[I["akuisisi_type"]] == "Under Duta" or x[I["utm_source"]] == "Duta"]))}
+                                                 ("Duta", [x for x in w if x[I["akuisisi_type"]] == "Under Duta" or x[I["utm_source"]] == "Duta"]),
+                                                 ("Purchase Masker", [x for x in w if "masker" in x[I["utm_source"]].lower()]))}
                 if "total_sales_register_date" in I else None,
                 "per_day": {str(d): sum(1 for x in w if joined(x).date() == d) for d in (mon + dt.timedelta(days=k) for k in range(7))}}
     info.update(status="ok", last=stat(last_mon), before=stat(prev_mon), private_html=str(out / "index.html"))
