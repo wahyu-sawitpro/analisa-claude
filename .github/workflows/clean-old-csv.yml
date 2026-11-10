@@ -16,9 +16,9 @@ jobs:
         with:
           fetch-depth: 0   # butuh riwayat penuh untuk tahu umur tiap file
 
-      - name: Delete CSV files last committed more than 7 days ago
+      - name: Delete CSV files last committed more than 14 days ago
         run: |
-          cutoff=$(date -d '7 days ago' +%s)
+          cutoff=$(date -d '14 days ago' +%s)
           git ls-files -z '*.csv' | while IFS= read -r -d '' f; do
             t=$(git log -1 --format=%ct -- "$f")
             if [ "$t" -lt "$cutoff" ]; then
@@ -29,7 +29,7 @@ jobs:
           if ! git diff --cached --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
-            git commit -m "Remove CSV files older than 7 days"
+            git commit -m "Remove CSV files older than 14 days"
             git push
           else
             echo "Nothing to remove"
