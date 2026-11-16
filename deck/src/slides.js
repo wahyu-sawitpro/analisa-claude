@@ -733,7 +733,8 @@ function teamSpecs(A,N,pre){
     // Which orders make the story: every order of Rp50M+ (else the top 3), customers with more than one invoice this
     // week, and CRM successes that came from an interesting source (ads, social media, referral...) rather than Toling.
     const ckey=o=>o.ph||o.nk||null, BIG=50e6, big=O.filter(o=>o.gmv>=BIG), main=(big.length?big:O.slice(0,3)).slice(0,6);
-    const multi=(()=>{ const m=new Map(); O.forEach(o=>{ const k=ckey(o); if(k) (m.get(k)||m.set(k,[]).get(k)).push(o); }); return [...m.values()].filter(os=>os.length>=2).sort((a,b)=>sumG(b)-sumG(a)); })();
+    const multi=(()=>{ const m=new Map(); O.forEach(o=>{ const k=ckey(o); if(k) (m.get(k)||m.set(k,[]).get(k)).push(o); }); const dup=os=>(A.dupOrders||[]).some(g=>g.length===os.length&&g.every(o=>os.includes(o))); // same day, products and amount: a possible double entry, not a repeat buyer
+      return [...m.values()].filter(os=>os.length>=2&&!dup(os)).sort((a,b)=>sumG(b)-sumG(a)); })();
     const OUTL=/ads|iklan|tiktok|instagram|facebook|\bfb\b|social|sosmed|referral|referensi|rekomendasi|webinar|event|\blive\b|komunitas|group/i, srcTxt=r=>[r.source,r.channel,r.detail].filter(Boolean).join(" ");
     const hi=ST.filter(x=>x.state==="matched"&&x.orders.length&&OUTL.test(srcTxt(x.r))).sort((a,b)=>b.sales-a.sales);
     const srcLabel=r=>{ const t=srcTxt(r); const m=t.match(/tiktok|instagram|facebook|ads|iklan|social media|sosmed|referral|referensi|rekomendasi|webinar|event|live|komunitas/i); return m?({iklan:"Ads",sosmed:"Social media",referensi:"Referral",rekomendasi:"Referral"}[m[0].toLowerCase()]||m[0].replace(/^./,c=>c.toUpperCase())):(r.source||r.channel); };

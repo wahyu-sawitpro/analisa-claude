@@ -211,7 +211,23 @@ Months the data covers in full form the trend; a partial month is left out. The 
   “Rejection reasons · potential loss” slide with the biggest leads at stake and any competitor price in the notes.
 - **Overdue prospects.** Prospects whose estimated closing date has passed by the end of the week become an action.
 
-## Week of 19–25 Oct 2026 (sample data)
+## Week of 9–15 Nov 2026 (sample data)
+The sample is the six weekly exports on `main` uploaded 16 Nov: sales 2–15 Nov for both teams, success stories and
+rejection reasons 9–15 Nov. All six are the right kind and cover the full period. Also on `main` but not part of the
+weekly six (not used): `Sales Smallholder.csv` (2 Jan – 15 Nov), `CRM Smallholder.csv` (1 Aug – 25 Nov: some
+engagements are dated after the export day) and `detail customer smallholder.csv` (one row per customer).
+- Total Rp849M from 43 orders. Smallholder Rp666M (+199% from Rp223M); Plantation Rp183M (−64% from Rp508M).
+- Smallholder: one Pupuk Grosir order of NPK Sawit 13-8-27 Pak Tani ×400 in Siak (Rp232M, Muhammad Abdul Wahab) is 35%
+  of the week; three orders of Rp50M+ make Rp366M (55%). Price tiers: Khusus Petani Rp233M overtook Toling (Rp83.6M;
+  Toling led the week before with Rp156M), Grosir came back from Rp0 to Rp232M. 21 of 23 buyers did not buy the week
+  before; 8 orders (Rp131M) are from new customers. 15 of 23 orders are still open.
+- Plantation: the week before had three big orders (Topaz Rp190M, Grosir Rp138M + Rp90.8M); last week was 20 smaller
+  orders (average Rp72.6M → Rp9.2M), 96% Topaz seeds. One CRM win from a live session (PSEN-2597, Rp18M).
+  #B2C28384 and #B2C28385 (Tebo) look like one order entered twice.
+- Rejections: Smallholder 93 leads did not order, 40 still inquiring (22 asked the price), Rp135M of potential sales
+  and ~2.3 t of need logged on 6 leads. Plantation: all 36 entries are one KebunPRO ads template with no reason.
+
+## Findings for the week of 19–25 Oct 2026 (earlier sample)
 The sample is the six weekly exports for 19–25 Oct (sales last two weeks, rejection reasons and success stories for
 both teams). Slides say "sales", never "GMV".
 - Smallholder sales Rp515M (+37%), but one wholesale KCL order is 52% of it; without each week's largest order, −7%.
