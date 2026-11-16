@@ -106,6 +106,7 @@ function canonStatus(v){ const s=norm(v); if(!s) return null;
   if(/timbang|pikir|consider|follow|nego|ragu/.test(s)) return "Considering";
   if(/tertarik|minat|interest|hot|warm/.test(s)) return "Interested";
   return clean(v).replace(/^./,c=>c.toUpperCase()); }
+const STILL_INQ="Still inquiring, no clear interest to buy now";
 const REASON_EN=[
   [/belum\s*(ada\s*)?ketertarikan|cek harga|nanya|no clear interest/,"Still inquiring, no clear interest to buy now"],
   [/belum\s*ada\s*kebutuhan|kebutuhan\s*dalam\s*waktu/,"No need in the near term"],
@@ -316,6 +317,9 @@ function analyse(sources,opt={}){
   A.crmMap=Object.assign({},...A.crmSources.map(s=>s.map));
   A.won=C.filter(r=>r.outcome==="Won"); A.warm=C.filter(r=>r.outcome==="Warm"); A.lost=C.filter(r=>r.outcome==="Lost"); A.nostatus=C.filter(r=>!r.outcome);
   A.notWon=C.filter(r=>r.outcome!=="Won"&&r.kind!=="service"&&r.kind!=="viewer"&&!/success|closing/i.test(r._src||""));
+  // A lead who didn't order with no reason logged counts as still inquiring (the user's rule)
+  A.notWon.forEach(r=>{ if(!r.reason&&(r.kind==="lead"||!r.kind)){ r.reason=STILL_INQ; r.reasonImputed=true; r.theme=themeOf(r.reason); } });
+  A.reasonImputed=A.notWon.filter(r=>r.reasonImputed).length;
   A.viewers=C.filter(r=>r.kind==="viewer"); A.viewerSessions=countBy(A.viewers,r=>r.session);
   C.forEach(r=>{ r.wonKind=r.outcome==="Won"?{lead:"Lead worked",pos:"Sale logged at checkout",aftersales:"After-sales call"}[r.kind]:null; }); A.nostatus=A.nostatus.filter(r=>r.kind!=="service"&&r.kind!=="viewer");
   A.service=C.filter(r=>r.kind==="service"); A.wonLead=A.won.filter(r=>r.kind==="lead"); A.wonPos=A.won.filter(r=>r.kind==="pos"); A.wonAfter=A.won.filter(r=>r.kind==="aftersales");
@@ -644,7 +648,7 @@ const PURPOSE_EN=[[/aku?i?sisi|acquisition/i,"Acquisition"],[/pupuk|fertili[sz]e
   [/event|acara/i,"Event"],[/kebunpro/i,"KebunPRO"],[/dokter|uji|leaf|soil|tanah|daun/i,"Leaf / soil test"],[/drone|pemetaan|mapping/i,"Drone / mapping"]];
 const purposeLabel=v=>{ const c=clean(v); if(!c) return null; const m=PURPOSE_EN.find(([re])=>re.test(c)); return m?(typeof m[1]==="function"?m[1](c):m[1]):c; };
 const respLabel=v=>{ const m=RESP_EN.find(([re])=>re.test(v||"")); return m?m[1]:clean(v); };
-const barrierOf=r=>[r.reason||(r.reasonRaw&&trReason(r.reasonRaw))||"No reason logged",r.respRaw&&respLabel(r.respRaw)].filter(Boolean).join(" · ");
+const barrierOf=r=>[r.reason||(r.reasonRaw&&trReason(r.reasonRaw))||STILL_INQ,r.respRaw&&respLabel(r.respRaw)].filter(Boolean).join(" · ");
 // SawitPRO price tiers (product_cat), cheapest to most expensive, as the user defined them:
 // Khusus Petani (farmer price, close to the subsidised price), Toling (mobile shop: sells at set stops, so the
 // customer pays no shipping), Grosir (wholesale) and Retail (the standard app price).
@@ -685,7 +689,7 @@ const noteQtyKg=d=>{ let kg=0; const n=v=>parseFloat(String(v).replace(/\.(?=\d{
   for(const m of d.matchAll(/(\d+(?:[.,]\d+)?)\s*kg\b/gi)) if(n(m[1])>50) kg+=n(m[1]); // "50kg" in a product name is a pack size, not a need
   return kg; };
 function reasonNotes(rows){
-  const g=new Map(); rows.forEach(r=>{ const k=r.reason||"No reason logged"; (g.get(k)||g.set(k,[]).get(k)).push(r); });
+  const g=new Map(); rows.forEach(r=>{ const k=r.reason||STILL_INQ; (g.get(k)||g.set(k,[]).get(k)).push(r); });
   return [...g].map(([k,rs])=>{ const wn=rs.filter(r=>clean(r.detail));
     const th=NOTE_THEMES.map(([t,f])=>[t,wn.filter(r=>typeof f==="function"?f(r.detail):f.test(r.detail)).length]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);
     const q=wn.map(r=>noteQtyKg(r.detail)).filter(x=>x>0);

@@ -22,7 +22,8 @@ added to this deck, not built as separate decks.
 - **Show the engagement purpose on the rejection slides:** Plantation "Tujuan Melakukan Engagement", Smallholder
   "Objective" (purpose chart on "Rejection reasons last week", a Purpose column on the notes and potential tables).
 - **"Belum ketertarikan yang jelas (cek harga / nanya-nanya)" is not a refusal.** Label it "Still inquiring, no clear
-  interest to buy now" and treat it as an open enquiry.
+  interest to buy now" and treat it as an open enquiry. A lead who didn't order with no reason logged counts as the
+  same "Still inquiring" reason (the notes slide says how many were filled in this way).
 - **SawitPRO price tiers, cheapest to most expensive:** Khusus Petani (farmer price, close to the subsidised price),
   Toling (toko keliling: sells at set stops, so the customer pays no shipping), Grosir (wholesale), Retail (product_cat
   "Pupuk"). Use this order on the "price tiers" slide and in every price-related finding or action.

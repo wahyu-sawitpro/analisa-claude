@@ -893,7 +893,7 @@ function teamSpecs(A,N,pre){
       val:(r,lab)=>{ const c=cols.find(x=>x.lab===lab); return A.reasonRows.filter(x=>x.reason===r&&x[c.k]===c.g).length; }}});
     { const PP=A.notWon.filter(r=>r.kind==="lead"||!r.kind), pc=countBy(PP,r=>purposeLabel(r.purpose));
       if(pc.length) cards.push({w:.8,title:"Purpose of the engagement",sub:"Why the team reached out; top reason in grey",
-        chart:{type:"hbar",items:pc.slice(0,6).map(([k,n])=>{ const rr=countBy(PP.filter(r=>purposeLabel(r.purpose)===k),r=>r.reason||"No reason logged")[0]; return {k,v:n,r:rr?`${rr[0].replace(/, no clear interest to buy now/,"")} ${rr[1]}`:""}; }),color:CAT[1]}}); }
+        chart:{type:"hbar",items:pc.slice(0,6).map(([k,n])=>{ const rr=countBy(PP.filter(r=>purposeLabel(r.purpose)===k),r=>r.reason||STILL_INQ)[0]; return {k,v:n,r:rr?`${rr[0].replace(/, no clear interest to buy now/,"")} ${rr[1]}`:""}; }),color:CAT[1]}}); }
     if(N.tplDominant){ const pics=countBy(A.reasonRows,r=>r.pic); cards.push({w:.9,title:"Who logged these",sub:"Engagements that did not order, by PIC; lead source in grey",
       chart:{type:"hbar",items:pics.slice(0,6).map(([p,n])=>({k:p,v:n,r:countBy(A.reasonRows.filter(r=>r.pic===p),r=>r.source)[0]?.[0]||"–"})),color:"#8E9C84"}}); }
     S.push({kicker:pre+N.rk,title:N.rrTitle,rows:[{cards}],notes:N.rrNotes});
@@ -929,6 +929,7 @@ function teamSpecs(A,N,pre){
         tok&&`<b>${tok} ${tok===1?"lead is":"leads are"} waiting for the mobile shop (Toling).</b> Publish the Toling schedule per area; Toling has no shipping cost, which is often the deciding point.`,
         tpl&&`<b>${tpl} notes only say a catalogue was sent.</b> They don't say what the lead needs, so they can't be followed up or sized.`,
         GA.length>G.length&&`<b>Also:</b> ${esc(GA.slice(G.length).map(g=>`${short(g.k).toLowerCase()} ${g.n}`).join(", "))}.`,
+        A.reasonImputed&&`<b>${A.reasonImputed} of ${all} leads had no reason logged</b> and are counted as still inquiring.`,
         withN<all&&`<b>${all-withN} of ${all} leads have no discussion notes.</b>`].filter(Boolean)});
   }
 
