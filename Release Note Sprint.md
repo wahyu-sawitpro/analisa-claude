@@ -1,50 +1,40 @@
-# Release Note Sprint 26\.21
+# Release Note Sprint 26\.22
 
 ## PetaniPRO App Android
 
 ID
 
-- Tampilan dan pengalaman menggunakan aplikasi kini semakin nyaman dan mudah\.
+- Upload surat lahan melalui menu Data Kebun untuk memverifikasi kebun Anda\.
 
-- Input catatan panen kini lebih mudah dengan pemisahan kolom wajib dan opsional\.
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
 
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
-
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
 
 EN
 
-- Enjoy a smoother and more user\-friendly app experience\.
+- Upload your land certificate through the Farm Data menu to get your farm verified\.
 
-- Recording your harvest is now easier with clearly separated required and optional fields\.
+- Track Your Orders Easily on Toko Sawit\!
 
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
-
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
 
 ## PetaniPRO App iOS
 
 ID
 
-- Input catatan panen kini lebih mudah dengan pemisahan kolom wajib dan opsional\.
+- Pantau produktivitas kebun dan perkembangan aktivitas Catat Panen dan Catat Rawat dalam satu tempat di menu Laporan\.
 
-- Kini tersedia lebih banyak pilihan tipe pembeli TBS untuk mencatat hasil panenmu\.
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
 
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
-
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
 
 EN
 
-- Recording your harvest is now easier with clearly separated required and optional fields\.
+- Track your farm's productivity and monitor your harvest and maintenance activities in Report menu\.
 
-- Choose from more FFB buyer types when recording your harvest\.
+- Track Your Orders Easily on Toko Sawit\!
 
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
-
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
-
-
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
 
 
 
@@ -52,19 +42,15 @@ EN
 
 ID
 
-- Update informasi harga TBS regional dengan harga spesifik pabrik kelapa sawit \(PKS\) dan RAM agar pengguna dapat mengakses informasi harga yang lebih relevan dan sesuai dengan lokasi yang dipilih\.
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
 
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
-
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
 
 EN
 
-- Update regional FFB prices with specific mill and RAM prices to help users access more relevant and location\-specific pricing information\.
+- Track Your Orders Easily on Toko Sawit\!
 
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
-
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
 
 
 
@@ -72,31 +58,37 @@ EN
 
 ID
 
-- Update informasi harga TBS regional dengan harga spesifik pabrik kelapa sawit \(PKS\) dan RAM agar pengguna dapat mengakses informasi harga yang lebih relevan dan sesuai dengan lokasi yang dipilih\.
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
 
-- Update regional FFB prices with specific mill and RAM prices to help users access more relevant and location\-specific pricing information\.
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
 
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
+- Pembaruan konfigurasi komisi affiliate untuk Topaz Seed \(minimum pembelian 500 benih\) dan Pupuk SawitPRO sesuai dengan ketentuan masing\-masing produk\.
 
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
+
+
+EN
+
+- Track Your Orders Easily on Toko Sawit\!
+
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
+
+- Updated affiliate commission configurations for Topaz Seed \(minimum purchase of 500 seeds\) and Pupuk SawitPRO based on each product’s eligibility requirements\.
+
+
 
 ## AgenPRO App Android
 
 ID
 
-- Update informasi harga TBS regional dengan harga spesifik pabrik kelapa sawit \(PKS\) dan RAM agar pengguna dapat mengakses informasi harga yang lebih relevan dan sesuai dengan lokasi yang dipilih\.
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
 
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
-
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
 
 EN
 
-- Update regional FFB prices with specific mill and RAM prices to help users access more relevant and location\-specific pricing information\.
+- Track Your Orders Easily on Toko Sawit\!
 
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
-
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
 
 
 
@@ -104,19 +96,15 @@ EN
 
 ID
 
-- Update informasi harga TBS regional dengan harga spesifik pabrik kelapa sawit \(PKS\) dan RAM agar pengguna dapat mengakses informasi harga yang lebih relevan dan sesuai dengan lokasi yang dipilih\.
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
 
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
-
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
 
 EN
 
-- Update regional FFB prices with specific mill and RAM prices to help users access more relevant and location\-specific pricing information\.
+- Track Your Orders Easily on Toko Sawit\!
 
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
-
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
 
 
 
@@ -124,29 +112,19 @@ EN
 
 ID 
 
-- Perubahan tampilan halaman beranda yang lebih ringkas
+- Penyempurnaan pada fitur Rencana Keja Harian
 
-- Tambahkan jadwal pekerjaan melalui Rencana Kerja Harian dan monitor seluruh realisasi kerja tim di lapangan\.
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
 
-- Monitoring produktivitas kebun terhadap standar marihat
-
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
-
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
 
 EN
 
-- A more streamlined and concise home page layout\.
+- Improvements to the Daily Work Plan \(Rencana Kerja Harian\) feature\.
 
-- Add work schedules through the Daily Work Plan \(Rencana Kerja Harian/RKH\) and monitor all fieldwork execution across teams\.
+- Track Your Orders Easily on Toko Sawit\!
 
-- Monitor plantation productivity against Marihat standards\.
-
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
-
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
-
-
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
 
 
 
@@ -154,23 +132,19 @@ EN
 
 ID 
 
-- Simplifikasi laporan penggajian pekerja dalam format CSV agar proses penghitungan gaji lebih cepat
+- Sekarang sudah bisa memasukkan Biaya Umum Kebun kedalam KebunPRO\. Catat biaya utilitas, perbaikan aset dll menjadi satu laporan\.
 
-- Penambahan fungsi pengisian 2 angka desimal pada harga penjualan buah yang dikenakan pajak
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
 
-- Monitoring yield melalui peta kebun terhadap standar pencapaian marihat
-
-- Perubahan struktur menu menjadi lebih tepat letak dan lebih intuitif
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
 
 EN
 
-- Simplification of worker payroll reports in CSV format to speed up salary calculation\.
+- You can now record General Plantation Expenses in KebunPRO\. Track utility costs, equipment repairs, and other operational expenses in a single consolidated report\.
 
-- Added support for entering sales prices with two decimal places for taxable fruit sales\.
+- Track Your Orders Easily on Toko Sawit\!
 
-- Monitor yields performance through plantation maps against Marihat productivity standards\.
-
-- Improved menu structure for better organization and a more intuitive user experience\.
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
 
 
 
@@ -178,47 +152,15 @@ EN
 
 ID
 
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
+- Tersedia fitur manajemen armada truk yang memudahkan pemilik/pengurus ramp mengelola kendaraan operasional ramp\-nya
 
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
-
-EN
-
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
-
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
-
-
-
-## DutaPRO App
-
-ID
-
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
-
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
+- Mengelola transaksi pembelian dan penjualan TBS pertama lebih mudah dengan wizard yang diperbarui
 
 EN
 
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
+- A truck fleet management feature is available, making it easier for ramp owners/managers to oversee their operational vehicles\.
 
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
-
-
-
-## KUDPRO App
-
-ID
-
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
-
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
-
-EN
-
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
-
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
+- Managing initial FFB purchase and sales transactions is easier with the updated wizard
 
 
 
@@ -226,15 +168,45 @@ EN
 
 ID
 
-- Cek Status Pengiriman: Status pengiriman barang bisa dilihat langsung di halaman Daftar Pesanan\.
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
 
-- Pin Lokasi saat Checkout: Tandai lokasi rumah di peta saat melakukan pemesanan agar kurir lebih mudah menemukan alamat pengiriman\.
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
 
 EN
 
-- Check Delivery Status: View your order’s delivery status directly on the Order List page\.
+- Track Your Orders Easily on Toko Sawit\!
 
-- Pin Your Location at Checkout: Mark your home’s location on the map during checkout to help the courier find your delivery address more easily\.
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
 
 
+
+## DutaPRO App
+
+ID
+
+- Pantau Pesananmu dengan Mudah di Toko Sawit\!
+
+- Upload Dokumen Pembelian Benih dengan Mudah di Toko Sawit\!
+
+EN
+
+- Track Your Orders Easily on Toko Sawit\!
+
+- Upload Seed Purchase Documents Easily on Toko Sawit\!
+
+
+
+## SupirPRO App
+
+ID
+
+- Pembaruan dan perbaikan otentikasi
+
+- Support login dengan akun Google
+
+EN
+
+- Authentication updates and fixes
+
+- Login with Google Account
 
