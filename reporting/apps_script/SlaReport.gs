@@ -35,6 +35,7 @@ const SLA_TARGETS = [
 ];
 
 function slaSetup() {
+  slaCheckFileIds_();
   const token = slaToken_();
   SLA_TARGETS.forEach(t => {
     const f = Drive.Files.get(t.fileId, { supportsAllDrives: true, fields: 'id,name,webViewLink' });
@@ -60,6 +61,7 @@ function slaInstallTrigger() {
 }
 
 function slaPullLatestReport() {
+  slaCheckFileIds_();
   const props = PropertiesService.getScriptProperties();
   const token = slaToken_();
   const a = slaLatestArtifact_(token);
@@ -122,4 +124,12 @@ function slaToken_() {
   const token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
   if (!token) throw new Error('Add Script Property GITHUB_TOKEN first.');
   return token;
+}
+
+function slaCheckFileIds_() {
+  SLA_TARGETS.forEach(t => {
+    if (!t.fileId || t.fileId.indexOf('PASTE_') === 0) {
+      throw new Error('Fill in the Drive file ID for ' + t.ext + ' (SLA_PPTX_FILE_ID / SLA_XLSX_FILE_ID) at the top of the script first.');
+    }
+  });
 }
