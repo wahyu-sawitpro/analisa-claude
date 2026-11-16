@@ -37,14 +37,12 @@ jobs:
             fi
           done
 
-      - name: Build deck + xlsx
-        run: python reporting/sla_report.py --data-dir . --template "deck slide.pptx" --out "output/sla_report.pptx" --xlsx "output/sla_report.xlsx"
+      - name: Build deck
+        run: python reporting/sla_report.py --data-dir . --template "deck slide.pptx" --out "output/sla_report.pptx" --no-xlsx
 
-      - name: Keep outputs as artifact
+      - name: Keep pptx as artifact
         uses: actions/upload-artifact@v4
         with:
           name: sla-report
-          path: |
-            output/sla_report.pptx
-            output/sla_report.xlsx
+          path: output/sla_report.pptx
           retention-days: 14
