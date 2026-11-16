@@ -213,7 +213,9 @@ Months the data covers in full form the trend; a partial month is left out. The 
 
 ## Week of 9–15 Nov 2026 (sample data)
 The sample is the six weekly exports on `main` uploaded 16 Nov: sales 2–15 Nov for both teams, success stories and
-rejection reasons 9–15 Nov. The first Smallholder sales upload missed one order (#B2C28413, Grosir KCL Mentari ×354,
+rejection reasons 9–15 Nov. The Plantation CRM files were re-uploaded at 11:28 with Emima Pratiwi Siburian's engagements (45 rejections, 6 wins);
+the Smallholder sales re-upload names the sales column `total_sales` (sales_amount + shipping, read as sales) and the
+category `product_category`. The first Smallholder sales upload missed one order (#B2C28413, Grosir KCL Mentari ×354,
 Rp152M, 15 Nov, partly paid) and showed Rp666M; the re-upload (10:53) has it and matches the team's Rp817M. Also on
 `main` but not part of the weekly six (not used): `Sales Smallholder.csv` (2 Jan – 15 Nov, also without #B2C28413),
 `CRM Smallholder.csv` (1 Aug – 25 Nov: some engagements are dated after the export day) and
@@ -224,10 +226,11 @@ Rp152M, 15 Nov, partly paid) and showed Rp666M; the re-upload (10:53) has it and
   before), Khusus Petani Rp233M (from Rp58.9M), Toling Rp83.6M (from Rp156M, when it led). 22 of 24 buyers did not buy
   the week before. Rp90.6M is still to collect on 3 partly paid orders; 16 of 24 orders are still open.
 - Plantation: the week before had three big orders (Topaz Rp190M, Grosir Rp138M + Rp90.8M); last week was 20 smaller
-  orders (average Rp72.6M → Rp9.2M), 96% Topaz seeds. One CRM win from a live session (PSEN-2597, Rp18M).
+  orders (average Rp72.6M → Rp9.2M), 96% Topaz seeds. 7 CRM wins came from ads and a live session (Rp54.5M): 6 from ads,
+  mostly Emima Pratiwi Siburian (Rp36.5M), and PSEN-2597 from a live session (Rp18M).
   #B2C28384 and #B2C28385 (Tebo) look like one order entered twice.
 - Rejections: Smallholder 93 leads did not order, 40 still inquiring (22 asked the price), Rp135M of potential sales
-  and ~2.3 t of need logged on 6 leads. Plantation: all 36 entries are one KebunPRO ads template with no reason.
+  and ~2.3 t of need logged on 6 leads. Plantation: all 81 entries (Devi Mariana Naibaho 36, Emima Pratiwi Siburian 45) say no clear interest.
 
 ## Findings for the week of 19–25 Oct 2026 (earlier sample)
 The sample is the six weekly exports for 19–25 Oct (sales last two weeks, rejection reasons and success stories for

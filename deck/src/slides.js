@@ -742,7 +742,7 @@ function teamSpecs(A,N,pre){
     main.forEach(o=>add(ckey(o)&&multi.some(os=>ckey(os[0])===ckey(o))?"c:"+ckey(o):"o:"+o.no,multi.find(os=>ckey(os[0])===ckey(o))||[o],o.gmv>=BIG?"Rp50M+ order":"Top 3 order"));
     multi.forEach(os=>add("c:"+ckey(os[0]),os,`${os.length} invoices this week`));
     hi.forEach(x=>{ const o=x.orders[0], k=ckey(o)&&multi.some(os=>ckey(os[0])===ckey(o))?"c:"+ckey(o):"o:"+o.no; add(k,story.get(k)?.os||x.orders,`CRM: from ${srcLabel(x.r)}`,x.r); });
-    const SR=[...story.values()].slice(0,9), bigG=sumG(big);
+    const SR0=[...story.values()], SR=SR0.slice(0,7), more=SR0.slice(7), bigG=sumG(big);
     const title=[big.length?`${pl(big.length,"order")} of Rp50M+ (${rp(bigG)}, ${share(bigG)}% of sales)`:`No order reached Rp50M; the top 3 bring ${rp(sumG(main))} (${share(sumG(main))}%)`,
       multi.length&&`${pl(multi.length,"customer")} bought more than once (${rp(multi.reduce((s,os)=>s+sumG(os),0))})`,
       hi.length&&`${hi.length} CRM ${hi.length===1?"win":"wins"} from ${andList([...new Set(hi.map(x=>srcLabel(x.r)))])}`].filter(Boolean).join("; ");
@@ -754,7 +754,8 @@ function teamSpecs(A,N,pre){
           return {colW:[13,11,12,...(hid?[]:[9]),10,9,9,16,8,6,11],head:["Why it's a story","Order(s)","Customer name",...(hid?[]:["Phone"]),"PIC","Location","Category","Products (qty)","Sales","Status","CRM / source"],
             align:["l","l","l",...(hid?[]:["l"]),"l","l","l","l","r","l","l"],
             rows:SR.map(x=>{ const os=x.os, o=os[0], c=x.crm||crmOf(o); return [{v:x.why.join(" · "),bold:true},os.map(y=>y.no).join(", "),...who(os,c),picOf(os),regionOf(o),[...new Set(os.map(catOf))].join(", "),os.map(qtyTxt).join("; "),rp(sumG(os)),custOf(o),c?[c.id,srcLabel(c)||c.channel].filter(Boolean).join(" · "):"–"]; })}; })()}]}],
-      notes:[hi.length&&`<b>CRM wins worth telling:</b> ${esc(hi.slice(0,3).map(x=>`${x.r.id} (${x.r.pic||"–"}) from ${srcLabel(x.r)}${x.r.channel?` via ${lc(x.r.channel)}`:""}, ${rp(x.sales)}`).join("; "))}.`,
+      notes:[hi.length&&`<b>CRM wins worth telling:</b> ${esc(countBy(hi,x=>srcLabel(x.r)).map(([k,c])=>{ const xs=hi.filter(x=>srcLabel(x.r)===k); return `${k} ${c} (${rp(xs.reduce((t,x)=>t+x.sales,0))}, ${andList([...new Set(xs.map(x=>x.r.pic).filter(Boolean))])})`; }).join("; "))}.`,
+        more.length&&`<b>${more.length} more ${more.length===1?"story":"stories"} not in the table:</b> ${esc(more.map(x=>`${x.os.map(o=>o.no).join("+")} ${rp(sumG(x.os))} (${x.why.join(", ")})`).join("; "))}.`,
         multi.length&&`<b>Repeat buyers this week:</b> ${esc(multi.slice(0,3).map(os=>`${os.length} invoices, ${rp(sumG(os))} (${regionOf(os[0])})`).join("; "))}.`,
         `<b>PIC:</b> ${esc(A.byPic.slice(0,4).map(x=>`${x.p} ${rp(x.g)} (${pl(x.n,"order")})`).join(", "))}.`,
         A.partial.length&&`<b>${rp(A.outstanding||A.partial.reduce((s,o)=>s+o.gmv,0))} still to collect</b> on ${pl(A.partial.length,"partly paid order")}; ${A.openOrders.length} of ${O.length} orders are still open.`].filter(Boolean)});

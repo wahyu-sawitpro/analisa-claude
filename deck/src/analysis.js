@@ -43,7 +43,7 @@ const SALES_FIELDS=[
   ["phone",[/customer_?phone|phone|no\.?\s*hp/]],
   ["name",[/customer_?name|nama\s*customer/,/^name$|^nama$/]],
   ["qty",[/^qty$|quantity|jumlah/]],
-  ["gmv",[/^gmv$/,/gmv/,/sales_?amount/,/nett_?sales/,/revenue/,/^sales$/,/^total$/]],
+  ["gmv",[/^gmv$/,/gmv/,/total_?sales/,/sales_?amount/,/nett_?sales/,/revenue/,/^sales$/,/^total$/]],
   ["salesAmount",[/sales_?amount/]],
   ["nett",[/nett_?sales|net\s*sales/]],
   ["revenue",[/^revenue$|paid\s*amount|amount\s*paid|total_?paid|paid_?with/]],
