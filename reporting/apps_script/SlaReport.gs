@@ -1,9 +1,8 @@
 /**
  * Delivery SLA / Aging Report (B2C Smallholder) — pull from GitHub, overwrite fixed Drive files.
  *
- * Same pattern as the AM report (Code.gs) and LTV report (LtvReport.gs) — no email.
- * All names are prefixed "sla"/"SLA_" so this file can sit in the SAME Apps Script
- * project as Code.gs / LtvReport.gs without name clashes.
+ * Same pattern as the AM and LTV reports — no email.
+ * Runs in its OWN Apps Script project (separate from the AM and LTV projects).
  *
  * Every Wednesday ~11:17 WIB GitHub Actions (sla-report-weekly.yml) reads
  * "pending and aging more than 14 days from smallholder team customer.csv" and builds the
@@ -12,8 +11,8 @@
  * shared links never change (Drive keeps previous weeks as version history).
  *
  * Setup:
- *  1. Services (+) -> "Drive API" (v3)   (already there if you use the AM / LTV report project).
- *  2. Script Property GITHUB_TOKEN        (already there if you use the AM / LTV report project).
+ *  1. Services (+) -> "Drive API".
+ *  2. Project Settings -> Script Properties -> GITHUB_TOKEN.
  *  3. Upload one .pptx and one .xlsx to Drive once (any content) and paste their
  *     file IDs into SLA_PPTX_FILE_ID / SLA_XLSX_FILE_ID below.
  *  4. Run slaSetup() once and approve the permissions.

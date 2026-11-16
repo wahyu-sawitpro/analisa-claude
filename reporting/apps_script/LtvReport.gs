@@ -1,9 +1,7 @@
 /**
  * Customer LTV & KebunPRO Cross-sell Report — pull from GitHub, overwrite fixed Drive files.
  *
- * Runs ALONGSIDE the AM report script (Code.gs) — it does not change or replace it.
- * All names here are prefixed "ltv"/"LTV_" so this file can sit in the SAME Apps Script
- * project as Code.gs without name clashes (or in its own project — it is self-contained).
+ * Runs in its OWN Apps Script project (separate from the AM and SLA projects).
  *
  * Every Monday 16:00 WIB GitHub Actions builds the artifact "ltv-report"
  * (ltv_report.pptx + ltv_report.xlsx). This script runs Monday 19:00–20:00 WIB,
@@ -11,8 +9,8 @@
  * links never change (Drive keeps previous weeks as version history).
  *
  * Setup:
- *  1. Services (+) -> "Drive API" (v3)   (already there if you use the AM report project).
- *  2. Script Property GITHUB_TOKEN        (already there if you use the AM report project).
+ *  1. Services (+) -> "Drive API".
+ *  2. Project Settings -> Script Properties -> GITHUB_TOKEN.
  *  3. Upload one .pptx and one .xlsx to Drive once (any content) and paste their
  *     file IDs into LTV_PPTX_FILE_ID / LTV_XLSX_FILE_ID below.
  *  4. Run ltvSetup() once and approve the permissions.
