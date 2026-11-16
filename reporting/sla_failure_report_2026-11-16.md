@@ -45,9 +45,9 @@
 ## Otomasi (Apps Script)
 
 File: `reporting/apps_script/SlaReport.gs`. Setiap hari jam 08:00 WIB, script ini:
-1. Membaca CSV terbaru di Drive yang namanya mengandung *"pending and aging more than 14 days"*. Kalau tidak ada, membaca tab `SLA_RAW` di spreadsheet.
-2. Menghitung aging, hari terlambat, lama pelunasan, dan hari sejak lunas. Lalu mengklasifikasi **akar masalah**: pembayaran belum lunas / pelunasan telat / fulfilment, beserta **flag proses** (SO masih NEW, jadwal sebelum lunas, jadwal di hari ke-14, jadwal terlewat, kritis).
-3. Menyusun **lessons learned dan action** secara otomatis berdasarkan flag yang muncul.
-4. Menulis tab `SLA Report` (KPI, detail, lessons), menambah baris di tab `SLA History` (untuk tren dan customer/PIC yang berulang), lalu mengirim email HTML ke `SLA_RECIPIENTS`.
+1. Membaca CSV *"pending and aging more than 14 days from smallholder team customer.csv"* **langsung dari GitHub** (branch `main`) memakai Script Property `GITHUB_TOKEN`. Tidak perlu Sheet atau Drive.
+2. Menghitung aging, hari terlambat, lama pelunasan, dan hari sejak lunas. Lalu mengklasifikasi **akar masalah** dan **flag proses**.
+3. Menyusun **lessons learned dan action** secara otomatis.
+4. Mengirim email HTML ke `SLA_RECIPIENTS`. Opsional: kalau `SLA_SPREADSHEET_ID` diisi, script juga menulis tab `SLA Report` dan `SLA History`.
 
-Setup: isi `SLA_SPREADSHEET_ID` (atau bind script ke sheet) dan `SLA_RECIPIENTS`, jalankan `slaRunReport()` sekali untuk approve permission, lalu jalankan `slaInstallTrigger()`.
+Setup: pastikan Script Property `GITHUB_TOKEN` sudah ada, isi `SLA_RECIPIENTS`, jalankan `slaRunReport()` sekali, lalu `slaInstallTrigger()`. Setiap minggu cukup upload CSV baru ke GitHub dengan nama file yang sama.

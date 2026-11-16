@@ -4,31 +4,27 @@
  * SLA: an order must be DELIVERED within 14 days of sale_order_date AND be fully PAID.
  * Any order that is still not delivered after 14 days counts as an SLA failure.
  *
- * Input  : the export "pending and aging more than 14 days from smallholder team customer"
- *          (columns: sale_order_date, item, customer_ref, product_category, customer_name,
- *           pic_names, full_payment_date, invoice_status, sale_order_status, sales,
- *           odoo_delivery_status, delivery_scheduled_at, Aging)
- *          Read from (first that exists):
- *            a) the newest CSV in Drive whose name contains SLA_CSV_NAME, or
- *            b) the tab SLA_RAW_SHEET in the report spreadsheet (paste/import the CSV there).
- * Output : tab "SLA Report"  — summary, root cause per order, lessons learned & actions
- *          tab "SLA History" — one row per order per run (to track repeat offenders / trend)
- *          HTML email to SLA_RECIPIENTS (skipped if the list is empty)
+ * Input  : the CSV "pending and aging more than 14 days from smallholder team customer.csv"
+ *          read DIRECTLY from GitHub (repo SLA_REPO, branch SLA_BRANCH) — no Sheet / Drive upload.
+ *          Just keep uploading the new CSV to GitHub with the same file name.
+ * Output : HTML email to SLA_RECIPIENTS (report + root cause + lessons learned).
+ *          Optional: if SLA_SPREADSHEET_ID is filled (or the script is bound to a Sheet),
+ *          it also writes tabs "SLA Report" and "SLA History" (trend / repeat offenders).
  *
  * All names are prefixed "sla"/"SLA_" so this file can live in the same Apps Script
- * project as Code.gs / LtvReport.gs without clashes.
+ * project as Code.gs / LtvReport.gs without clashes (they share Script Property GITHUB_TOKEN).
  *
  * Setup:
- *  1. Create (or reuse) a Google Sheet; paste its ID into SLA_SPREADSHEET_ID
- *     (leave '' if this script is bound to that sheet).
+ *  1. Script Property GITHUB_TOKEN (already there if you use the AM / LTV report project).
  *  2. Fill SLA_RECIPIENTS.
- *  3. Run slaRunReport() once and approve the permissions (Sheets, Drive, Gmail).
+ *  3. Run slaRunReport() once and approve the permissions.
  *  4. Run slaInstallTrigger() once (daily 08:00 WIB).
  */
 
-const SLA_SPREADSHEET_ID = '';                // '' = the spreadsheet this script is bound to
-const SLA_CSV_NAME = 'pending and aging more than 14 days';
-const SLA_RAW_SHEET = 'SLA_RAW';
+const SLA_REPO = 'wahyu-sawitpro/analisa-claude';
+const SLA_BRANCH = 'main';
+const SLA_CSV_PATH = 'pending and aging more than 14 days from smallholder team customer.csv';
+const SLA_SPREADSHEET_ID = '';                // optional: '' = no Sheet output (unless bound to a Sheet)
 const SLA_REPORT_SHEET = 'SLA Report';
 const SLA_HISTORY_SHEET = 'SLA History';
 const SLA_RECIPIENTS = [];                    // e.g. ['ops@sawitpro.com', 'smallholder-lead@sawitpro.com']
@@ -43,16 +39,21 @@ const SLA_DELIVERED = ['done', 'delivered', 'completed', 'received'];
 /* ------------------------------------------------------------------ entry points */
 
 function slaRunReport() {
-  const ss = slaSpreadsheet_();
-  const rows = slaReadSource_(ss);
+  const rows = slaReadSource_();
   const today = slaToday_();
   const orders = rows.map(r => slaAnalyzeRow_(r, today)).filter(o => o && o.failed);
   orders.sort((a, b) => b.aging - a.aging);
   const lessons = slaBuildLessons_(orders);
 
-  slaWriteReport_(ss, orders, lessons, today);
-  slaAppendHistory_(ss, orders, today);
-  if (SLA_RECIPIENTS.length) slaSendEmail_(orders, lessons, today, ss.getUrl());
+  const ss = slaSpreadsheet_();
+  if (ss) {
+    slaWriteReport_(ss, orders, lessons, today);
+    slaAppendHistory_(ss, orders, today);
+  }
+  const link = ss ? ss.getUrl()
+    : 'https://github.com/' + SLA_REPO + '/blob/' + SLA_BRANCH + '/' + encodeURI(SLA_CSV_PATH);
+  if (SLA_RECIPIENTS.length) slaSendEmail_(orders, lessons, today, link);
+  else Logger.log(slaHtml_(orders, lessons, today, link));
   Logger.log(orders.length + ' order(s) failed SLA.');
 }
 
@@ -68,31 +69,26 @@ function slaInstallTrigger() {
 /* ------------------------------------------------------------------ source */
 
 function slaSpreadsheet_() {
-  return SLA_SPREADSHEET_ID ? SpreadsheetApp.openById(SLA_SPREADSHEET_ID)
-                            : SpreadsheetApp.getActiveSpreadsheet();
+  if (SLA_SPREADSHEET_ID) return SpreadsheetApp.openById(SLA_SPREADSHEET_ID);
+  try { return SpreadsheetApp.getActiveSpreadsheet(); } catch (e) { return null; }
 }
 
-function slaReadSource_(ss) {
-  let values = null;
-  const files = DriveApp.searchFiles(
-    "title contains '" + SLA_CSV_NAME.replace(/'/g, "\\'") + "' and trashed = false");
-  let newest = null;
-  while (files.hasNext()) {
-    const f = files.next();
-    if (!/\.csv$/i.test(f.getName()) && f.getMimeType() !== 'text/csv') continue;
-    if (!newest || f.getLastUpdated() > newest.getLastUpdated()) newest = f;
+/** Reads the CSV straight from GitHub (works for private repos via GITHUB_TOKEN). */
+function slaReadSource_() {
+  const token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  if (!token) throw new Error('Add Script Property GITHUB_TOKEN first.');
+  const url = 'https://api.github.com/repos/' + SLA_REPO + '/contents/' +
+              SLA_CSV_PATH.split('/').map(encodeURIComponent).join('/') + '?ref=' + SLA_BRANCH;
+  const res = UrlFetchApp.fetch(url, {
+    headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github.raw' },
+    muteHttpExceptions: true,
+  });
+  if (res.getResponseCode() !== 200) {
+    throw new Error('GitHub ' + res.getResponseCode() + ' for "' + SLA_CSV_PATH + '" on ' +
+                    SLA_BRANCH + ': ' + res.getContentText().slice(0, 200));
   }
-  if (newest) {
-    values = Utilities.parseCsv(newest.getBlob().getDataAsString('UTF-8'));
-    Logger.log('Source: Drive CSV "' + newest.getName() + '" (' + newest.getLastUpdated() + ')');
-  } else {
-    const sh = ss.getSheetByName(SLA_RAW_SHEET);
-    if (!sh) throw new Error('No Drive CSV matching "' + SLA_CSV_NAME +
-                             '" and no tab "' + SLA_RAW_SHEET + '".');
-    values = sh.getDataRange().getValues();
-    Logger.log('Source: tab ' + SLA_RAW_SHEET);
-  }
-  return slaRowsToObjects_(values);
+  Logger.log('Source: GitHub ' + SLA_REPO + '@' + SLA_BRANCH + '/' + SLA_CSV_PATH);
+  return slaRowsToObjects_(Utilities.parseCsv(res.getContentText('UTF-8')));
 }
 
 function slaRowsToObjects_(values) {
@@ -355,7 +351,7 @@ function slaHtml_(orders, lessons, today, url) {
     h += '<h3>Lessons learned & actions</h3><ol>' + lessons.map(l =>
       '<li><b>' + esc(l.lesson) + '</b><br>→ ' + esc(l.action) + '</li>').join('') + '</ol>';
   }
-  return h + '<p><a href="' + url + '">Open full report</a></p></div>';
+  return h + '<p><a href="' + url + '">Open source / full report</a></p></div>';
 }
 
 function slaSendEmail_(orders, lessons, today, url) {
