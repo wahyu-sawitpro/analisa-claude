@@ -1,0 +1,50 @@
+name: Delivery SLA / Aging Report B2C Smallholder (build deck)
+
+on:
+  schedule:
+    - cron: "17 4 * * 3"    # Wednesday 04:17 UTC = 11:17 WIB; Apps Script pulls it at 13:00 WIB
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Jakarta
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r reporting/requirements.txt
+
+      - name: Check input files
+        run: |
+          for f in "pending and aging more than 14 days from smallholder team customer.csv" "deck slide.pptx"; do
+            if [ ! -f "$f" ]; then
+              echo "::error::File '$f' tidak ditemukan di repo. Upload export terbaru dulu."
+              exit 1
+            fi
+          done
+          for f in "Sales Smallholder.csv" "CRM Smallholder.csv"; do
+            if [ ! -f "$f" ]; then
+              echo "::warning::'$f' tidak ada — konteks customer / kontak CRM dilewati."
+            fi
+          done
+
+      - name: Build deck + xlsx
+        run: python reporting/sla_report.py --data-dir . --template "deck slide.pptx" --out "output/sla_report.pptx" --xlsx "output/sla_report.xlsx"
+
+      - name: Keep outputs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sla-report
+          path: |
+            output/sla_report.pptx
+            output/sla_report.xlsx
+          retention-days: 14
