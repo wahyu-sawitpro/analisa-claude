@@ -213,14 +213,16 @@ Months the data covers in full form the trend; a partial month is left out. The 
 
 ## Week of 9–15 Nov 2026 (sample data)
 The sample is the six weekly exports on `main` uploaded 16 Nov: sales 2–15 Nov for both teams, success stories and
-rejection reasons 9–15 Nov. All six are the right kind and cover the full period. Also on `main` but not part of the
-weekly six (not used): `Sales Smallholder.csv` (2 Jan – 15 Nov), `CRM Smallholder.csv` (1 Aug – 25 Nov: some
-engagements are dated after the export day) and `detail customer smallholder.csv` (one row per customer).
-- Total Rp849M from 43 orders. Smallholder Rp666M (+199% from Rp223M); Plantation Rp183M (−64% from Rp508M).
-- Smallholder: one Pupuk Grosir order of NPK Sawit 13-8-27 Pak Tani ×400 in Siak (Rp232M, Muhammad Abdul Wahab) is 35%
-  of the week; three orders of Rp50M+ make Rp366M (55%). Price tiers: Khusus Petani Rp233M overtook Toling (Rp83.6M;
-  Toling led the week before with Rp156M), Grosir came back from Rp0 to Rp232M. 21 of 23 buyers did not buy the week
-  before; 8 orders (Rp131M) are from new customers. 15 of 23 orders are still open.
+rejection reasons 9–15 Nov. The first Smallholder sales upload missed one order (#B2C28413, Grosir KCL Mentari ×354,
+Rp152M, 15 Nov, partly paid) and showed Rp666M; the re-upload (10:53) has it and matches the team's Rp817M. Also on
+`main` but not part of the weekly six (not used): `Sales Smallholder.csv` (2 Jan – 15 Nov, also without #B2C28413),
+`CRM Smallholder.csv` (1 Aug – 25 Nov: some engagements are dated after the export day) and
+`detail customer smallholder.csv` (one row per customer).
+- Total Rp1,001M from 44 orders. Smallholder Rp818M (+267% from Rp223M); Plantation Rp183M (−64% from Rp508M).
+- Smallholder: two Grosir orders of Muhammad Abdul Wahab (NPK Pak Tani ×400 in Siak Rp232M, KCL Mentari ×354 in Kampar
+  Rp152M) are 47% of the week; four orders of Rp50M+ make Rp518M (63%). Price tiers: Grosir Rp383M led (Rp0 the week
+  before), Khusus Petani Rp233M (from Rp58.9M), Toling Rp83.6M (from Rp156M, when it led). 22 of 24 buyers did not buy
+  the week before. Rp90.6M is still to collect on 3 partly paid orders; 16 of 24 orders are still open.
 - Plantation: the week before had three big orders (Topaz Rp190M, Grosir Rp138M + Rp90.8M); last week was 20 smaller
   orders (average Rp72.6M → Rp9.2M), 96% Topaz seeds. One CRM win from a live session (PSEN-2597, Rp18M).
   #B2C28384 and #B2C28385 (Tebo) look like one order entered twice.
