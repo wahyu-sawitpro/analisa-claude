@@ -1,9 +1,10 @@
 """
 B2C Smallholder — Delivery SLA Failure (Aging) Report + Lessons Learned (output in English)
 
-SLA: an order must be DELIVERED within 14 days of sale_order_date. Delivery can only start
-after the order is FULLY PAID, so the time left to deliver = 14 days - days the customer took
-to pay. Any order still not delivered after 14 days is an SLA failure.
+SLA: an order must be DELIVERED by sale_order_date + 14 days. Goods are shipped only once the
+order is FULLY PAID, but the SLA always counts from the sale order date — late payment does not
+move the deadline (order on the 1st -> deliver by the 15th, even if paid on the 10th).
+Any order still not delivered after 14 days is an SLA failure.
 All orders belong to PIC team Smallholder (rows of other teams are dropped when
 Sales Smallholder.csv says so).
 
@@ -19,11 +20,10 @@ Produces (same pattern as the AM / LTV report):
   - Deck .pptx based on "deck slide.pptx"
   - Workbook .xlsx (orders + findings, lessons learned, per PIC, assumptions)
 
-Root cause per order (stage where the 14 days were lost):
-  Not fully paid yet                              -> Payment   (cannot ship yet)
-  Paid after day 14                               -> Payment   (no delivery window left)
-  Paid with <= DISPATCH_DAYS left, not shipped    -> Payment + Delivery
-  Paid with  > DISPATCH_DAYS left, not shipped    -> Delivery
+Payment status per order (context for the breach; the deadline never moves):
+  Paid before deadline  -> paid by day 14 but not delivered by the deadline
+  Paid after deadline   -> paid after day 14; still counted late from the order date
+  Not fully paid        -> cannot ship yet; still counted late from the order date
 
 Usage:
   python reporting/sla_report.py --data-dir . --template "deck slide.pptx" \
@@ -115,8 +115,6 @@ def analyse(d: pd.DataFrame, today: dt.date, sales, crm) -> pd.DataFrame:
     d["is_paid"] = (d["inv"] == "PAID") & d["paid_date"].notna()
     d["days_to_pay"] = (d["paid_date"] - d["order_date"]).dt.days.where(d["is_paid"])
     d["days_since_paid"] = (t - d["paid_date"]).dt.days.where(d["is_paid"])
-    # delivery may only start after full payment -> days left in the 14-day SLA once paid
-    d["window"] = (SLA_DAYS - d["days_to_pay"]).where(d["is_paid"])
     d = d[~d["delivered"] & (d["aging"] > SLA_DAYS)].copy()
 
     if sales is not None and len(d):
@@ -131,23 +129,20 @@ def analyse(d: pd.DataFrame, today: dt.date, sales, crm) -> pd.DataFrame:
 
     rc, stage, flags, crm_txt = [], [], [], []
     for _, r in d.iterrows():
+        dl = d_id(r["deadline"].date())
         if not r["is_paid"]:
-            rc.append(f"Not fully paid yet ({r['inv'] or 'unpaid'}) — cannot ship"); stage.append("Payment")
-        elif r["window"] < 0:
-            rc.append(f"Paid after day {SLA_DAYS} (D+{int(r['days_to_pay'])}) — no delivery window left")
-            stage.append("Payment")
-        elif r["window"] <= DISPATCH_DAYS:
-            rc.append(f"Paid late (D+{int(r['days_to_pay'])}, {int(r['window'])}d left) — not shipped in time")
-            stage.append("Payment + Delivery")
+            rc.append(f"Not fully paid ({r['inv'] or 'unpaid'}) — not delivered by deadline {dl}")
+            stage.append("Not fully paid")
+        elif r["days_to_pay"] > SLA_DAYS:
+            rc.append(f"Paid late (D+{int(r['days_to_pay'])}) — not delivered by deadline {dl}")
+            stage.append("Paid after deadline")
         else:
-            rc.append(f"Paid on time (D+{int(r['days_to_pay'])}, {int(r['window'])}d left) — not shipped")
-            stage.append("Delivery")
+            rc.append(f"Paid D+{int(r['days_to_pay'])} — not delivered by deadline {dl}")
+            stage.append("Paid before deadline")
 
         f = []
         if r["is_paid"]:
-            f.append(f"Fully paid on D+{int(r['days_to_pay'])} -> "
-                     + (f"{int(r['window'])} day(s) left to deliver" if r["window"] >= 0
-                        else f"SLA already {int(-r['window'])} day(s) over when paid"))
+            f.append(f"Fully paid on D+{int(r['days_to_pay'])}; SLA deadline stays {dl} (order date + {SLA_DAYS})")
         if r["is_paid"] and r["days_since_paid"] > DISPATCH_DAYS:
             f.append(f"Paid {int(r['days_since_paid'])}d ago, still not dispatched")
         if r["is_paid"] and r["so"] == "NEW":
@@ -203,22 +198,19 @@ def lessons(d: pd.DataFrame) -> list[tuple[str, str]]:
         m = d["stage"] == name
         return int(m.sum()), ", ".join(d.loc[m, "ref"])
 
-    k, refs = st("Delivery")
+    k, refs = st("Paid before deadline")
     if k:
-        L.append((f"{k}/{n} order(s) were fully paid with enough time left in the {SLA_DAYS}-day SLA but were never shipped — "
-                  "the days were lost after payment.",
-                  f"Once PAID, the Smallholder PIC hands the order to delivery the same day; not dispatched within "
-                  f"{DISPATCH_DAYS} days -> escalate to the delivery lead. ({refs})"))
-    k, refs = st("Payment")
-    if k:
-        L.append((f"{k}/{n} order(s) were paid after day {SLA_DAYS} (or are still unpaid) — delivery cannot start before full "
-                  "payment, so the SLA was already lost at payment.",
-                  f"Smallholder PIC reminds the customer on D+1 / D+3 / D+7; target fully paid by D+{PAY_DAYS} so there are "
-                  f"≥ {SLA_DAYS - PAY_DAYS} days left to deliver. Unpaid at D+7 -> re-date or cancel the order. ({refs})"))
-    k, refs = st("Payment + Delivery")
-    if k:
-        L.append((f"{k}/{n} order(s) were paid with ≤ {DISPATCH_DAYS} days left — too little time to deliver.",
-                  f"Late-window payments (after D+{SLA_DAYS - DISPATCH_DAYS}) get priority dispatch the same day. ({refs})"))
+        L.append((f"{k}/{n} order(s) were fully paid before the SLA deadline but still not delivered by order date + "
+                  f"{SLA_DAYS} — payment was not the blocker.",
+                  f"Once PAID, the Smallholder PIC books delivery on or before the SLA deadline; not dispatched within "
+                  f"{DISPATCH_DAYS} days of payment -> escalate to the delivery lead. ({refs})"))
+    k1, r1 = st("Paid after deadline")
+    k2, r2 = st("Not fully paid")
+    if k1 + k2:
+        L.append((f"{k1 + k2}/{n} order(s) were paid after day {SLA_DAYS} or are still unpaid — the SLA still counts from "
+                  "the sale order date, so late payment does not excuse the breach.",
+                  f"Smallholder PIC reminds the customer on D+1 / D+3 / D+7 so the order is fully paid early enough to "
+                  f"deliver by D+{SLA_DAYS}; unpaid at D+7 -> re-date or cancel the order. ({', '.join(x for x in (r1, r2) if x)})"))
     k, _ = has("SO still NEW")
     if k:
         L.append((f"{k}/{n} order(s) are PAID but the Sale Order is still NEW — payment did not move the order to the warehouse.",
@@ -262,7 +254,7 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
 
     deck = Deck(template)
     W = deck.W
-    st_col = {"Delivery": RED, "Payment": ORANGE, "Payment + Delivery": ORANGE}
+    st_col = {"Paid before deadline": RED, "Paid after deadline": ORANGE, "Not fully paid": ORANGE}
 
     def rc_color(stage):
         return st_col.get(stage, MUTED)
@@ -278,7 +270,7 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
          f"PIC team {PIC_TEAM}  •  {fmt_int(len(d))} order(s) failing  •  {d_id(today)}",
          size=12, bold=True, color=GREEN)
     text(s, int(0.45 * IN), int(2.3 * IN), int(7 * IN), int(0.3 * IN),
-         f"SLA: delivered ≤ {SLA_DAYS} days after sale order date; delivery starts only after full payment.",
+         f"SLA: delivered by sale order date + {SLA_DAYS} days (shipped once fully paid; late payment does not move the deadline).",
          size=10, color=MUTED)
     text(s, int(0.45 * IN), int(2.55 * IN), int(7 * IN), int(0.3 * IN),
          f"Source: {AGING_FILE}  •  Auto-generated {d_id(today)}", size=9, color=MUTED)
@@ -286,29 +278,28 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
     # ---------------------------------------------------------- 2. summary
     s = deck.new()
     header(deck, s, "Summary — Orders Failing the Delivery SLA",
-           f"PIC team {PIC_TEAM}  •  SLA {SLA_DAYS} days from sale order date  •  delivery only after full payment "
-           f"→ days left to deliver = {SLA_DAYS} − days to pay")
+           f"PIC team {PIC_TEAM}  •  SLA deadline = sale order date + {SLA_DAYS} days, even if payment is late  •  "
+           f"shipped once fully paid")
     gap = int(0.2 * IN)
     tw = (W - 2 * MX - 3 * gap) // 4
     y = TOP + int(0.72 * IN)
-    n_pay = int(d["stage"].eq("Payment").sum())
-    n_del = len(d) - n_pay
+    n_before = int(d["stage"].eq("Paid before deadline").sum())
     tiles = [("Orders failing SLA", fmt_int(len(d))),
              ("Sales value held", fmt_idr(d["sales_idr"].sum())),
-             ("Lost at payment / after payment", f"{n_pay} / {n_del}"),
+             ("Paid before / after deadline", f"{n_before} / {len(d) - n_before}"),
              ("Avg days to full payment", f"D+{d['days_to_pay'].mean():.0f}" if d["days_to_pay"].notna().any() else "–")]
     for i, (lab, val) in enumerate(tiles):
         kpi_tile(s, MX + i * (tw + gap), y, tw, int(0.85 * IN), lab, val)
     y2 = y + int(1.05 * IN)
     half = (W - 2 * MX - gap) // 2
     if len(d):
-        g = d.groupby("stage").agg(n=("ref", "size"), v=("sales_idr", "sum"), w=("window", "mean")).reset_index()
-        text(s, MX, y2, half, int(0.22 * IN), "Where the 14 days were lost", size=10, bold=True, color=GREEN)
-        table(s, MX, y2 + int(0.26 * IN), half, ["Stage", "Orders", "Sales", "Avg days left after paid"],
+        g = d.groupby("stage").agg(n=("ref", "size"), v=("sales_idr", "sum"),
+                                   w=("days_since_paid", "mean"), o=("days_late", "mean")).reset_index()
+        text(s, MX, y2, half, int(0.22 * IN), "By payment status", size=10, bold=True, color=GREEN)
+        table(s, MX, y2 + int(0.26 * IN), half, ["Payment status", "Orders", "Sales", "Avg since paid", "Avg over SLA"],
               [[(r.stage, rc_color(r.stage)), fmt_int(r.n), fmt_idr(r.v),
-                "–" if pd.isna(r.w) else (f"{r.w:.0f}d" if r.w >= 0 else f"over {-r.w:.0f}d")]
-               for r in g.itertuples()],
-              [2.4, 0.9, 1.3, 1.9])
+                "–" if pd.isna(r.w) else f"{r.w:.0f}d", f"+{r.o:.0f}d"] for r in g.itertuples()],
+              [2.2, 0.8, 1.2, 1.2, 1.2])
         p = d.groupby("pic").agg(n=("ref", "size"), v=("sales_idr", "sum"), a=("aging", "max")).reset_index()
         text(s, MX + half + gap, y2, half, int(0.22 * IN), "By PIC", size=10, bold=True, color=GREEN)
         table(s, MX + half + gap, y2 + int(0.26 * IN), half, ["PIC", "Team", "Orders", "Sales", "Oldest (d)"],
@@ -319,26 +310,20 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
              size=14, bold=True, color=GREEN)
 
     # ---------------------------------------------------------- 3. order detail
-    def win(r):
-        if not r.is_paid:
-            return ("not paid", RED)
-        return (f"{int(r.window)}d", GREEN if r.window > DISPATCH_DAYS else ORANGE) if r.window >= 0 \
-            else (f"over {int(-r.window)}d", RED)
     def since_paid(r):
         return f"{int(r.days_since_paid)}d" if r.is_paid else ("not paid", RED)
     rows = [[r.ref, r.customer_name, r.pic, r.item, fmt_idr(r.sales_idr), _d(r.order_date),
              f"{_d(r.paid_date)} (D+{int(r.days_to_pay)})" if r.is_paid else (r.inv or "–", RED),
-             f"{int(r.aging)}d", since_paid(r), win(r), (f"+{int(r.days_late)}d", RED),
+             _d(r.deadline), f"{int(r.aging)}d", since_paid(r), (f"+{int(r.days_late)}d", RED),
              (r.stage, rc_color(r.stage))] for r in d.itertuples()]
-    legend = (f"Aging = sale order date → today  •  Since paid = full payment date → today  •  "
-              f"Window after paid = {SLA_DAYS} − days to pay (time left to deliver once fully paid; "
-              f"'over' = paid after day {SLA_DAYS})  •  Over SLA = aging − {SLA_DAYS} (days past the deadline "
-              f"= sale order date + {SLA_DAYS})")
+    legend = (f"SLA deadline = sale order date + {SLA_DAYS} days (does not move if payment is late)  •  "
+              f"Fully paid (D+x) = full payment date, x days after the order  •  Aging = sale order date → today  •  "
+              f"Since paid = full payment date → today  •  Over SLA = aging − {SLA_DAYS} = days past the deadline")
     paged_table(deck, "Orders Failing SLA — Detail",
-                f"PIC team {PIC_TEAM}  •  as of {d_id(today)}  •  delivery can start only after full payment",
-                ["Order", "Customer", "PIC", "Item", "Sales", "Order date", "Fully paid", "Aging",
-                 "Since paid", "Window after paid", "Over SLA", "Lost at"], rows,
-                [1.25, 1.5, 1.5, 2.0, 0.95, 0.95, 1.3, 0.65, 0.75, 0.9, 0.7, 1.2],
+                f"PIC team {PIC_TEAM}  •  as of {d_id(today)}  •  shipped once fully paid, deadline counted from order date",
+                ["Order", "Customer", "PIC", "Item", "Sales", "Order date", "Fully paid", "SLA deadline", "Aging",
+                 "Since paid", "Over SLA", "Payment status"], rows,
+                [1.25, 1.5, 1.5, 2.0, 0.95, 0.95, 1.3, 0.95, 0.65, 0.75, 0.7, 1.5],
                 left_cols=(1, 2, 3, 11), font=7, legend=legend, empty_row=["–"] + [""] * 11)
 
     # ---------------------------------------------------------- 4. findings per order
@@ -348,7 +333,7 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
              "  •  ".join(r.flags + ([r.crm_contact] if r.crm_contact else []))]
             for r in d.itertuples()]
     paged_table(deck, "Why Each Order Failed — Process Findings",
-                "Payment first, then delivery: findings derived from the data",
+                f"SLA deadline = sale order date + {SLA_DAYS} days, even if payment is late  •  findings derived from the data",
                 ["Order", "Customer / PIC", "Root cause", "Findings"], rows, [1.1, 2.0, 2.4, 6.0],
                 left_cols=(1, 2, 3), font=7, per_page=6,
                 empty_row=["–", "", "", ""])
@@ -375,9 +360,9 @@ def write_xlsx(path: Path, d: pd.DataFrame, L, today: dt.date):
         "Sales (IDR)": d["sales_idr"], "Order date": d["order_date"].dt.date,
         "SLA deadline": d["deadline"].dt.date, "Invoice status": d["inv"],
         "Full payment date": d["paid_date"].dt.date, "Days to pay": d["days_to_pay"],
-        "Window after paid (14 - days to pay)": d["window"], "Since paid (paid -> today)": d["days_since_paid"], "SO status": d["so"], "Delivery status": d["delivery"],
+        "Since paid (paid -> today)": d["days_since_paid"], "SO status": d["so"], "Delivery status": d["delivery"],
         "Scheduled": d["sched_date"].dt.date, "Aging (order -> today)": d["aging"], "Over SLA (aging - 14)": d["days_late"],
-        "Root cause": d["root_cause"], "Lost at": d["stage"], "Findings": d["flags"].map("\n".join),
+        "Root cause": d["root_cause"], "Payment status": d["stage"], "Findings": d["flags"].map("\n".join),
         "CRM contact while pending": d["crm_contact"],
     })
     by_pic = (d.groupby("pic").agg(Orders=("ref", "size"), **{"Sales (IDR)": ("sales_idr", "sum")},
@@ -392,8 +377,8 @@ def write_xlsx(path: Path, d: pd.DataFrame, L, today: dt.date):
             ("Report date", d_id(today)),
             ("PIC team", PIC_TEAM),
             ("Delivery SLA (days from sale order date)", SLA_DAYS),
-            ("Delivery may start", "only after full payment (invoice PAID)"),
-            ("Days left to deliver", f"{SLA_DAYS} - days to full payment"),
+            ("Goods are shipped", "once the order is fully paid (invoice PAID)"),
+            ("SLA deadline", f"sale order date + {SLA_DAYS} days — does not move if payment is late"),
             ("Target: fully paid within (days)", PAY_DAYS),
             ("Target: dispatched after payment within (days)", DISPATCH_DAYS),
             ("Schedule delivery no later than day", BUFFER_DAY),
