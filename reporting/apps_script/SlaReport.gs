@@ -6,15 +6,15 @@
  *
  * Every Wednesday ~11:17 WIB GitHub Actions (sla-report-weekly.yml) reads
  * "pending and aging more than 14 days from smallholder team customer.csv" and builds the
- * artifact "sla-report" (sla_report.pptx + sla_report.xlsx). This script runs Wednesday
- * 13:00–14:00 WIB, downloads the newest artifact and overwrites TWO fixed Drive files, so the
- * shared links never change (Drive keeps previous weeks as version history).
+ * artifact "sla-report" (sla_report.pptx). This script runs Wednesday 13:00–14:00 WIB,
+ * downloads the newest artifact and overwrites ONE fixed Drive .pptx file, so the shared link
+ * never changes (Drive keeps previous weeks as version history). Same as the AM report: PPT only.
  *
  * Setup:
  *  1. Services (+) -> "Drive API".
  *  2. Project Settings -> Script Properties -> GITHUB_TOKEN.
- *  3. Upload one .pptx and one .xlsx to Drive once (any content) and paste their
- *     file IDs into SLA_PPTX_FILE_ID / SLA_XLSX_FILE_ID below.
+ *  3. SLA_PPTX_FILE_ID below = the Drive .pptx file that is overwritten every week
+ *     (a real .pptx upload, not a Google Slides file).
  *  4. Run slaSetup() once and approve the permissions.
  *  5. Run slaInstallTrigger() once (weekly Wednesday 13:00 WIB trigger for this report only).
  *  Optional: run slaPullLatestReport() manually any time to test.
@@ -22,16 +22,13 @@
 
 const SLA_REPO = 'wahyu-sawitpro/analisa-claude';
 const SLA_ARTIFACT_NAME = 'sla-report';
-const SLA_PPTX_FILE_ID = 'PASTE_PPTX_FILE_ID';
-const SLA_XLSX_FILE_ID = 'PASTE_XLSX_FILE_ID';
+const SLA_PPTX_FILE_ID = '1Q9Z_iE15N4xt_rOP-lKVyLykjRDBRQzA'; // Drive: Pending Aging.pptx
 const SLA_MAX_AGE_HOURS = 30; // ignore artifacts older than this (e.g. workflow failed this week)
 const SLA_LAST_ID_PROP = 'LAST_ARTIFACT_ID_SLA'; // separate from the AM / LTV report's last-artifact property
 
 const SLA_TARGETS = [
   { ext: '.pptx', fileId: SLA_PPTX_FILE_ID,
     mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' },
-  { ext: '.xlsx', fileId: SLA_XLSX_FILE_ID,
-    mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
 ];
 
 function slaSetup() {
@@ -129,7 +126,7 @@ function slaToken_() {
 function slaCheckFileIds_() {
   SLA_TARGETS.forEach(t => {
     if (!t.fileId || t.fileId.indexOf('PASTE_') === 0) {
-      throw new Error('Fill in the Drive file ID for ' + t.ext + ' (SLA_PPTX_FILE_ID / SLA_XLSX_FILE_ID) at the top of the script first.');
+      throw new Error('Fill in SLA_PPTX_FILE_ID at the top of the script first.');
     }
   });
 }

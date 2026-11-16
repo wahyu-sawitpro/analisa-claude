@@ -6,7 +6,7 @@ Ada 3 otomasi. **Masing-masing punya project Apps Script sendiri.**
 |---|---|---|---|---|---|
 | AM Report | `AM Report Smallholder` | `AmReport.gs` | Senin 16:00 WIB | Senin 17:00–18:00 WIB | 1 `.pptx` |
 | LTV Report | `LTV Report Smallholder` | `LtvReport.gs` | Senin 16:00 WIB | Senin 19:00–20:00 WIB | 1 `.pptx` + 1 `.xlsx` |
-| SLA / Aging Report | `SLA Aging Report B2C` | `SlaReport.gs` | Rabu ~11:17 WIB | Rabu 13:00–14:00 WIB | 1 `.pptx` + 1 `.xlsx` |
+| SLA / Aging Report | `SLA Aging Report B2C` | `SlaReport.gs` | Rabu ~11:17 WIB | Rabu 13:00–14:00 WIB | 1 `.pptx` |
 
 ## Cara kerja (sama untuk ketiganya)
 
@@ -49,7 +49,7 @@ Untuk setiap report, upload file kosong atau sembarang **satu kali saja**. File 
 |---|---|
 | AM | 1 file `.pptx` (sudah ada, ID-nya sudah terisi di `AmReport.gs`) |
 | LTV | 1 `.pptx` + 1 `.xlsx` (sudah ada, ID-nya sudah terisi di `LtvReport.gs`) |
-| SLA | 1 `.pptx` + 1 `.xlsx` (**baru**, buat sekarang) |
+| SLA | 1 `.pptx` (sudah ada: *Pending Aging.pptx*, ID-nya sudah terisi di `SlaReport.gs`) |
 
 Cara mengambil **File ID**: buka file di Drive, lalu lihat URL-nya:
 `https://docs.google.com/presentation/d/`**`1AbCdEf...XyZ`**`/edit` → bagian yang ditebalkan adalah File ID.
@@ -66,7 +66,7 @@ Lakukan langkah B1–B7 tiga kali, satu kali untuk setiap report. Tabel di bawah
 |---|---|---|---|
 | Nama project | `AM Report Smallholder` | `LTV Report Smallholder` | `SLA Aging Report B2C` |
 | File di repo | `reporting/apps_script/AmReport.gs` | `reporting/apps_script/LtvReport.gs` | `reporting/apps_script/SlaReport.gs` |
-| Konstanta File ID | `AM_PPTX_FILE_ID` | `LTV_PPTX_FILE_ID`, `LTV_XLSX_FILE_ID` | `SLA_PPTX_FILE_ID`, `SLA_XLSX_FILE_ID` |
+| Konstanta File ID | `AM_PPTX_FILE_ID` | `LTV_PPTX_FILE_ID`, `LTV_XLSX_FILE_ID` | `SLA_PPTX_FILE_ID` |
 | Workflow di tab Actions | *AM Report Smallholder (build deck)* | *LTV & Upsell / Cross-sell Report Smallholder (build deck)* | *Delivery SLA / Aging Report B2C Smallholder (build deck)* |
 | Fungsi setup | `amSetup` | `ltvSetup` | `slaSetup` |
 | Fungsi tes | `amPullLatestReport` | `ltvPullLatestReport` | `slaPullLatestReport` |
@@ -94,8 +94,7 @@ Lakukan langkah B1–B7 tiga kali, satu kali untuk setiap report. Tabel di bawah
 
 ### B5. Isi File ID Drive
 Kembali ke editor (ikon `< >`). Di bagian atas script, ganti File ID dengan file dari langkah A2, lalu klik **Save**.
-- **AM** dan **LTV**: ID-nya sudah terisi. Cukup pastikan ID tersebut memang file yang dipakai tim.
-- **SLA**: ganti `PASTE_PPTX_FILE_ID` dan `PASTE_XLSX_FILE_ID`.
+- **AM**, **LTV**, dan **SLA**: ID-nya sudah terisi. Cukup pastikan ID tersebut memang file yang dipakai tim.
 
 ### B6. Pastikan sudah ada artifact di GitHub
 1. Di GitHub, buka tab **Actions**, lalu pilih workflow dari tabel.

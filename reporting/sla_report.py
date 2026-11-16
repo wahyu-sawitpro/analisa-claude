@@ -366,13 +366,14 @@ def main():
     ap.add_argument("--template", default="deck slide.pptx")
     ap.add_argument("--out", default="output/sla_report.pptx")
     ap.add_argument("--xlsx", default=None, help="default: same name as --out with .xlsx")
+    ap.add_argument("--no-xlsx", action="store_true", help="build the deck only")
     ap.add_argument("--today", default=None, help="YYYY-MM-DD (default: today WIB)")
     a = ap.parse_args()
     today = dt.date.fromisoformat(a.today) if a.today else dt.datetime.now(TZ).date()
     out = Path(a.out)
-    xlsx = Path(a.xlsx) if a.xlsx else out.with_suffix(".xlsx")
+    xlsx = None if a.no_xlsx else (Path(a.xlsx) if a.xlsx else out.with_suffix(".xlsx"))
     info = build(Path(a.data_dir), Path(a.template), out, xlsx, today)
-    print(f"OK -> {out}\n      {xlsx}")
+    print(f"OK -> {out}" + (f"\n      {xlsx}" if xlsx else ""))
     for k, v in info.items():
         print(f"  {k}: {v}")
 
