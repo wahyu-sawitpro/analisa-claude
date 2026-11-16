@@ -42,12 +42,14 @@
 6. **PIC bertemu customer tapi tidak mengeskalasi order yang pending.** → Saat visit atau call ke customer yang punya order pending lebih dari 7 hari, PIC wajib cek status kirim dan mencatatnya di CRM.
 7. **Dua-duanya repeat customer.** Risiko churn tinggi. → PIC menelepon minggu ini dengan tanggal kirim yang pasti. Pertimbangkan goodwill (free ongkir/voucher) di order berikutnya.
 
-## Otomasi (Apps Script)
+## Otomasi (sama seperti AM report & LTV report, tanpa email)
 
-File: `reporting/apps_script/SlaReport.gs`. Setiap hari jam 08:00 WIB, script ini:
-1. Membaca CSV terbaru di Drive yang namanya mengandung *"pending and aging more than 14 days"*. Kalau tidak ada, membaca tab `SLA_RAW` di spreadsheet.
-2. Menghitung aging, hari terlambat, lama pelunasan, dan hari sejak lunas. Lalu mengklasifikasi **akar masalah**: pembayaran belum lunas / pelunasan telat / fulfilment, beserta **flag proses** (SO masih NEW, jadwal sebelum lunas, jadwal di hari ke-14, jadwal terlewat, kritis).
-3. Menyusun **lessons learned dan action** secara otomatis berdasarkan flag yang muncul.
-4. Menulis tab `SLA Report` (KPI, detail, lessons), menambah baris di tab `SLA History` (untuk tren dan customer/PIC yang berulang), lalu mengirim email HTML ke `SLA_RECIPIENTS`.
+| Langkah | Kapan | File |
+|---|---|---|
+| GitHub Actions membaca CSV aging (+ Sales & CRM untuk konteks), lalu membuat deck `.pptx` dan `.xlsx` sebagai artifact `sla-report` | Rabu ~11:17 WIB | `.github/workflows/sla-report-weekly.yml`, `reporting/sla_report.py` |
+| Apps Script mengambil artifact terbaru dan menimpa 2 file tetap di Drive (link tidak berubah; minggu sebelumnya tersimpan sebagai version history) | Rabu 13:00–14:00 WIB | `reporting/apps_script/SlaReport.gs` |
 
-Setup: isi `SLA_SPREADSHEET_ID` (atau bind script ke sheet) dan `SLA_RECIPIENTS`, jalankan `slaRunReport()` sekali untuk approve permission, lalu jalankan `slaInstallTrigger()`.
+Isi deck: Summary (KPI, per akar masalah, per PIC) → Detail order → Temuan proses per order (termasuk kontak CRM selama order pending) → Lessons learned & actions.
+Isi xlsx: Orders failing SLA, Lessons learned, Per PIC, Assumptions.
+
+Rutinitas: sebelum Rabu 11:00 WIB, upload CSV *"pending and aging more than 14 days from smallholder team customer.csv"* terbaru ke `main`.
