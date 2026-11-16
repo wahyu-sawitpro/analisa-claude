@@ -324,16 +324,22 @@ def build(data_dir: Path, template: Path, out: Path, xlsx: Path | None, today: d
             return ("not paid", RED)
         return (f"{int(r.window)}d", GREEN if r.window > DISPATCH_DAYS else ORANGE) if r.window >= 0 \
             else (f"over {int(-r.window)}d", RED)
-    rows = [[r.ref, r.customer_name, r.pic, r.item, fmt_idr(r.sales_idr), _d(r.order_date), _d(r.deadline),
+    def since_paid(r):
+        return f"{int(r.days_since_paid)}d" if r.is_paid else ("not paid", RED)
+    rows = [[r.ref, r.customer_name, r.pic, r.item, fmt_idr(r.sales_idr), _d(r.order_date),
              f"{_d(r.paid_date)} (D+{int(r.days_to_pay)})" if r.is_paid else (r.inv or "–", RED),
-             win(r), fmt_int(r.aging), (f"+{int(r.days_late)}", RED),
+             f"{int(r.aging)}d", since_paid(r), win(r), (f"+{int(r.days_late)}d", RED),
              (r.stage, rc_color(r.stage))] for r in d.itertuples()]
+    legend = (f"Aging = sale order date → today  •  Since paid = full payment date → today  •  "
+              f"Window after paid = {SLA_DAYS} − days to pay (time left to deliver once fully paid; "
+              f"'over' = paid after day {SLA_DAYS})  •  Over SLA = aging − {SLA_DAYS} (days past the deadline "
+              f"= sale order date + {SLA_DAYS})")
     paged_table(deck, "Orders Failing SLA — Detail",
-                f"PIC team {PIC_TEAM}  •  SLA deadline = sale order date + {SLA_DAYS} days  •  "
-                "Days left = days between full payment and the SLA deadline",
-                ["Order", "Customer", "PIC", "Item", "Sales", "Order date", "SLA deadline", "Fully paid", "Days left",
-                 "Aging", "Late", "Lost at"], rows, [1.25, 1.5, 1.5, 2.0, 0.95, 0.95, 0.95, 1.3, 0.8, 0.6, 0.55, 1.3],
-                left_cols=(1, 2, 3, 11), font=7, empty_row=["–"] + [""] * 11)
+                f"PIC team {PIC_TEAM}  •  as of {d_id(today)}  •  delivery can start only after full payment",
+                ["Order", "Customer", "PIC", "Item", "Sales", "Order date", "Fully paid", "Aging",
+                 "Since paid", "Window after paid", "Over SLA", "Lost at"], rows,
+                [1.25, 1.5, 1.5, 2.0, 0.95, 0.95, 1.3, 0.65, 0.75, 0.9, 0.7, 1.2],
+                left_cols=(1, 2, 3, 11), font=7, legend=legend, empty_row=["–"] + [""] * 11)
 
     # ---------------------------------------------------------- 4. findings per order
     # table() styles only the first paragraph of a cell -> keep every cell on one paragraph
@@ -369,8 +375,8 @@ def write_xlsx(path: Path, d: pd.DataFrame, L, today: dt.date):
         "Sales (IDR)": d["sales_idr"], "Order date": d["order_date"].dt.date,
         "SLA deadline": d["deadline"].dt.date, "Invoice status": d["inv"],
         "Full payment date": d["paid_date"].dt.date, "Days to pay": d["days_to_pay"],
-        "Days left to deliver after paid": d["window"], "Days since paid": d["days_since_paid"], "SO status": d["so"], "Delivery status": d["delivery"],
-        "Scheduled": d["sched_date"].dt.date, "Aging (days)": d["aging"], "Days late": d["days_late"],
+        "Window after paid (14 - days to pay)": d["window"], "Since paid (paid -> today)": d["days_since_paid"], "SO status": d["so"], "Delivery status": d["delivery"],
+        "Scheduled": d["sched_date"].dt.date, "Aging (order -> today)": d["aging"], "Over SLA (aging - 14)": d["days_late"],
         "Root cause": d["root_cause"], "Lost at": d["stage"], "Findings": d["flags"].map("\n".join),
         "CRM contact while pending": d["crm_contact"],
     })
