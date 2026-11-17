@@ -2,7 +2,8 @@ name: AM Report Smallholder (build deck)
 
 on:
   schedule:
-    - cron: "0 9 * * 1"    # Monday 09:00 UTC = 16:00 WIB; Apps Script pulls it at 17:00 WIB
+    - cron: "37 8 * * 1"   # Monday 08:37 UTC = 15:37 WIB. Off the top of the hour because GitHub delays
+                           # scheduled runs most at :00; Apps Script checks hourly and picks it up whenever it lands.
   workflow_dispatch:
 
 permissions:
@@ -35,9 +36,20 @@ jobs:
       - name: Build deck
         run: python reporting/am_report.py --data-dir . --template "deck slide.pptx" --out "output/report.pptx"
 
+      - name: Fingerprint of the input data
+        # Same CSVs + same report code => same hash. Apps Script compares it with last week's
+        # and, when unchanged, only renames the week in the stacked deck instead of adding slides.
+        run: |
+          for f in "CRM Smallholder.csv" "Sales Smallholder.csv" reporting/am_report.py; do
+            [ -f "$f" ] && sha256sum "$f"
+          done | sha256sum | cut -d' ' -f1 > output/am_data_hash.txt
+          cat output/am_data_hash.txt
+
       - name: Keep pptx as artifact
         uses: actions/upload-artifact@v4
         with:
           name: am-report-pptx
-          path: output/report.pptx
+          path: |
+            output/report.pptx
+            output/am_data_hash.txt
           retention-days: 14
