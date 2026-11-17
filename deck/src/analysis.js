@@ -69,7 +69,7 @@ function detectWith(fields,headers){
 const detectCrm=h=>detectWith(CRM_FIELDS,h), detectSales=h=>detectWith(SALES_FIELDS,h);
 // A farmer acquisition export: one row per registered farmer, with the registration week and Duta / non-Duta type.
 const ACQ_FIELDS=[["week",[/minggu_?register|register_?week|week_?register|^minggu$|^week$/]],["type",[/akuisisi_?type|acquisition_?type/]],["joined",[/join_?date_?farmer|register_?date|join_?date|tanggal_?daftar/]],
-  ["source",[/^utm_?source$/]],["campaign",[/^utm_?source_?name$|utm_?campaign/]],["referral",[/^referral_?utm$/]],["status",[/status_?under_?duta/]],["duta",[/^duta_?id$|^duta_?name$/]],["dutaName",[/^duta_?name$/]],
+  ["source",[/^utm_?source$/]],["campaign",[/^campaign_?name$/,/^utm_?source_?name$|utm_?campaign/]],["referral",[/^referral_?utm$/]],["status",[/status_?under_?duta/]],["duta",[/^duta_?id$|^duta_?name$/]],["dutaName",[/^duta_?name$/]],
   ["test",[/is_?test_?duta|is_?test/]],["role",[/user_?role|^role$/]],["farms",[/jumlah_?farm|farm_?count|num_?farms/]],["ha",[/total_?area_?hectare|area_?hectare|^hectare|luas/]],["prov",[/^province$|^provinsi$/]],["regency",[/^regency$|^kabupaten$/]],["farmHa",[/detail_?hectare|farm_?hectares?$/]],["name",[/farmer_?name|^name$|user_?name/]],["farmName",[/^farm_?name$/]],["lastSale",[/last_?sale_?order_?date|last_?order_?date/]],["regSales",[/total_?sales_?register_?date|sales_?(on_?)?register/]],["email",[/farmer_?email|^e-?mail$/]],["farmLoc",[/^location$|farm_?location/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
 const detectAcq=h=>detectWith(ACQ_FIELDS,h);
 const isAcqList=headers=>{ const m=detectAcq(headers); return !!(m.type||m.week&&m.joined&&(m.id||m.duta)); };
