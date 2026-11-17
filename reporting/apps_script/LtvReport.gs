@@ -3,10 +3,12 @@
  *
  * Runs in its OWN Apps Script project (separate from the AM and SLA projects).
  *
- * Every Monday 16:00 WIB GitHub Actions builds the artifact "ltv-report"
- * (ltv_report.pptx + ltv_report.xlsx). This script runs Monday 19:00–20:00 WIB,
- * downloads the newest artifact and overwrites TWO fixed Drive files, so the shared
- * links never change (Drive keeps previous weeks as version history).
+ * Every Monday GitHub Actions builds the artifact "ltv-report" (ltv_report.pptx +
+ * ltv_report.xlsx). GitHub often starts scheduled runs hours late (e.g. 02:00 WIB on
+ * Tuesday instead of 16:00 WIB on Monday), so this script does NOT wait for a fixed time:
+ * it checks every hour and, as soon as a NEW artifact exists, overwrites TWO fixed Drive
+ * files, so the shared links never change (Drive keeps previous weeks as version history).
+ * When there is nothing new it just logs and exits (no error, no email).
  *
  * Setup:
  *  1. Services (+) -> "Drive API".
@@ -14,7 +16,7 @@
  *  3. Upload one .pptx and one .xlsx to Drive once (any content) and paste their
  *     file IDs into LTV_PPTX_FILE_ID / LTV_XLSX_FILE_ID below.
  *  4. Run ltvSetup() once and approve the permissions.
- *  5. Run ltvInstallTrigger() once (weekly Monday 19:00 WIB trigger for LTV only).
+ *  5. Run ltvInstallTrigger() once (hourly check; replaces the old Monday 19:00 trigger).
  *  Optional: run ltvPullLatestReport() manually any time to test.
  */
 
@@ -22,7 +24,7 @@ const LTV_REPO = 'wahyu-sawitpro/analisa-claude';
 const LTV_ARTIFACT_NAME = 'ltv-report';
 const LTV_PPTX_FILE_ID = '1VIO1pjQJQkd5TIwwJKV2v7YIk7OSTbQc';
 const LTV_XLSX_FILE_ID = '1qlsD9_NgZxtcZwUsYRtrnREUGWx7U6wx';
-const LTV_MAX_AGE_HOURS = 30; // ignore artifacts older than this (e.g. workflow failed this week)
+const LTV_STALE_DAYS = 8;      // newest artifact older than this = the weekly workflow did not run
 const LTV_LAST_ID_PROP = 'LAST_ARTIFACT_ID_LTV'; // separate from the AM report's LAST_ARTIFACT_ID
 
 const LTV_TARGETS = [
@@ -50,11 +52,9 @@ function ltvInstallTrigger() {
     .forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('ltvPullLatestReport')
     .timeBased()
-    .onWeekDay(ScriptApp.WeekDay.MONDAY)
-    .atHour(19)
-    .inTimezone('Asia/Jakarta')
+    .everyHours(1)
     .create();
-  Logger.log('LTV trigger installed: every Monday 19:00–20:00 WIB');
+  Logger.log('LTV trigger installed: checks GitHub every hour, updates Drive only when a new report exists');
 }
 
 function ltvPullLatestReport() {
@@ -63,13 +63,15 @@ function ltvPullLatestReport() {
   const a = ltvLatestArtifact_(token);
   if (!a) throw new Error('No artifact "' + LTV_ARTIFACT_NAME + '" found.');
 
-  const ageH = (Date.now() - new Date(a.created_at).getTime()) / 36e5;
-  if (ageH > LTV_MAX_AGE_HOURS) {
-    throw new Error('Latest LTV artifact is ' + ageH.toFixed(0) +
-                    'h old — this week\'s LTV workflow probably failed. Check the Actions tab.');
-  }
   if (props.getProperty(LTV_LAST_ID_PROP) === String(a.id)) {
-    Logger.log('LTV artifact ' + a.id + ' already uploaded, nothing to do.');
+    const ageD = (Date.now() - new Date(a.created_at).getTime()) / 864e5;
+    // Raise ONE error (Google emails it) if no new weekly report has appeared for too long.
+    if (ageD > LTV_STALE_DAYS && props.getProperty('LTV_STALE_WARNED') !== String(a.id)) {
+      props.setProperty('LTV_STALE_WARNED', String(a.id));
+      throw new Error('No new LTV report for ' + ageD.toFixed(0) + ' days — check the Actions tab ' +
+                      '(workflow failed, or the CSV was not uploaded).');
+    }
+    Logger.log('No new LTV report yet (latest ' + a.id + ' from ' + a.created_at + ' is already in Drive).');
     return;
   }
 
