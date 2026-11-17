@@ -17,6 +17,12 @@
  *
  * When there is nothing new it just logs and exits (no error, no email).
  *
+ * SAME DATA AS LAST WEEK: the artifact carries ltv_data_hash.txt (fingerprint of the input
+ * CSVs + report code). If it equals the fingerprint of the newest week already in the deck,
+ * no slides are copied: only that week's divider title is renamed to the new week
+ * ("Week of 23 Nov 2026 — data unchanged since 16 Nov 2026") and its slides are kept, so at
+ * least the last deck always stays. The fixed .pptx / .xlsx files are left as they are.
+ *
  * Every slide the script inserts carries a tag "[ltv-week:YYYY-MM-DD]" in its speaker
  * notes; that tag is how a week is found again (to replace or delete it). Don't remove it.
  *
@@ -41,6 +47,7 @@ const LTV_KEEP_WEEKS = 8;       // weeks kept in the stacked deck
 const LTV_STALE_DAYS = 8;       // newest artifact older than this = the weekly workflow did not run
 const LTV_LAST_ID_PROP = 'LAST_ARTIFACT_ID_LTV';
 const LTV_DECK_PROP = 'LTV_STACK_DECK_ID';
+const LTV_HASH_PROP = 'LTV_LAST_DATA_HASH';   // fingerprint of the newest week in the deck
 const LTV_TZ = 'Asia/Jakarta';
 const LTV_TAG_RE = /\[ltv-week:(\d{4}-\d{2}-\d{2})\]/;
 
@@ -95,11 +102,20 @@ function ltvPullLatestReport() {
   const blobs = Utilities.unzip(ltvDownload_(token, a));
   const pptx = blobs.find(x => x.getName().toLowerCase().endsWith('.pptx'));
   const xlsx = blobs.find(x => x.getName().toLowerCase().endsWith('.xlsx'));
+  const hashBlob = blobs.find(x => x.getName().toLowerCase().endsWith('ltv_data_hash.txt'));
   if (!pptx || !xlsx) throw new Error('Artifact ' + a.id + ' must contain one .pptx and one .xlsx');
+  const hash = hashBlob ? hashBlob.getDataAsString().trim() : '';
+  const week = ltvWeekOf_(a.created_at);
+
+  // 0. same data as the newest week in the deck -> only rename that week, keep its slides
+  if (hash && hash === props.getProperty(LTV_HASH_PROP) && ltvRetitleNewestWeek_(week)) {
+    props.setProperty(LTV_LAST_ID_PROP, String(a.id));
+    return;
+  }
 
   // 1. stacked deck (newest week on top, keep LTV_KEEP_WEEKS)
-  const week = ltvWeekOf_(a.created_at);
   ltvStackWeek_(pptx.copyBlob(), week);
+  if (hash) props.setProperty(LTV_HASH_PROP, hash); else props.deleteProperty(LTV_HASH_PROP);
 
   // 2 + 3. fixed "latest" files
   [[LTV_PPTX_FILE_ID, pptx, LTV_PPTX_MIME], [LTV_XLSX_FILE_ID, xlsx, LTV_XLSX_MIME]].forEach(([id, blob, mime]) => {
@@ -111,9 +127,12 @@ function ltvPullLatestReport() {
   props.setProperty(LTV_LAST_ID_PROP, String(a.id));
 }
 
-/** Re-process the latest artifact even if it was already uploaded (first fill / repair). */
+/** Re-process the latest artifact even if it was already uploaded (first fill / repair).
+ *  Always does a full insert of the week's slides (ignores the "data unchanged" shortcut). */
 function ltvForceUpdate() {
-  PropertiesService.getScriptProperties().deleteProperty(LTV_LAST_ID_PROP);
+  const props = PropertiesService.getScriptProperties();
+  props.deleteProperty(LTV_LAST_ID_PROP);
+  props.deleteProperty(LTV_HASH_PROP);
   ltvPullLatestReport();
 }
 
@@ -154,6 +173,7 @@ function ltvStackWeek_(pptxBlob, week) {
     Drive.Files.update({ trashed: true }, tmp.id, null, { supportsAllDrives: true });
   }
   placeholders.forEach(s => s.remove());
+  PropertiesService.getScriptProperties().setProperty('LTV_DATA_SINCE', week.label);
 
   // retention: keep only the newest LTV_KEEP_WEEKS weeks
   const weeks = ltvWeeksInDeck_(deck);
@@ -161,6 +181,38 @@ function ltvStackWeek_(pptxBlob, week) {
   if (drop.length) ltvDeleteWeeks_(deck, drop);
   Logger.log('Stacked deck: added week of ' + week.label + '; weeks kept: ' +
              weeks.slice(0, LTV_KEEP_WEEKS).join(', ') + (drop.length ? '; deleted: ' + drop.join(', ') : ''));
+}
+
+/** Data unchanged: rename the newest week in the deck to `week` and keep its slides.
+ *  Returns false when there is nothing to rename (empty deck) so the caller does a full insert. */
+function ltvRetitleNewestWeek_(week) {
+  const deck = SlidesApp.openById(ltvDeckId_());
+  const weeks = ltvWeeksInDeck_(deck);
+  if (!weeks.length) return false;
+  const oldKey = weeks[0];
+  if (oldKey === week.key) {
+    Logger.log('Data unchanged and week of ' + week.label + ' is already on top — nothing to do.');
+    return true;
+  }
+  const slides = deck.getSlides().filter(s => ltvTagOf_(s) === oldKey);
+  // first slide of the week is the divider: replace its title and subtitle
+  const boxes = slides[0].getShapes().filter(sh => sh.getShapeType() === SlidesApp.ShapeType.TEXT_BOX);
+  const firstLabel = (PropertiesService.getScriptProperties().getProperty('LTV_DATA_SINCE') || ltvLabelOf_(oldKey));
+  if (boxes[0]) boxes[0].getText().setText('LTV Report — Week of ' + week.label);
+  if (boxes[1]) boxes[1].getText().setText('Data unchanged since the week of ' + firstLabel +
+                                           ' — slides kept, only the title was updated (' +
+                                           Utilities.formatDate(new Date(), LTV_TZ, 'd MMM yyyy HH:mm') + ' WIB)');
+  const tag = '[ltv-week:' + week.key + ']';
+  slides.forEach(s => ltvSetTag_(s, tag));
+  PropertiesService.getScriptProperties().setProperty('LTV_DATA_SINCE', firstLabel);
+  Logger.log('Data unchanged since week of ' + firstLabel + ': renamed week ' + oldKey + ' -> ' + week.key +
+             ' (' + slides.length + ' slides kept, nothing copied).');
+  return true;
+}
+
+function ltvLabelOf_(key) {
+  const p = key.split('-').map(Number);
+  return Utilities.formatDate(new Date(Date.UTC(p[0], p[1] - 1, p[2], 5)), LTV_TZ, 'd MMM yyyy');
 }
 
 /** Week keys present in the deck, newest first. */

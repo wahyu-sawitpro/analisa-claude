@@ -39,6 +39,16 @@ jobs:
       - name: Build deck + xlsx
         run: python reporting/ltv_report.py --data-dir . --template "deck slide.pptx" --out "output/ltv_report.pptx" --xlsx "output/ltv_report.xlsx"
 
+      - name: Fingerprint of the input data
+        # Same CSVs + same report code => same hash. Apps Script compares it with last week's
+        # and, when unchanged, only renames the week in the stacked deck instead of adding slides.
+        run: |
+          for f in "detail customer smallholder.csv" "Sales Smallholder.csv" "CRM Smallholder.csv" \
+                   reporting/ltv_report.py reporting/am_report.py; do
+            [ -f "$f" ] && sha256sum "$f"
+          done | sha256sum | cut -d' ' -f1 > output/ltv_data_hash.txt
+          cat output/ltv_data_hash.txt
+
       - name: Keep outputs as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -46,4 +56,5 @@ jobs:
           path: |
             output/ltv_report.pptx
             output/ltv_report.xlsx
+            output/ltv_data_hash.txt
           retention-days: 14
