@@ -121,7 +121,7 @@ flagged as a likely bulk sign-up or import.
 The registration review opens with an overview (farmers per complete week, the running week left out; last week vs the
 week before and vs the median of the earlier weeks; "Injected User" bulk adds called out), and has a slide on Identified
 Campaigns by campaign name next to Organic with last week's viral content. Viral content is listed by hand in
-`deck/src/organic-content.json` (date, platform, account, views); entries dated in last week are shown.
+`deck/src/organic-content.json` (date, platform, account, views); entries dated in last week are shown. Tables show every row when they fit; otherwise the "Other" row is listed name by name in the note under the slide.
 
 ## Weekly registration refresh (every Tuesday, 10:00 WIB)
 A scheduled routine refreshes the farmer-registration review from `Farmer register for weekly farmer.csv` on `main`:

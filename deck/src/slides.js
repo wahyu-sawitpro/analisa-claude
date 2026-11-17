@@ -542,19 +542,20 @@ function acqSpecs(Q,pre){
       `<b>Days:</b> the file's weeks run from Monday morning to the next Monday morning; registrations before the cut on the next Monday are counted as Monday, so each day is a full 24 hours.`].filter(Boolean)});
   // 4. Channel and campaign detail
   const base=Q.weeks.slice(Math.max(0,W.length-5),-1), av=k=>base.length?base.reduce((s,x)=>s+(x.src.get(k)||0),0)/base.length:0;
-  const rowsC=Q.srcs.map(k=>{ const p=P?P.src.get(k)||0:0, l=L.src.get(k)||0;
+  const zeroCh=Q.srcs.filter(k=>!(L.src.get(k)||0)&&!(P?P.src.get(k)||0:0));
+  const rowsC=Q.srcs.filter(k=>!zeroCh.includes(k)).map(k=>{ const p=P?P.src.get(k)||0:0, l=L.src.get(k)||0;
     return [{v:k==="Duta"?"Duta (under Duta)":k,bold:true},P?nf.format(p):"–",{v:nf.format(l),bold:true},P?sg(l-p):"–",P?spc(l,p):"–",nf.format(Math.round(av(k)))]; });
   rowsC.push([{v:"Total",bold:true},P?{v:nf.format(P.total),bold:true}:"–",{v:nf.format(L.total),bold:true},P?{v:sg(d),bold:true}:"–",P?{v:spc(L.total,P.total),bold:true}:"–",{v:nf.format(Math.round(Q.avg||0)),bold:true}]);
-  const cTop=[...Q.camps].sort((a,b)=>b.l-a.l||a.d-b.d).slice(0,8), cRest=Q.camps.filter(x=>!cTop.includes(x));
+  const cAll=[...Q.camps].sort((a,b)=>b.l-a.l||a.d-b.d), cTop=cAll.length<=9?cAll:cAll.slice(0,7), cRest=cAll.filter(x=>!cTop.includes(x));
   const rowsK=cTop.map(x=>[x.k,P?nf.format(x.p):"–",{v:nf.format(x.l),bold:true},P?sg(x.d):"–"]);
   if(cRest.length) rowsK.push([`Other ${cRest.length} campaigns`,P?nf.format(cRest.reduce((s,x)=>s+x.p,0)):"–",nf.format(cRest.reduce((s,x)=>s+x.l,0)),P?sg(cRest.reduce((s,x)=>s+x.d,0)):"–"]);
   const bS=P?P.short:"–", lS=L.short, ph=L.noPhone, pp=P?P.noPhone:null;
   S.push({kicker:pre+"Acquisition · channels in detail",title:`${Q.dSrc.filter(x=>x.d<0).length} of ${Q.dSrc.length} channels fell last week; ${pct(ph,L.total)}% of new farmers have no phone number`,
     rows:[{cards:[
-      {w:1.1,title:"Farmers by channel",sub:"Acquisition channel",foot:`${base.length}-week avg = the ${base.length} weeks before last week (${base.map(x=>x.short).join(", ")}).`,
+      {w:1.1,title:"Farmers by channel",sub:`Acquisition channel; ${base.length}-week avg = ${base.map(x=>x.short).join(", ")}`,
         table:{colW:[30,14,14,13,13,14],head:["Channel",`Week of ${bS}`,`Week of ${lS}`,"Change","Change %",`${base.length}-week avg`],align:["l","r","r","r","r","r"],rows:rowsC}},
       {w:1,title:"Non-Duta farmers by campaign",sub:"Largest last week first",table:{colW:[46,18,18,18],head:["Campaign",`Week of ${bS}`,`Week of ${lS}`,"Change"],align:["l","r","r","r"],rows:rowsK}}]}],
-    notes:[`<b>Phone numbers:</b> ${nf.format(ph)} of ${nf.format(L.total)} farmers last week (${pct(ph,L.total)}%)${pp!=null?` and ${nf.format(pp)} of ${nf.format(P.total)} the week before`:""} registered without a phone number, so sales and Dutas cannot follow them up.`]});
+    notes:[`<b>Phone numbers:</b> ${nf.format(ph)} of ${nf.format(L.total)} farmers last week (${pct(ph,L.total)}%)${pp!=null?` and ${nf.format(pp)} of ${nf.format(P.total)} the week before`:""} registered without a phone number, so sales and Dutas cannot follow them up.`,otherNote(cRest,P),zeroCh.length&&`<b>No farmers either week:</b> ${zeroCh.map(esc).join(", ")}.`].filter(Boolean)});
   return S;
 }
 // Who registered: farmers vs estate owners, whether they added a farm, where they are, and users above 100 ha.
@@ -645,11 +646,14 @@ function acqOverviewSpec(Q,pre){
     notes:[med!=null&&`<b>Median week:</b> ${nf.format(Math.round(med))} farmers over the ${prior.length} complete weeks before last week (${W[0].short} – ${W[W.length-2].short}); last week was ${spc(L.total,med)} on it.`,
       ...inj.map(o=>`<b>Injected users, week of ${o.w.short}:</b> ${nf.format(o.n)} of ${nf.format(o.w.total)} were added in bulk (utm source “Injected User”), not acquired through a channel.`)].filter(Boolean)};
 }
+// When a table keeps an "Other" row, the note under it lists every campaign in it with its counts.
+const otherNote=(rest,P,lab="campaigns")=>{ if(!rest.length) return null; const on=[...rest].filter(x=>x.l).sort((a,b)=>b.l-a.l||b.p-a.p), off=rest.filter(x=>!x.l);
+  return `<b>Other ${rest.length} ${lab}${P?" (week before in brackets)":""}:</b> ${on.map(x=>`${esc(x.k)} ${nf.format(x.l)}${P?` (${nf.format(x.p)})`:""}`).join(", ")}${off.length?`${on.length?"; ":""}${off.length} more with none last week${P?` (${nf.format(off.reduce((a,x)=>a+x.p,0))} the week before)`:""}`:""}.`; };
 // Identified Campaigns by campaign name, and Organic with the viral content of last week
 function acqCampaignSpec(Q,pre){
   const L=Q.L, P=Q.P, R=Q.rawRows||[], ic=w=>new Map(countBy(R.filter(r=>r.w===w.w&&/identified\s*campaign/i.test(r.src||"")),r=>r.camp));
   const l=ic(L), p=P?ic(P):new Map(), keys=[...new Set([...l.keys(),...p.keys()])].map(k=>({k,l:l.get(k)||0,p:p.get(k)||0})).sort((a,b)=>b.l-a.l||b.p-a.p);
-  const top=keys.slice(0,7), rest=keys.slice(7), tl=keys.reduce((a,x)=>a+x.l,0), tp=keys.reduce((a,x)=>a+x.p,0);
+  const top=keys.length<=9?keys:keys.slice(0,7), rest=keys.filter(x=>!top.includes(x)), tl=keys.reduce((a,x)=>a+x.l,0), tp=keys.reduce((a,x)=>a+x.p,0);
   const rows=top.map(x=>[x.k,P?nf.format(x.p):"–",{v:nf.format(x.l),bold:true},P?sg(x.l-x.p):"–"]);
   if(rest.length) rows.push([`Other ${rest.length} campaigns`,P?nf.format(rest.reduce((a,x)=>a+x.p,0)):"–",nf.format(rest.reduce((a,x)=>a+x.l,0)),P?sg(rest.reduce((a,x)=>a+x.l-x.p,0)):"–"]);
   rows.push([{v:"Total",bold:true},P?{v:nf.format(tp),bold:true}:"–",{v:nf.format(tl),bold:true},P?{v:sg(tl-tp),bold:true}:"–"]);
@@ -662,7 +666,7 @@ function acqCampaignSpec(Q,pre){
     rows:[{cards:[
       {w:1.15,title:"Identified Campaigns by campaign name",sub:"Farmers per campaign (utm source name), largest last week first",table:{colW:[46,18,18,18],head:["Campaign",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change"],align:["l","r","r","r"],rows}},
       {w:1,title:"Organic: viral content last week",sub:`Organic farmers ${P?`${nf.format(org(P))} → `:""}${nf.format(org(L))}${P?` (${sg(org(L)-org(P))})`:""}`,table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows.length?vrows:[["No viral content listed","","",""]]}}]}],
-    notes:[vc.length&&`<b>Organic:</b> last week ${vc.length===1?"one piece":`${vc.length} pieces`} of content went viral (${vc.map(c=>`${c.platform} @${c.account}, ${fds(new Date(c.date+"T12:00:00"))}, ${nf.format(c.views)} views`).join("; ")}) and probably lifted organic sign-ups, but without a specific UTM it is hard to tell which sign-ups really came from social media.`].filter(Boolean)};
+    notes:[otherNote(rest,P),vc.length&&`<b>Organic:</b> last week ${vc.length===1?"one piece":`${vc.length} pieces`} of content went viral (${vc.map(c=>`${c.platform} @${c.account}, ${fds(new Date(c.date+"T12:00:00"))}, ${nf.format(c.views)} views`).join("; ")}) and probably lifted organic sign-ups, but without a specific UTM it is hard to tell which sign-ups really came from social media.`].filter(Boolean)};
 }
 function acqNarrative(T){
   const Q=T[0].A.acq, L=Q.L, P=Q.P, d=P?L.total-P.total:0, top=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0], ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), extAll=Q.weeks.reduce((s,x)=>s+x.real,0);
