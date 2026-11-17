@@ -426,6 +426,11 @@ function analyse(sources,opt={}){
   A.linkedOrders=O.filter(o=>o.crm&&o.crm.some(r=>r.outcome==="Won"));
   A.linkedGmv=A.linkedOrders.reduce((s,o)=>s+o.gmv,0);
   A.noCrm=O.filter(o=>!o.crm);
+  // CRM logging that stops mid-week while orders keep coming (Mon–Wed vs Thu–Sun of the review week)
+  if(A.weekStart&&C.length>=20){ const ws=+A.weekStart, di=d=>d?Math.floor((+d-ws)/864e5):-1;
+    const cd=C.map(r=>di(r.date)).filter(i=>i>=0&&i<7), early=cd.filter(i=>i<3).length, late=cd.filter(i=>i>=3).length;
+    const od=O.map(o=>di(o.date)).filter(i=>i>=0&&i<7), oLate=od.filter(i=>i>=3).length;
+    if(early>=15&&late/4<.25*early/3&&oLate>=3) A.logGap={early,late,oLate,orders:od.length,sun:cd.filter(i=>i===6).length}; }
   // Success-story export reconciled with sales: matched, put on the CRM but not in sales yet, or still a prospect
   A.stories=C.filter(r=>/success|closing|already\s*order/i.test(r._src||"")||r.outcome==="Won").map(r=>({r,
     state:r.outcome==="Won"?(r.orders.length?"matched":"missing"):"prospect",orders:r.orders,sales:r.orders.reduce((s,o)=>s+o.gmv,0)}));

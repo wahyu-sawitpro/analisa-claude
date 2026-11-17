@@ -408,6 +408,7 @@ function narrative(A){
   if(A.wonFromNotes.length) g.push(`${A.wonFromNotes.length} closed deal${A.wonFromNotes.length>1?"s":""} still marked “${A.wonFromNotes[0].statusLogged||"blank"}”`);
   if(A.dupRows) g.unshift(`${A.dupRows} engagement${A.dupRows>1?"s":""} entered twice`);
   if(A.service.length) g.unshift(`${A.service.length} order-status question${A.service.length>1?"s":""} logged as leads`);
+  if(A.logGap){ const G=A.logGap; g.unshift(`logging fell off after Wednesday (${G.early} engagements Mon–Wed, ${G.late} Thu–Sun) while ${G.oLate} of ${G.orders} orders came Thu–Sun`); }
   if(false) g.unshift(`${won-A.wonLead.length} checkout sale${won-A.wonLead.length>1?"s":""} logged as wins`);
   N.gaps=n?g:[];
   return N;
