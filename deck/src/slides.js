@@ -513,7 +513,6 @@ function acqSpecs(Q,pre){
     notes:[
       `<b>Dutas:</b> ${!L.under?`no farmer came through a Duta last week`:""}${L.under?`${L.under} farmers last week came through ${act.length} Duta${act.length===1?"":"s"} (${act.map(x=>`${x.k} ${x.l}`).join(", ")||"none"}), all ${L.real?"":"from "}${L.real?`${L.test} internal team, ${L.real} external`:"internal-team Dutas"}`:""}. ${intN} of the ${D.length} Dutas with farmers in ${W.length} weeks are internal team; external Dutas brought ${Q.weeks.reduce((s,x)=>s+x.real,0)}.`,
       Q.dropped&&`<b>Week left out:</b> the week of ${fds(new Date(Q.dropped.w))} (${nf.format(Q.dropped.n)} farmers to ${fds(Q.dropped.to)}) is still in progress, so last week is ${L.label}.`].filter(Boolean)});
-  if(Q.rawRows&&Q.rawRows.some(r=>/^organic$/i.test(r.src||""))) S.push(acqCampaignSpec(Q,pre));
   if(L.buyDay&&L.buyDay.concat(P?P.buyDay||[]:[]).some(c=>c.n)) S.push(acqBuyDaySpec(Q,pre));
   if(Q.profile) S.push(...acqProfileSpecs(Q,pre));
   // 2. What moved the total
@@ -546,16 +545,17 @@ function acqSpecs(Q,pre){
   const rowsC=Q.srcs.filter(k=>!zeroCh.includes(k)).map(k=>{ const p=P?P.src.get(k)||0:0, l=L.src.get(k)||0;
     return [{v:k==="Duta"?"Duta (under Duta)":k,bold:true},P?nf.format(p):"–",{v:nf.format(l),bold:true},P?sg(l-p):"–",P?spc(l,p):"–",nf.format(Math.round(av(k)))]; });
   rowsC.push([{v:"Total",bold:true},P?{v:nf.format(P.total),bold:true}:"–",{v:nf.format(L.total),bold:true},P?{v:sg(d),bold:true}:"–",P?{v:spc(L.total,P.total),bold:true}:"–",{v:nf.format(Math.round(Q.avg||0)),bold:true}]);
-  const cAll=[...Q.camps].sort((a,b)=>b.l-a.l||a.d-b.d), cTop=cAll.length<=9?cAll:cAll.slice(0,7), cRest=cAll.filter(x=>!cTop.includes(x));
+  const cAll=[...Q.camps].sort((a,b)=>b.l-a.l||a.d-b.d), cTop=cAll.length<=4?cAll:cAll.slice(0,3), cRest=cAll.filter(x=>!cTop.includes(x));
   const rowsK=cTop.map(x=>[x.k,P?nf.format(x.p):"–",{v:nf.format(x.l),bold:true},P?sg(x.d):"–"]);
-  if(cRest.length) rowsK.push([`Other ${cRest.length} campaigns`,P?nf.format(cRest.reduce((s,x)=>s+x.p,0)):"–",nf.format(cRest.reduce((s,x)=>s+x.l,0)),P?sg(cRest.reduce((s,x)=>s+x.d,0)):"–"]);
   const bS=P?P.short:"–", lS=L.short, ph=L.noPhone, pp=P?P.noPhone:null;
+  const vEnd=L.w+7*864e5, vc=(typeof ORGANIC_CONTENT!=="undefined"?ORGANIC_CONTENT:[]).filter(c=>{ const x=+new Date(c.date+"T12:00:00"); return x>=L.w-864e5&&x<vEnd+2*864e5; }).sort((a,b)=>b.views-a.views);
+  const vrows=vc.map(c=>[fds(new Date(c.date+"T12:00:00")),c.platform,`@${c.account}`,{v:nf.format(c.views),bold:true}]), vcH=104+Math.max(1,vrows.length)*25;
   S.push({kicker:pre+"Acquisition · channels in detail",title:`${Q.dSrc.filter(x=>x.d<0).length} of ${Q.dSrc.length} channels fell last week; ${pct(ph,L.total)}% of new farmers have no phone number`,
     rows:[{cards:[
-      {w:1.1,title:"Farmers by channel",sub:`Acquisition channel; ${base.length}-week avg = ${base.map(x=>x.short).join(", ")}`,
+      {w:1.1,title:"Farmers by channel",sub:`${base.length}-week avg = ${base.map(x=>x.short).join(", ")}${zeroCh.length?`; 0 both weeks: ${zeroCh.join(", ")}`:""}`,
         table:{colW:[30,14,14,13,13,14],head:["Channel",`Week of ${bS}`,`Week of ${lS}`,"Change","Change %",`${base.length}-week avg`],align:["l","r","r","r","r","r"],rows:rowsC}},
-      {w:1,title:"Identified Campaigns by campaign name",sub:"Utm source Identified Campaigns; largest last week first",table:{colW:[46,18,18,18],head:["Campaign",`Week of ${bS}`,`Week of ${lS}`,"Change"],align:["l","r","r","r"],rows:rowsK}}]}],
-    notes:[`<b>Phone numbers:</b> ${nf.format(ph)} of ${nf.format(L.total)} farmers last week (${pct(ph,L.total)}%)${pp!=null?` and ${nf.format(pp)} of ${nf.format(P.total)} the week before`:""} registered without a phone number, so sales and Dutas cannot follow them up.`,otherNote(cRest,P),zeroCh.length&&`<b>No farmers either week:</b> ${zeroCh.map(esc).join(", ")}.`].filter(Boolean)});
+      {w:1,split:[{w:2,title:"Identified Campaigns by campaign name",sub:"Utm source Identified Campaigns; largest last week first",table:{colW:[52,16,16,16],head:["Campaign",`Week of ${bS}`,`Week of ${lS}`,"Change"],align:["l","r","r","r"],rows:rowsK}},{h:vcH,title:"Viral content that might boost organic acquisition",sub:"Organic posts dated last week; views",table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows.length?vrows:[["No viral content listed","","",""]]}}]}]}],
+    notes:[otherNote(cRest,P),vc.length&&`<b>Viral content:</b> no UTM of its own, so the exact number of farmers it brought to Organic cannot be determined.`].filter(Boolean)});
   // the channel breakdown opens the acquisition slides
   const ci=S.findIndex(s=>/channels in detail/.test(s.kicker)); if(ci>0) S.unshift(S.splice(ci,1)[0]);
   return S;

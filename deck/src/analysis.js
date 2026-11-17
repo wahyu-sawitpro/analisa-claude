@@ -69,7 +69,7 @@ function detectWith(fields,headers){
 const detectCrm=h=>detectWith(CRM_FIELDS,h), detectSales=h=>detectWith(SALES_FIELDS,h);
 // A farmer acquisition export: one row per registered farmer, with the registration week and Duta / non-Duta type.
 const ACQ_FIELDS=[["week",[/minggu_?register|register_?week|week_?register|^minggu$|^week$/]],["type",[/akuisisi_?type|acquisition_?type/]],["joined",[/join_?date_?farmer|register_?date|join_?date|tanggal_?daftar/]],
-  ["source",[/^utm_?source$/]],["campaign",[/^utm_?source_?name$|utm_?campaign/]],["status",[/status_?under_?duta/]],["duta",[/^duta_?id$|^duta_?name$/]],["dutaName",[/^duta_?name$/]],
+  ["source",[/^utm_?source$/]],["campaign",[/^utm_?source_?name$|utm_?campaign/]],["referral",[/^referral_?utm$/]],["status",[/status_?under_?duta/]],["duta",[/^duta_?id$|^duta_?name$/]],["dutaName",[/^duta_?name$/]],
   ["test",[/is_?test_?duta|is_?test/]],["role",[/user_?role|^role$/]],["farms",[/jumlah_?farm|farm_?count|num_?farms/]],["ha",[/total_?area_?hectare|area_?hectare|^hectare|luas/]],["prov",[/^province$|^provinsi$/]],["regency",[/^regency$|^kabupaten$/]],["farmHa",[/detail_?hectare|farm_?hectares?$/]],["name",[/farmer_?name|^name$|user_?name/]],["farmName",[/^farm_?name$/]],["lastSale",[/last_?sale_?order_?date|last_?order_?date/]],["regSales",[/total_?sales_?register_?date|sales_?(on_?)?register/]],["email",[/farmer_?email|^e-?mail$/]],["farmLoc",[/^location$|farm_?location/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
 const detectAcq=h=>detectWith(ACQ_FIELDS,h);
 const isAcqList=headers=>{ const m=detectAcq(headers); return !!(m.type||m.week&&m.joined&&(m.id||m.duta)); };
@@ -927,6 +927,14 @@ const ACQ_BANDS=[["Up to 2 ha",0,2],["2–5 ha",2,5],["5–10 ha",5,10],["10–2
 const ACQ_BUY_CH=[["Toko Keliling",r=>/toko\s*keliling|^toling$/i.test(r.src||"")],["Duta",r=>r.under||/duta/i.test(r.src||"")],["Purchase Masker",r=>/purchase\s*masker|masker/i.test(r.src||"")]];
 // "organic" and "Organic" are one channel: an all-lowercase label takes a capital first letter
 const srcName=v=>v&&v===v.toLowerCase()?v.replace(/^./,c=>c.toUpperCase()):v;
+// Campaign name. When an Identified Campaigns row carries a generic name (petaniproapp, direct, organic or none), the real
+// campaign is in referral_utm (e.g. "Instagram_Boost_Oktober"); click ids such as "...BwE" are not campaign names.
+const GENERIC_CAMP=/^(petaniproapp|direct|organic|\(none\)|-)?$/i;
+function campName(r,m){ const raw=clean(r[m.campaign])||"", src=clean(r[m.source])||"";
+  if(/identified\s*campaign/i.test(src)&&GENERIC_CAMP.test(raw)){ const ref=String(r[m.referral]??"").split("&")[0].trim();
+    if(ref&&/^[A-Za-z][A-Za-z0-9]*([_-][A-Za-z0-9]+)+$/.test(ref)&&!/(BwE|wcB)$/.test(ref)&&!/gad_source|gclid/i.test(ref)) return ref.replace(/_/g," ");
+    return raw?`Not named (${raw})`:"Not named"; }
+  return raw.replace(/_/g," ").trim()||"No campaign"; }
 const ACQ_SRC_ORDER=["Organic","GADN","Meta","Identified Campaigns","Duta"];
 // Duta display name: internal-team Duta accounts carry "Test" in the name; show the user name without it.
 const dutaLabel=v=>{ const t=(clean(v)||"").replace(/\btest\b/ig,"").replace(/\s+/g," ").trim(); return t?t.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase()):null; };
@@ -953,7 +961,7 @@ function acquisition(sources){
       const w=wk||new Date(jd.getFullYear(),jd.getMonth(),jd.getDate()-((jd.getDay()+6)%7));
       const under=m.type?isUnder(r[m.type]):!blank(r[m.duta]);
       const test=under&&(String(r[m.test]??"").trim()==="1"||/^true$/i.test(String(r[m.test]??""))||/test/i.test(String(r[m.dutaName]??"")));
-      R.push({w:+w,jd,under,test,real:under&&!test,src:srcName(clean(r[m.source]))||(under?"Duta":"Unknown"),camp:(clean(r[m.campaign])||"").replace(/_/g," ").trim()||"No campaign",
+      R.push({w:+w,jd,under,test,real:under&&!test,src:srcName(clean(r[m.source]))||(under?"Duta":"Unknown"),camp:campName(r,m),
         status:clean(r[m.status]),duta:clean(r[m.duta]),dname:dutaLabel(r[m.dutaName])||clean(r[m.duta]),phone:!blank(r[m.phone]),
         id:clean(r[m.id]),...acqProfile(r,m)}); } }
   const all=[...new Set(R.map(r=>r.w))].sort((a,b)=>a-b), lastW=all[all.length-1], lastJ=Math.max(...R.filter(r=>r.w===lastW&&r.jd).map(r=>+r.jd));
