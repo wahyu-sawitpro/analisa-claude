@@ -69,6 +69,7 @@ function buildPptx(T,DX){
     txt(sl,DX.period,{x:X(65),y:X(306),w:X(1000),h:X(30),fontSize:15,bold:true,color:"141414"});
     txt(sl,DX.meta,{x:X(65),y:X(338),w:X(1000),h:X(26),fontSize:11,color:"535353"}); }
 
+  (DX.preSpecs||[]).forEach(sp=>panelSlide(sp));
   // Executive summary
   { const sl=content("Executive summary",DX.headline);
     DX.kpis.forEach((k,i)=>kpi(sl,80+i*274,132,256,118,k));

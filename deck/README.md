@@ -118,6 +118,11 @@ With `total_sales_register_date`, a slide checks whether farmers who joined thro
 the day they joined (Rp0 = acquired but no sale that day); Purchase Masker is shown the same way. A one-hour batch of registrations with no campaign is
 flagged as a likely bulk sign-up or import.
 
+The registration review opens with an overview (farmers per complete week, the running week left out; last week vs the
+week before and vs the median of the earlier weeks; "Injected User" bulk adds called out), and has a slide on Identified
+Campaigns by campaign name next to Organic with last week's viral content. Viral content is listed by hand in
+`deck/src/organic-content.json` (date, platform, account, views); entries dated in last week are shown.
+
 ## Weekly registration refresh (every Tuesday, 10:00 WIB)
 A scheduled routine refreshes the farmer-registration review from `Farmer register for weekly farmer.csv` on `main`:
 1. `python3 deck/tools/weekly_registrations.py <scratch dir>` (reads the file from the remote branch it was last uploaded

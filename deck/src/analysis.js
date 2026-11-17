@@ -924,7 +924,9 @@ function forecastStock(lines,P,target){
 /* ================= Farmer acquisition (Duta vs non-Duta) ================= */
 const ACQ_BANDS=[["Up to 2 ha",0,2],["2–5 ha",2,5],["5–10 ha",5,10],["10–25 ha",10,25],["25–100 ha",25,100],["Over 100 ha",100,Infinity]];
 // channels where the farmer can buy on the spot: did they buy on the day they joined?
-const ACQ_BUY_CH=[["Toko Keliling",r=>/toko\s*keliling|^toling$/i.test(r.src||"")],["Duta",r=>r.under||/^duta$/i.test(r.src||"")],["Purchase Masker",r=>/purchase\s*masker|masker/i.test(r.src||"")]];
+const ACQ_BUY_CH=[["Toko Keliling",r=>/toko\s*keliling|^toling$/i.test(r.src||"")],["Duta",r=>r.under||/duta/i.test(r.src||"")],["Purchase Masker",r=>/purchase\s*masker|masker/i.test(r.src||"")]];
+// "organic" and "Organic" are one channel: an all-lowercase label takes a capital first letter
+const srcName=v=>v&&v===v.toLowerCase()?v.replace(/^./,c=>c.toUpperCase()):v;
 const ACQ_SRC_ORDER=["Organic","GADN","Meta","Identified Campaigns","Duta"];
 // Duta display name: internal-team Duta accounts carry "Test" in the name; show the user name without it.
 const dutaLabel=v=>{ const t=(clean(v)||"").replace(/\btest\b/ig,"").replace(/\s+/g," ").trim(); return t?t.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase()):null; };
@@ -951,7 +953,7 @@ function acquisition(sources){
       const w=wk||new Date(jd.getFullYear(),jd.getMonth(),jd.getDate()-((jd.getDay()+6)%7));
       const under=m.type?isUnder(r[m.type]):!blank(r[m.duta]);
       const test=under&&(String(r[m.test]??"").trim()==="1"||/^true$/i.test(String(r[m.test]??""))||/test/i.test(String(r[m.dutaName]??"")));
-      R.push({w:+w,jd,under,test,real:under&&!test,src:clean(r[m.source])||(under?"Duta":"Unknown"),camp:(clean(r[m.campaign])||"").replace(/_/g," ").trim()||"No campaign",
+      R.push({w:+w,jd,under,test,real:under&&!test,src:srcName(clean(r[m.source]))||(under?"Duta":"Unknown"),camp:(clean(r[m.campaign])||"").replace(/_/g," ").trim()||"No campaign",
         status:clean(r[m.status]),duta:clean(r[m.duta]),dname:dutaLabel(r[m.dutaName])||clean(r[m.duta]),phone:!blank(r[m.phone]),
         id:clean(r[m.id]),...acqProfile(r,m)}); } }
   const all=[...new Set(R.map(r=>r.w))].sort((a,b)=>a-b), lastW=all[all.length-1], lastJ=Math.max(...R.filter(r=>r.w===lastW&&r.jd).map(r=>+r.jd));
@@ -979,7 +981,7 @@ function acquisition(sources){
     return {k,internal:x.some(r=>r.test),l:x.filter(r=>r.w===L.w).length,p:P?x.filter(r=>r.w===P.w).length:0,tot:x.length,
       sale:x.filter(r=>/sale/i.test(r.status||"")).length,leads:x.filter(r=>/lead/i.test(r.status||"")).length,weeks:new Set(x.map(r=>r.w)).size}; })
     .sort((a,b)=>b.l-a.l||b.tot-a.tot||a.k.localeCompare(b.k));
-  return {weeks:W,L,P,dutas,profile:R.some(r=>r.role||r.prov),srcs,dSrc,camps,avg,avgN:base.length,peak,dropped,rows:R.length,realAll:R.filter(r=>r.real).length,underAll:R.filter(r=>r.under).length,
+  return {rawRows:R.filter(r=>inW.has(r.w)),weeks:W,L,P,dutas,profile:R.some(r=>r.role||r.prov),srcs,dSrc,camps,avg,avgN:base.length,peak,dropped,rows:R.length,realAll:R.filter(r=>r.real).length,underAll:R.filter(r=>r.under).length,
     realWeeks:W.filter(x=>x.real).length,lastDate:dropped?dropped.to:new Date(lastJ),dates:R.map(r=>r.jd).filter(Boolean),files:sources.map(srcLabel)};
 }
 

@@ -513,6 +513,7 @@ function acqSpecs(Q,pre){
     notes:[
       `<b>Dutas:</b> ${!L.under?`no farmer came through a Duta last week`:""}${L.under?`${L.under} farmers last week came through ${act.length} Duta${act.length===1?"":"s"} (${act.map(x=>`${x.k} ${x.l}`).join(", ")||"none"}), all ${L.real?"":"from "}${L.real?`${L.test} internal team, ${L.real} external`:"internal-team Dutas"}`:""}. ${intN} of the ${D.length} Dutas with farmers in ${W.length} weeks are internal team; external Dutas brought ${Q.weeks.reduce((s,x)=>s+x.real,0)}.`,
       Q.dropped&&`<b>Week left out:</b> the week of ${fds(new Date(Q.dropped.w))} (${nf.format(Q.dropped.n)} farmers to ${fds(Q.dropped.to)}) is still in progress, so last week is ${L.label}.`].filter(Boolean)});
+  if(Q.rawRows&&Q.rawRows.some(r=>/identified\s*campaign/i.test(r.src||"")||/^organic$/i.test(r.src||""))) S.push(acqCampaignSpec(Q,pre));
   if(L.buyDay&&L.buyDay.concat(P?P.buyDay||[]:[]).some(c=>c.n)) S.push(acqBuyDaySpec(Q,pre));
   if(Q.profile) S.push(...acqProfileSpecs(Q,pre));
   // 2. What moved the total
@@ -628,10 +629,46 @@ function acqBuyDaySpec(Q,pre){
       {w:1.1,title:"Last week's farmers, one row each",sub:grp.size>10?`First 10 of ${grp.size} rows (${users.length} farmers)`:`${users.length} farmers; identical rows grouped`,table:{colW:[20,24,18,20,18],head:["Channel","Joined","Duta","Regency","Sales that day"],align:["l","l","l","l","r"],rows:urows.length?urows:[["None last week","","","",""]]}}]}],
     notes:notes.length?notes:undefined};
 }
+// First page: weekly acquisition (the week in progress left out), last week vs the week before and vs the median week.
+function acqOverviewSpec(Q,pre){
+  const L=Q.L, P=Q.P, W=Q.weeks, prior=W.slice(0,-1).map(w=>w.total), med=prior.length?median(prior):null, d=P?L.total-P.total:0;
+  const kp=[{v:nf.format(L.total),u:"",l:`farmers acquired last week (${L.label})`,hot:true},
+    P&&{v:sg(d),u:"",l:`vs the week before (${nf.format(P.total)}, ${P.label}): ${spc(L.total,P.total)}`},
+    med!=null&&{v:nf.format(Math.round(med)),u:"",l:`median week, the ${prior.length} weeks before last week`},
+    med!=null&&{v:spc(L.total,med),u:"",l:`last week vs the median week (${sg(Math.round(L.total-med))} farmers)`}].filter(Boolean);
+  const inj=[L,P].filter(Boolean).map(w=>({w,n:w.src.get("Injected User")||0})).filter(o=>o.n);
+  return {kicker:pre+"Acquisition · overview",
+    title:`${nf.format(L.total)} farmers acquired last week, ${P?`${sg(d)} (${spc(L.total,P.total)}) on the week before`:""}${med!=null?`; ${spc(L.total,med)} vs the median week (${nf.format(Math.round(med))})`:""}`,
+    rows:[{h:84,cards:[{kpiRow:kp}]},
+      {cards:[{title:"Farmers acquired per week",sub:`Complete weeks only${Q.dropped?`; the week of ${fds(new Date(Q.dropped.w))} is still running (${nf.format(Q.dropped.n)} so far) and left out`:""}. Last week in green; median week ${med!=null?nf.format(Math.round(med)):"–"}`,
+        chart:{type:"column",cats:W.map(w=>w.short),series:[{name:"Farmers",values:W.map(w=>w.total),colors:W.map((w,i)=>i===W.length-1?CAT[0]:"#A9B7A0")}],lblH:24}}]}],
+    notes:[med!=null&&`<b>Median week:</b> ${nf.format(Math.round(med))} farmers over the ${prior.length} complete weeks before last week (${W[0].short} – ${W[W.length-2].short}); last week was ${spc(L.total,med)} on it.`,
+      ...inj.map(o=>`<b>Injected users, week of ${o.w.short}:</b> ${nf.format(o.n)} of ${nf.format(o.w.total)} were added in bulk (utm source “Injected User”), not acquired through a channel.`)].filter(Boolean)};
+}
+// Identified Campaigns by campaign name, and Organic with the viral content of last week
+function acqCampaignSpec(Q,pre){
+  const L=Q.L, P=Q.P, R=Q.rawRows||[], ic=w=>new Map(countBy(R.filter(r=>r.w===w.w&&/identified\s*campaign/i.test(r.src||"")),r=>r.camp));
+  const l=ic(L), p=P?ic(P):new Map(), keys=[...new Set([...l.keys(),...p.keys()])].map(k=>({k,l:l.get(k)||0,p:p.get(k)||0})).sort((a,b)=>b.l-a.l||b.p-a.p);
+  const top=keys.slice(0,7), rest=keys.slice(7), tl=keys.reduce((a,x)=>a+x.l,0), tp=keys.reduce((a,x)=>a+x.p,0);
+  const rows=top.map(x=>[x.k,P?nf.format(x.p):"–",{v:nf.format(x.l),bold:true},P?sg(x.l-x.p):"–"]);
+  if(rest.length) rows.push([`Other ${rest.length} campaigns`,P?nf.format(rest.reduce((a,x)=>a+x.p,0)):"–",nf.format(rest.reduce((a,x)=>a+x.l,0)),P?sg(rest.reduce((a,x)=>a+x.l-x.p,0)):"–"]);
+  rows.push([{v:"Total",bold:true},P?{v:nf.format(tp),bold:true}:"–",{v:nf.format(tl),bold:true},P?{v:sg(tl-tp),bold:true}:"–"]);
+  const org=w=>w?w.src.get("Organic")||0:0, end=L.w+7*864e5;
+  const vc=(typeof ORGANIC_CONTENT!=="undefined"?ORGANIC_CONTENT:[]).filter(c=>{ const t=+new Date(c.date+"T12:00:00"); return t>=L.w-864e5&&t<end+2*864e5; }).sort((a,b)=>b.views-a.views);
+  const vrows=vc.map(c=>[fds(new Date(c.date+"T12:00:00")),c.platform,`@${c.account}`,{v:nf.format(c.views),bold:true}]);
+  const lead=keys[0];
+  return {kicker:pre+"Acquisition · Identified Campaigns and Organic",
+    title:`Identified Campaigns brought ${nf.format(tl)} farmers last week${P?` (${sg(tl-tp)})`:""}${lead&&lead.l?`, led by “${lead.k}” (${nf.format(lead.l)})`:""}; Organic ${nf.format(org(P))} → ${nf.format(org(L))}`,
+    rows:[{cards:[
+      {w:1.15,title:"Identified Campaigns by campaign name",sub:"Farmers per campaign (utm source name), largest last week first",table:{colW:[46,18,18,18],head:["Campaign",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change"],align:["l","r","r","r"],rows}},
+      {w:1,title:"Organic: viral content last week",sub:`Organic farmers ${P?`${nf.format(org(P))} → `:""}${nf.format(org(L))}${P?` (${sg(org(L)-org(P))})`:""}`,table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows.length?vrows:[["No viral content listed","","",""]]}}]}],
+    notes:[vc.length&&`<b>Organic:</b> last week ${vc.length===1?"one piece":`${vc.length} pieces`} of content went viral (${vc.map(c=>`${c.platform} @${c.account}, ${fds(new Date(c.date+"T12:00:00"))}, ${nf.format(c.views)} views`).join("; ")}) and probably lifted organic sign-ups, but without a specific UTM it is hard to tell which sign-ups really came from social media.`].filter(Boolean)};
+}
 function acqNarrative(T){
   const Q=T[0].A.acq, L=Q.L, P=Q.P, d=P?L.total-P.total:0, top=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0], ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), extAll=Q.weeks.reduce((s,x)=>s+x.real,0);
   const D=Q.dutas, act=D.filter(x=>x.l), intD=D.filter(x=>x.internal), extD=D.filter(x=>!x.internal), lead=[...D].sort((a,b)=>b.tot-a.tot)[0];
   const topC=Q.camps[0], gainC=Q.camps[Q.camps.length-1], X={multi:false,acq:true,gaps:[],dates:Q.dates};
+  if(Q.weeks.length>1) X.preSpecs=[acqOverviewSpec(Q,"")];
   X.eyebrow="Farmer Acquisition"; X.title=`Duta vs Non-Duta, ${L.label}`; X.period=`Week of ${L.label} ${new Date(L.w).getFullYear()}`; X.meta=P?`vs ${P.label}`:`${nf.format(L.total)} farmers`;
   X.headline=P?`${nf.format(L.total)} farmers joined last week, ${sg(d)} (${spc(L.total,P.total)}): ${nf.format(L.under)} through Dutas (${sg(L.under-P.under)}) and ${nf.format(L.non)} without (${sg(L.non-P.non)})`:`${nf.format(L.total)} farmers joined in the week of ${L.label}`;
   X.kpis=[{v:nf.format(L.total),u:"",l:`farmers registered ${L.label}${P?`, ${sg(d)} (${spc(L.total,P.total)}) on ${P.label}`:""}`,hot:true},
@@ -1155,6 +1192,7 @@ function buildDeck(T,X){
   const S=[], next=()=>S.length+1;
   S.push(`<div class="slide cover26"><img class="bg" src="${IMG.cover26}" alt=""><div class="hdr">${esc(X.eyebrow)}</div>
     <div class="txt"><p class="title">${esc(X.title)}</p><p class="sub">${esc(X.period)}</p><p class="meta">${esc(X.meta)}</p></div></div>`);
+  (X.preSpecs||[]).forEach(sp=>S.push(panelSlide(next(),sp)));
   S.push(contentSlide(next(),"Executive summary",X.headline,`
     <div class="kpis">${X.kpis.map(kpiHtml).join("")}</div>
     <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin-top:18px">
