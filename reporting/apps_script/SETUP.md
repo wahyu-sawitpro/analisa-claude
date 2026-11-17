@@ -5,7 +5,7 @@ Ada 3 otomasi. **Masing-masing punya project Apps Script sendiri.**
 | Report | Project Apps Script | File script | Report dibuat GitHub | Apps Script update Drive | File di Drive |
 |---|---|---|---|---|---|
 | AM Report | `AM Report Smallholder` | `AmReport.gs` | Senin 16:00 WIB | Senin 17:00–18:00 WIB | 1 `.pptx` |
-| LTV Report | `LTV Report Smallholder` | `LtvReport.gs` | Senin ~15:23 WIB (GitHub bisa telat beberapa jam) | Cek tiap jam; Drive ter-update ≤ 1 jam setelah report jadi | 1 `.pptx` + 1 `.xlsx` |
+| LTV Report | `LTV Report Smallholder` | `LtvReport.gs` | Senin ~15:23 WIB (GitHub bisa telat beberapa jam) | Cek tiap jam; Drive ter-update ≤ 1 jam setelah report jadi | Google Slides bertumpuk (8 minggu terakhir, terbaru di atas) + `.pptx` & `.xlsx` minggu terbaru |
 | SLA / Aging Report | `SLA Aging Report B2C` | `SlaReport.gs` | Rabu ~11:17 WIB | Rabu 13:00–14:00 WIB | 1 `.pptx` |
 
 ## Cara kerja (sama untuk ketiganya)
