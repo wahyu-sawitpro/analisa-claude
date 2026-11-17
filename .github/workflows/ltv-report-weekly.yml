@@ -2,7 +2,8 @@ name: LTV & Upsell / Cross-sell Report Smallholder (build deck)
 
 on:
   schedule:
-    - cron: "0 9 * * 1"    # Monday 09:00 UTC = 16:00 WIB (same slot as the AM report)
+    - cron: "23 8 * * 1"   # Monday 08:23 UTC = 15:23 WIB. Off the top of the hour because GitHub delays
+                           # scheduled runs most at :00; Apps Script checks hourly and picks it up whenever it lands.
   workflow_dispatch:
 
 permissions:
