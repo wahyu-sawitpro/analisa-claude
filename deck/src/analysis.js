@@ -926,7 +926,8 @@ const ACQ_BANDS=[["Up to 2 ha",0,2],["2–5 ha",2,5],["5–10 ha",5,10],["10–2
 // channels where the farmer can buy on the spot: did they buy on the day they joined?
 const ACQ_BUY_CH=[["Toko Keliling",r=>/toko\s*keliling|^toling$/i.test(r.src||"")],["Duta",r=>r.under||/duta/i.test(r.src||"")],["Purchase Masker",r=>/purchase\s*masker|masker/i.test(r.src||"")]];
 // "organic" and "Organic" are one channel: an all-lowercase label takes a capital first letter
-const srcName=v=>v&&v===v.toLowerCase()?v.replace(/^./,c=>c.toUpperCase()):v;
+// Organic is shown as "Other channel" (user request: no organic label on the slides)
+const srcName=v=>{ v=v&&v===v.toLowerCase()?v.replace(/^./,c=>c.toUpperCase()):v; return /^organic$/i.test(v||"")?"Other channel":v; };
 // Campaign name. When an Identified Campaigns row carries a generic name (petaniproapp, direct, organic or none), the real
 // campaign is in referral_utm (e.g. "Instagram_Boost_Oktober"); click ids such as "...BwE" are not campaign names.
 const GENERIC_CAMP=/^(petaniproapp|direct|organic|\(none\)|-)?$/i;
@@ -935,7 +936,7 @@ function campName(r,m){ const raw=clean(r[m.campaign])||"", src=clean(r[m.source
     if(ref&&/^[A-Za-z][A-Za-z0-9]*([_-][A-Za-z0-9]+)+$/.test(ref)&&!/(BwE|wcB)$/.test(ref)&&!/gad_source|gclid/i.test(ref)) return ref.replace(/_/g," ");
     return raw?`Not named (${raw})`:"Not named"; }
   return raw.replace(/_/g," ").trim()||"No campaign"; }
-const ACQ_SRC_ORDER=["Organic","GADN","Meta","Identified Campaigns","Duta"];
+const ACQ_SRC_ORDER=["Other channel","GADN","Meta","Identified Campaigns","Duta"];
 // Duta display name: internal-team Duta accounts carry "Test" in the name; show the user name without it.
 const dutaLabel=v=>{ const t=(clean(v)||"").replace(/\btest\b/ig,"").replace(/\s+/g," ").trim(); return t?t.toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase()):null; };
 const isUnder=v=>/under|^duta$/i.test(String(v||""))&&!/non/i.test(String(v||""));

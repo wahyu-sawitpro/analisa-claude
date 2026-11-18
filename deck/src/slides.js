@@ -490,7 +490,7 @@ function doNarrative(T){
 }
 // Farmer acquisition: Duta vs non-Duta last week, what moved the total, the weekly trend, and the channel / campaign detail.
 const sg=v=>v>0?`+${nf.format(v)}`:v<0?`−${nf.format(-v)}`:"0", spc=(l,p)=>p?`${l>=p?"+":"−"}${Math.abs(Math.round((l/p-1)*100))}%`:"–";
-const SRC_C={Organic:CAT[0],GADN:CAT[2],Meta:CAT[4],"Identified Campaigns":CAT[1],Duta:CAT[3]};
+const SRC_C={"Other channel":CAT[0],GADN:CAT[2],Meta:CAT[4],"Identified Campaigns":CAT[1],Duta:CAT[3]};
 const srcC=(k,i)=>SRC_C[k]||EXTRA[i%EXTRA.length];
 function acqSpecs(Q,pre){
   const S=[], L=Q.L, P=Q.P, W=Q.weeks, d=P?L.total-P.total:0, dn=P?L.non-P.non:0, du=P?L.under-P.under:0;
@@ -554,8 +554,8 @@ function acqSpecs(Q,pre){
     rows:[{cards:[
       {w:1.1,title:"Farmers by channel",sub:`${base.length}-week avg = ${base.map(x=>x.short).join(", ")}${zeroCh.length?`; 0 both weeks: ${zeroCh.join(", ")}`:""}`,
         table:{colW:[30,14,14,13,13,14],head:["Channel",`Week of ${bS}`,`Week of ${lS}`,"Change","Change %",`${base.length}-week avg`],align:["l","r","r","r","r","r"],rows:rowsC}},
-      {w:1,split:[{w:2,title:"Identified Campaigns by campaign name",sub:"Utm source Identified Campaigns; largest last week first",table:{colW:[52,16,16,16],head:["Campaign",`Week of ${bS}`,`Week of ${lS}`,"Change"],align:["l","r","r","r"],rows:rowsK}},{h:vcH,title:"Viral content that might boost organic acquisition",sub:"Organic posts dated last week; views",table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows.length?vrows:[["No viral content listed","","",""]]}}]}]}],
-    notes:[otherNote(cRest,P),vc.length&&`<b>Viral content:</b> no UTM of its own, so the exact number of farmers it brought to Organic cannot be determined.`].filter(Boolean)});
+      {w:1,split:[{w:2,title:"Identified Campaigns by campaign name",sub:"Utm source Identified Campaigns; largest last week first",table:{colW:[52,16,16,16],head:["Campaign",`Week of ${bS}`,`Week of ${lS}`,"Change"],align:["l","r","r","r"],rows:rowsK}},{h:vcH,title:"Viral content that might boost Other channel acquisition",sub:"Posts dated last week (no UTM; counted under Other channel); views",table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows.length?vrows:[["No viral content listed","","",""]]}}]}]}],
+    notes:[otherNote(cRest,P),vc.length&&`<b>Viral content:</b> no UTM of its own, so the exact number of farmers it brought to Other channel cannot be determined.`].filter(Boolean)});
   // the channel breakdown opens the acquisition slides
   const ci=S.findIndex(s=>/channels in detail/.test(s.kicker)); if(ci>0) S.unshift(S.splice(ci,1)[0]);
   return S;
@@ -629,7 +629,7 @@ function acqBuyDaySpec(Q,pre){
   return {kicker:pre+"Registrations · Toko Keliling, Duta and Purchase Masker: did they buy on the day they joined?",title,
     rows:[{cards:[
       {w:1.25,title:"Acquired, bought on the day they joined, and sales",sub:`Week of ${P?P.short+" vs ":""}${L.short} (last week in bold)`,table:{colW:[22,13,13,14,14,18],head:["Channel","Week of","Acquired","Bought","Did not buy","Sales that day"],align:["l","l","r","r","r","r"],rows}},
-      {w:1.1,title:"Last week's farmers, one row each",sub:grp.size>10?`First 10 of ${grp.size} rows (${users.length} farmers)`:`${users.length} farmers; identical rows grouped`,table:{colW:[20,24,18,20,18],head:["Channel","Joined","Duta","Regency","Sales that day"],align:["l","l","l","l","r"],rows:urows.length?urows:[["None last week","","","",""]]}}]}],
+      {w:1.4,title:"Last week's farmers, one row each",sub:grp.size>10?`First 10 of ${grp.size} rows (${users.length} farmers)`:`${users.length} farmers; identical rows grouped`,table:{colW:[15,17,25,27,16],head:["Channel","Joined","Duta","Regency","Sales"],align:["l","l","l","l","r"],rows:urows.length?urows:[["None last week","","","",""]]}}]}],
     notes:notes.length?notes:undefined};
 }
 // First page: weekly acquisition (the week in progress left out), last week vs the week before and vs the median week.
@@ -653,14 +653,14 @@ const otherNote=(rest,P,lab="campaigns")=>{ if(!rest.length) return null; const 
   return `<b>Other ${rest.length} ${lab}${P?" (week before in brackets)":""}:</b> ${on.map(x=>`${esc(x.k)} ${nf.format(x.l)}${P?` (${nf.format(x.p)})`:""}`).join(", ")}${off.length?`${on.length?"; ":""}${off.length} more with none last week${P?` (${nf.format(off.reduce((a,x)=>a+x.p,0))} the week before)`:""}`:""}.`; };
 // Identified Campaigns by campaign name, and Organic with the viral content of last week
 function acqCampaignSpec(Q,pre){
-  const L=Q.L, P=Q.P, W=Q.weeks, org=w=>w?w.src.get("Organic")||0:0, end=L.w+7*864e5;
+  const L=Q.L, P=Q.P, W=Q.weeks, org=w=>w?w.src.get("Other channel")||0:0, end=L.w+7*864e5;
   const vc=(typeof ORGANIC_CONTENT!=="undefined"?ORGANIC_CONTENT:[]).filter(c=>{ const t=+new Date(c.date+"T12:00:00"); return t>=L.w-864e5&&t<end+2*864e5; }).sort((a,b)=>b.views-a.views);
   const vrows=vc.map(c=>[fds(new Date(c.date+"T12:00:00")),c.platform,`@${c.account}`,{v:nf.format(c.views),bold:true}]);
-  return {kicker:pre+"Acquisition · Organic",
-    title:`Organic brought ${nf.format(org(L))} farmers last week${P?` (${sg(org(L)-org(P))} on ${nf.format(org(P))})`:""}${vc.length?`; ${vc.length} viral post${vc.length===1?"":"s"} may have helped`:""}`,
+  return {kicker:pre+"Acquisition · Other channel",
+    title:`Other channel brought ${nf.format(org(L))} farmers last week${P?` (${sg(org(L)-org(P))} on ${nf.format(org(P))})`:""}${vc.length?`; ${vc.length} viral post${vc.length===1?"":"s"} may have helped`:""}`,
     rows:[{cards:[
-      {w:1,title:"Organic farmers per week",sub:"Utm source Organic; last week in green",chart:{type:"column",cats:W.map(w=>w.short),series:[{name:"Organic",values:W.map(w=>org(w)),colors:W.map((w,i)=>i===W.length-1?CAT[0]:"#A9B7A0")}],lblH:24}},
-      {w:1.1,title:"Viral content that might boost organic acquisition",sub:"Posts dated last week, most views first",table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows.length?vrows:[["No viral content listed","","",""]]}}]}],
+      {w:1,title:"Other channel farmers per week",sub:"Utm source Organic, shown as Other channel; last week in green",chart:{type:"column",cats:W.map(w=>w.short),series:[{name:"Other channel",values:W.map(w=>org(w)),colors:W.map((w,i)=>i===W.length-1?CAT[0]:"#A9B7A0")}],lblH:24}},
+      {w:1.1,title:"Viral content that might boost Other channel acquisition",sub:"Posts dated last week, most views first",table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows.length?vrows:[["No viral content listed","","",""]]}}]}],
     notes:[vc.length&&`<b>Note:</b> these posts have no UTM of their own, so the exact number of farmers they brought cannot be determined; they may explain part of the Organic ${P?`${sg(org(L)-org(P))} change`:"total"}.`].filter(Boolean)};
 }
 function acqNarrative(T){
