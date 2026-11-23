@@ -20,7 +20,8 @@ added to this deck, not built as separate decks.
   average), a chart of total sales for the 4 weeks, the week-by-week table (no average row) and under it a "Top category"
   card (category with the most sales and with the most orders, the week before vs last week). Its yellow box says in 2-4 short
   lines why sales fell or rose vs the week before (e.g. smaller average order, fewer customers, the category that
-  led last week vs the week before); never a long analysis. Every slide after it
+  led last week vs the week before), each line saying what it means, not only the numbers (e.g. sales up
+  but orders down = customers bought in bulk; units per order; same or different buyers); never a long analysis. Every slide after it
   compares last week with the week before only. Then the sales slide (last week vs the week before), then
   "Product categories · bought most vs earned most" (units vs sales, last week vs the week before), the other sales slides, success
   story and rejection reasons. When last week's data stops 2+ days before Sunday, say so and add the like-for-like
