@@ -605,7 +605,7 @@ function acqOverviewSpec(Q,pre){
         {w:1,title:"Where last week's users came from",sub:"By utm source; share of last week at the right",chart:{type:"hbar",items:chs.map(([k,v])=>({k,v,color:isBulk(k)?"#B3BBAB":CAT[0],r:v/L.total<.005?"<1%":`${pct(v,L.total)}%`}))}}]}],
     notes:[avg!=null&&`<b>Average week:</b> ${nf.format(Math.round(avg))} users over the ${pr.length} complete weeks before last week (${pr[0].short} – ${pr[pr.length-1].short}); last week was ${spc(L.total,avg)} on it.`,
       inj.length&&`<b>Injected User</b> (added in bulk, not acquired): ${inj.map(o=>`${nf.format(o.n)} of ${nf.format(o.w.total)} in the week of ${o.w.short}`).join("; ")}.${P?` Without it, users acquired went ${nf.format(P.total-(P.src.get("Injected User")||0))} → ${nf.format(L.total-(L.src.get("Injected User")||0))} (${spc(L.total-(L.src.get("Injected User")||0),P.total-(P.src.get("Injected User")||0))}).`:""}`,
-      `<b>Other channel</b> is utm source Organic (no campaign tag); it likely relates to social media activity.`].filter(Boolean)};
+      `<b>Other channel</b> is a channel without a UTM. It could be organic and/or likely relates to social media activity.`].filter(Boolean)};
 }
 // Which channels worked: last week against the week before and the average week, with what the users did after joining.
 function acqChannelSpec(Q,pre){
@@ -629,7 +629,7 @@ function acqChannelSpec(Q,pre){
       byR[0]&&`<b>Fastest growth:</b> ${byR.slice(0,3).map(c=>`${f(c)} (+${Math.round(c.r*100)}%)`).join("; ")}${fresh.length?`; new last week: ${fresh.map(f).join(", ")}`:""}.`,
       !byR[0]&&fresh.length&&`<b>New last week:</b> ${fresh.map(f).join(", ")}.`,
       dn[0]&&`<b>Fell most:</b> ${dn.slice(0,2).map(c=>`${f(c)} (${sg(c.d)}, −${Math.round(-c.r*100)}%)`).join("; ")}${/identified/i.test(dn[0].k)&&icD&&icD.d<0?`; mostly “${esc(icD.k)}” ${nf.format(icD.p)} → ${nf.format(icD.l)}`:""}.`,
-      ch.find(c=>c.k==="Other channel"&&c.l)&&`<b>Other channel</b> is utm source Organic (no campaign tag); it likely relates to social media activity.`,
+      ch.find(c=>c.k==="Other channel"&&c.l)&&`<b>Other channel</b> is a channel without a UTM. It could be organic and/or likely relates to social media activity.`,
       bulk.length&&`<b>Not counted as growth:</b> ${bulk.map(f).join(", ")}, users added in bulk.`,
       cRest.length&&`<b>Other ${cRest.length} campaigns:</b> ${cRest.filter(x=>x.l).sort((a,b)=>b.l-a.l).slice(0,5).map(x=>`${esc(x.k)} ${nf.format(x.l)}`).join(", ")}${cRest.filter(x=>x.l).length>5?`; ${cRest.filter(x=>x.l).length-5} more with ${nf.format(cRest.filter(x=>x.l).sort((a,b)=>b.l-a.l).slice(5).reduce((t,x)=>t+x.l,0))} users between them`:""}.`].filter(Boolean)};
 }
