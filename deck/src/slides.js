@@ -791,6 +791,7 @@ function teamSpecs(A,N,pre){
       why.push(Math.abs(eSize)>=Math.abs(eOrd)
         ?`<b>Sales ${up?"rose":"fell"} ${rp(Math.abs(dG))} because orders were ${aL<aP?"smaller":"bigger"}:</b> average order ${rp(aP)} → ${rp(aL)}, while orders went ${inv(P)} → ${inv(L)}.`
         :`<b>Sales ${up?"rose":"fell"} ${rp(Math.abs(dG))} because there were ${inv(L)<inv(P)?"fewer":"more"} orders:</b> ${inv(P)} → ${inv(L)}, average order ${rp(aP)} → ${rp(aL)}.`);
+      if(share>=.3) why[0]=why[0].replace(/\.$/,`; one order is ${Math.round(share*100)}% of last week (${rp(L.top)}).`);
       const back=[...L.cust.keys()].filter(k=>P.cust.has(k)).length, lost=[...P.cust].filter(([k])=>!L.cust.has(k));
       why.push(`<b>Customers ${P.customers} → ${L.customers}:</b> ${back?`only ${back}`:"none"} bought in both weeks; the ${lost.length} who didn't come back had spent ${rp(lost.reduce((t,[,v])=>t+v,0))}.`);
       const topC=w=>[...w.cat].sort((a,b)=>b[1]-a[1])[0], tL=topC(L), tP=topC(P);
@@ -799,15 +800,17 @@ function teamSpecs(A,N,pre){
         :`<b>${esc(tL[0])} sold most last week</b> (${rp(tL[1])}, was ${rp(P.cat.get(tL[0])||0)}); the week before ${esc(tP[0])} led with ${rp(tP[1])}${L.cat.get(tP[0])?`, now ${rp(L.cat.get(tP[0]))}`:", with no sales last week"}.`);
     }
     S.push({kicker:pre+"Sales trend · last 4 weeks",title:`${rp(L.gmv)} last week${A.lastDays<7?` (to ${fds(A.dataEnd)})`:""}: ${dPct(L.gmv,P.gmv)} vs the week before, ${dPct(L.gmv,avg)} vs the ${nP}-week average; ${inv(L)} orders (${dPct(inv(L),inv(P))}, ${dPct(inv(L),ai)})`,
-      rows:[{h:84,cards:[{kpiRow:[{v:dPct(L.gmv,P.gmv),u:"",l:`Sales vs the week before: ${rp(L.gmv)} vs ${rp(P.gmv)}`,hot:true},
+      rows:[{h:72,cards:[{kpiRow:[{v:dPct(L.gmv,P.gmv),u:"",l:`Sales vs the week before: ${rp(L.gmv)} vs ${rp(P.gmv)}`,hot:true},
         {v:dPct(L.gmv,avg),u:"",l:`Sales vs the ${nP}-week average: ${rp(L.gmv)} vs ${rp(avg)}`},
         {v:dPct(inv(L),inv(P)),u:"",l:`Orders (unique invoices) vs the week before: ${inv(L)} vs ${inv(P)}`},
         {v:dPct(inv(L),ai),u:"",l:`Orders vs the ${nP}-week average: ${inv(L)} vs ${f1(ai)}`}]}]},
       {cards:[{w:.95,title:"Total sales, last 4 weeks",sub:`Weeks start on Monday; orders (unique invoices) in the label${A.lastDays<7?"; * = partial week":""}`,chart:{type:"column",cats:W.map((x,i)=>`${wkLab(A,x,i)}\n${inv(x)} orders`),series:[{name:"Sales",color:CAT[0],values:W.map(x=>x.gmv),colors:W.map((x,i)=>i===W.length-1?CAT[1]:CAT[0])}],fmt:rp,lblH:38}},
-        {w:1.2,title:"Week by week",sub:"Orders = unique invoices; avg order = sales ÷ orders; new = sales from new customers",table:{colW:[12,14,9,10,13,13,22],head:["Week","Sales","Orders","Cust.","Avg order","New cust.","Top category"],align:["l","r","r","r","r","r","l"],
-          rows:W.map((x,i)=>{ const tc=[...x.cat].sort((a,b)=>b[1]-a[1])[0]; return [{v:wkLab(A,x,i),bold:i===W.length-1},rp(x.gmv),String(inv(x)),String(x.customers),rp(inv(x)?x.gmv/inv(x):0),rp(x.newGmv),tc?`${tc[0]} ${pct(tc[1],x.gmv)}%`:"–"]; })}}]}],
+        {w:1.2,split:[{h:182,title:"Week by week",table:{colW:[12,14,9,10,13,13,22],head:["Week","Sales","Orders","Cust.","Avg order","New cust.","Top category"],align:["l","r","r","r","r","r","l"],
+          rows:W.map((x,i)=>{ const tc=[...x.cat].sort((a,b)=>b[1]-a[1])[0]; return [{v:wkLab(A,x,i),bold:i===W.length-1},rp(x.gmv),String(inv(x)),String(x.customers),rp(inv(x)?x.gmv/inv(x):0),rp(x.newGmv),tc?`${tc[0]} ${pct(tc[1],x.gmv)}%`:"–"]; })}},
+          {title:"Top category",table:{colW:[16,42,42],head:["",`Week of ${fds(P.start)}`,`Last week (${fds(L.start)})`],align:["l","l","l"],
+            rows:[["Most sales",...[P,L].map(w=>{ const t=[...w.cat].sort((a,b)=>b[1]-a[1])[0]; return t?`${t[0]} · ${rp(t[1])}`:"–"; })],
+              ["Most orders",...[P,L].map(w=>{ const t=[...w.catOrders].sort((a,b)=>b[1]-a[1])[0]; return t?`${t[0]} · ${t[1]} order${t[1]===1?"":"s"}`:"–"; })]].map(r=>[{v:r[0],bold:true},r[1],{v:r[2],bold:true}])}}]}]}],
       notes:[...why,
-        share>=.3&&`<b>One order is ${Math.round(share*100)}% of last week</b> (${rp(L.top)}).`,
         partialNote(A)].filter(Boolean)});
     // categories: units vs sales, last week vs the week before
     const CC=cats.map(k=>({k,q:L.catQty.get(k)||0,g:L.cat.get(k)||0,o:L.catOrders.get(k)||0,pq:P.catQty.get(k)||0,pg:P.cat.get(k)||0}));
