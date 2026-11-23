@@ -15,9 +15,11 @@ added to this deck, not built as separate decks.
 ## Standing requests from the user
 - **Sales deck structure (composed):** Smallholder and Plantation are separate teams: no slide compares or sums them
   (no both-teams trend, no "Teams at a glance"; the executive summary shows each team on its own). In each team section
-  first the 4-week trend (weekly sales, last week vs the week before, last week vs the average of the earlier weeks,
-  orders, customers, average order, new-customer sales, top category), then last week vs the week before, then
-  "Product categories · bought most vs earned most" (units vs sales, week by week), the other sales slides, success
+  first the summary slide, the only slide that uses the 4 weeks: four deltas (sales last week vs the week before,
+  sales vs the average of the 3 earlier weeks, orders = unique invoices vs the week before, orders vs the 3-week
+  average), a chart of total sales for the 4 weeks and the week-by-week table (no average row). Every slide after it
+  compares last week with the week before only. Then the sales slide (last week vs the week before), then
+  "Product categories · bought most vs earned most" (units vs sales, last week vs the week before), the other sales slides, success
   story and rejection reasons. When last week's data stops 2+ days before Sunday, say so and add the like-for-like
   view (the same first days of each week).
 - **Always go deeper.** Don't stop at totals and the first explanation. For any change, break it down (volume vs

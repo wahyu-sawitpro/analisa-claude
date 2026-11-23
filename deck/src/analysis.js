@@ -305,6 +305,7 @@ function analyse(sources,opt={}){
     if(A.lastDays<7) A.weeks4.forEach(x=>{ const cut=+x.start+days*864e5; x.lfl=wl(+x.start).filter(l=>+l.date<cut).reduce((t,l)=>t+(l.gmv||0),0); });
     const prior=A.weeks4.slice(0,-1); A.avgPrior=prior.length?prior.reduce((t,x)=>t+x.gmv,0)/prior.length:null;
     A.avgPriorOrders=prior.length?prior.reduce((t,x)=>t+x.orders,0)/prior.length:null;
+    A.avgPriorInv=prior.length?prior.reduce((t,x)=>t+x.invoices,0)/prior.length:null;
     if(A.lastDays<7&&prior.length) A.avgPriorLfl=prior.reduce((t,x)=>t+x.lfl,0)/prior.length; }
   if(!opt.trend&&weeks.length>=2){ prevLines=lines.filter(l=>l.date&&wkOf(l.date)===weeks[1]);
     const keep=lines.filter(l=>!l.date||wkOf(l.date)===weeks[0]); lines.splice(0,lines.length,...keep);
@@ -600,7 +601,7 @@ function weekSummary(L){
   const O=[...om.values()], gmv=O.reduce((s,o)=>s+o.gmv,0), cust=new Map();
   O.forEach(o=>{ const f=o.lines[0], k=f.ph||f.nk||f.orderNo||f.invoice; cust.set(k,(cust.get(k)||0)+o.gmv); });
   const by=f=>{ const m=new Map(); L.forEach(l=>{ const k=f(l); if(k) m.set(k,(m.get(k)||0)+(l.gmv||0)); }); return m; };
-  return {orders:O.length,gmv,aov:O.length?gmv/O.length:0,customers:cust.size,cust,top:Math.max(0,...O.map(o=>o.gmv)),
+  return {orders:O.length,invoices:new Set(L.map((l,i)=>l.invoice||l.orderNo||`line-${i}`)).size,gmv,aov:O.length?gmv/O.length:0,customers:cust.size,cust,top:Math.max(0,...O.map(o=>o.gmv)),
     newOrders:O.filter(o=>o.lines.some(l=>/new/i.test(l.custStatus||""))).length,
     family:by(l=>l.family),tier:by(l=>priceTierOf(l.category)),region:by(l=>l.region),pic:by(l=>l.pic),app:by(l=>l.app),cat:by(l=>l.category||(L.some(x=>x.category)?"(no category)":null)),
     days:by(l=>l.date?String((l.date.getDay()+6)%7):null),
