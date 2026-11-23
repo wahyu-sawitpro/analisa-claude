@@ -171,7 +171,7 @@ const svgChart=(c,W,H)=>`<svg class="chart" width="${W}" height="${H}" viewBox="
 // card = {w (weight), title, sub, chart | table | kpis (vertical) | kpiRow (horizontal) | split:[card] (stacked), foot}
 const BODY_W=1080, BODY_H=500, GAPX=16, GAPY=14;
 const CARD={px:22,pt:18,title:24,sub:20,gap:8,pb:14};
-function notesH(notes){ if(!notes?.length) return 0; const lines=notes.reduce((s,n)=>s+Math.ceil(tw(String(n).replace(/<[^>]+>/g,""),12.3)/1030),0); return Math.min(150,22+lines*18); }
+function notesH(notes,max=150){ if(!notes?.length) return 0; const lines=notes.reduce((s,n)=>s+Math.ceil(tw(String(n).replace(/<[^>]+>/g,""),12.3)/1030),0); return Math.min(max,22+lines*18); }
 function placeCards(cards,x,y,W,H,horizontal=true){
   const tw_=cards.reduce((s,c)=>s+(c.w||1),0), out=[]; let pos=horizontal?x:y;
   const fixed=horizontal?0:cards.reduce((s,c)=>s+(c.h||0),0), flex=horizontal?tw_:cards.filter(c=>!c.h).reduce((s,c)=>s+(c.w||1),0);
@@ -187,7 +187,7 @@ function placeCard(c,x,y,w,h){
   return [{...c,x,y,w,h,inner:{x:CARD.px,y:top,w:w-2*CARD.px,h:h-top-CARD.pb-fh},fh}];
 }
 function layoutPanels(spec){
-  const nh=notesH(spec.notes), H=BODY_H-(nh?nh+GAPY:0), rows=spec.rows, fixed=rows.reduce((s,r)=>s+(r.h||0),0), free=rows.filter(r=>!r.h).length;
+  const nh=notesH(spec.notes,spec.notesMax), H=BODY_H-(nh?nh+GAPY:0), rows=spec.rows, fixed=rows.reduce((s,r)=>s+(r.h||0),0), free=rows.filter(r=>!r.h).length;
   let y=0; const cells=[];
   rows.forEach(r=>{ const h=r.h||(H-fixed-GAPY*(rows.length-1))/(free||1); cells.push(...placeCards(r.cards,0,y,BODY_W,h,true)); y+=h+GAPY; });
   return {cells,notes:nh?{y:BODY_H-nh,h:nh,list:spec.notes}:null};

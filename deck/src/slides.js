@@ -789,7 +789,7 @@ function teamSpecs(A,N,pre){
     if(dG){
       const aP=inv(P)?P.gmv/inv(P):0, aL=inv(L)?L.gmv/inv(L):0, eOrd=(inv(L)-inv(P))*aP, eSize=inv(L)*(aL-aP);
       const main=Math.abs(eSize)>=Math.abs(eOrd)?`mostly ${aL<aP?"smaller":"bigger"} orders`:`mostly ${inv(L)<inv(P)?"fewer":"more"} orders`;
-      why.push(`<b>Why sales ${dG<0?"fell":"rose"} ${rp(Math.abs(dG))} (${dPct(L.gmv,P.gmv)}): ${main}.</b> Orders ${inv(P)} → ${inv(L)} (${sg(eOrd)}); average order ${rp(aP)} → ${rp(aL)} (${sg(eSize)}).${P.qty||L.qty?` Units ${nf.format(P.qty)} → ${nf.format(L.qty)} (${dPct(L.qty,P.qty)})${P.qty&&L.qty?`, sales per unit ${rp(P.gmv/P.qty)} → ${rp(L.gmv/L.qty)}`:""}.`:""}`);
+      why.push(`<b>Why sales ${dG<0?"fell":"rose"} ${rp(Math.abs(dG))} (${dPct(L.gmv,P.gmv)}): ${main}.</b> Orders ${inv(P)} → ${inv(L)} (${sg(eOrd)}); average order ${rp(aP)} → ${rp(aL)} (${sg(eSize)}).${P.qty||L.qty?` Units ${nf.format(P.qty)} → ${nf.format(L.qty)} (${dPct(L.qty,P.qty)}).`:""}`);
       // customers: who stopped, who came back, who is new
       const lost=[...P.cust].filter(([k])=>!L.cust.has(k)), back=[...L.cust].filter(([k])=>P.cust.has(k)), nw=[...L.cust].filter(([k])=>!P.cust.has(k));
       const sum=a=>a.reduce((t,[,v])=>t+v,0), backP=back.reduce((t,[k])=>t+P.cust.get(k),0);
@@ -800,14 +800,35 @@ function teamSpecs(A,N,pre){
         const dn=ps.filter(x=>x.d<0).slice(0,2), up=ps.filter(x=>x.d>0).reverse().slice(0,1);
         why.push(`<b>PICs selling ${P.pic.size} → ${L.pic.size}:</b> ${[...dn.map(x=>`${esc(x.k)} ${sg(x.d)} (${x.pc} → ${x.c} customers)`),...up.map(x=>`${esc(x.k)} ${sg(x.d)}`)].join("; ")||"no change"}.`);
       }
-      // price tiers, most expensive first
+      // price tiers, most expensive first: what each tier did, how much of the change it explains, who bought it,
+      // which tier led each week, whether the mix moved to cheaper or dearer tiers, and the next step with an owner
       const TR=PRICE_TIERS.map(([k])=>k).reverse().filter(k=>P.tier.get(k)||L.tier.get(k));
       if(TR.length){
-        const big=TR.map(k=>({k,d:(L.tier.get(k)||0)-(P.tier.get(k)||0)})).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d))[0];
-        why.push(`<b>Price tiers (most expensive → cheapest):</b> ${TR.map(k=>`${k==="Retail"?"Retail (Pupuk)":k} ${rp(P.tier.get(k)||0)} → ${rp(L.tier.get(k)||0)}`).join(" · ")}; ${big.k} moved most (${sg(big.d)}).`);
+        const g=(w,k)=>w.tier.get(k)||0, q=(w,k)=>w.tierQty.get(k)||0, ti=(w,k)=>w.tierInfo.get(k), no=(w,k)=>ti(w,k)?ti(w,k).orders.size:0, cu=(w,k)=>ti(w,k)?ti(w,k).cust.size:0;
+        const tP=TR.reduce((t,k)=>t+g(P,k),0)||1, tL=TR.reduce((t,k)=>t+g(L,k),0)||1, sh=(v,t)=>`${Math.round(v/t*100)}%`;
+        const part=d=>dG&&Math.sign(d)===Math.sign(dG)&&Math.abs(d/dG)>=.01?` = ${Math.round(Math.abs(d/dG)*100)}% of the ${dG<0?"drop":"rise"}`:"";
+        const ppu=(w,k)=>q(w,k)?g(w,k)/q(w,k):0;
+        const TS={Retail:"Retail (Pupuk)",Grosir:"Grosir",Toling:"Toling","Khusus Petani":"Khusus Petani"};
+        const pc=d=>dG&&Math.sign(d)===Math.sign(dG)&&Math.abs(d/dG)>=.05?`; <b>${Math.round(Math.abs(d/dG)*100)}% of the ${dG<0?"drop":"rise"}</b>`:"";
+        const lines=TR.filter(k=>Math.max(g(P,k),g(L,k))>=Math.max(tP,tL)*.02).map(k=>{ const a=g(P,k), b=g(L,k), d=b-a, u=q(P,k)||q(L,k);
+          if(a&&b&&Math.abs(d)<Math.max(Math.abs(dG)*.05,1e6)) return {k,d,t:`${TS[k]} flat at ${rp(b)}${u&&Math.abs(q(L,k)-q(P,k))/(q(P,k)||1)>.15?` (units ${nf.format(q(P,k))} → ${nf.format(q(L,k))}, price per unit ${rp(ppu(P,k))} → ${rp(ppu(L,k))})`:""}`};
+          if(!b) return {k,d,t:`${TS[k]} ${rp(a)} → none (${cu(P,k)} customer${cu(P,k)===1?"":"s"}${u?`, ${nf.format(q(P,k))} units`:""} did not reorder${pc(d)})`};
+          if(!a) return {k,d,t:`${TS[k]} new at ${rp(b)} (${nn(cu(L,k),"customer")}${pc(d)})`};
+          return {k,d,t:`${TS[k]} ${rp(a)} → ${rp(b)} (customers ${cu(P,k)} → ${cu(L,k)}${u?`, units ${nf.format(q(P,k))} → ${nf.format(q(L,k))}`:""}${pc(d)})`}; });
+        const lead=w=>TR.slice().sort((x,y)=>g(w,y)-g(w,x))[0], lP=lead(P), lL=lead(L);
+        const cheap=TR.filter(k=>k==="Toling"||k==="Khusus Petani"), cP=cheap.reduce((t,k)=>t+g(P,k),0)/tP, cL=cheap.reduce((t,k)=>t+g(L,k),0)/tL;
+        const leadTxt=lP===lL?`${TS[lL]} led both weeks`:`${TS[lL]} led last week (${sh(g(L,lL),tL)}); ${TS[lP]} led the week before (${sh(g(P,lP),tP)})`;
+        const mixTxt=cheap.length&&Math.abs(cL-cP)>=.1?`, so sales moved to the ${cL>cP?"cheaper":"more expensive"} tiers (Toling + Khusus Petani ${Math.round(cP*100)}% → ${Math.round(cL*100)}%)`:"";
+        why.push(`<b>Price tiers, most expensive first:</b> ${lines.map(x=>x.t).join(" · ")}. ${leadTxt}${mixTxt}.`);
+        // next step: the tier that moved most against the week, owned by the PIC who sold most of it the week before;
+        // a category that sells every other week explains the gap, so the step is to confirm this week's order
+        const worst=lines.filter(x=>Math.sign(x.d)===Math.sign(dG||-1)).sort((x,y)=>Math.abs(y.d)-Math.abs(x.d))[0];
+        const own=worst&&ti(P,worst.k)?[...ti(P,worst.k).pic].sort((x,y)=>y[1]-x[1])[0]:null;
+        const cyc=worst&&alt.some(c=>priceTierOf(c)===worst.k);
+        if(worst&&worst.d<0) why.push(`<b>Next:</b> ${own?`${esc(own[0])} to `:""}call the ${nn(cu(P,worst.k),`${worst.k} customer`)} from the week before${cyc?" and confirm this week's order (this tier orders every other week, see below)":" and ask whether the order is delayed or lost to a cheaper tier or another supplier"}.`);
       }
     }
-    S.push({kicker:pre+"Sales trend · last 4 weeks",title:`${rp(L.gmv)} last week${A.lastDays<7?` (to ${fds(A.dataEnd)})`:""}: ${dPct(L.gmv,P.gmv)} vs the week before, ${dPct(L.gmv,avg)} vs the ${nP}-week average; ${inv(L)} orders (${dPct(inv(L),inv(P))}, ${dPct(inv(L),ai)})`,
+    S.push({kicker:pre+"Sales trend · last 4 weeks",notesMax:180,title:`${rp(L.gmv)} last week${A.lastDays<7?` (to ${fds(A.dataEnd)})`:""}: ${dPct(L.gmv,P.gmv)} vs the week before, ${dPct(L.gmv,avg)} vs the ${nP}-week average; ${inv(L)} orders (${dPct(inv(L),inv(P))}, ${dPct(inv(L),ai)})`,
       rows:[{h:84,cards:[{kpiRow:[{v:dPct(L.gmv,P.gmv),u:"",l:`Sales vs the week before: ${rp(L.gmv)} vs ${rp(P.gmv)}`,hot:true},
         {v:dPct(L.gmv,avg),u:"",l:`Sales vs the ${nP}-week average: ${rp(L.gmv)} vs ${rp(avg)}`},
         {v:dPct(inv(L),inv(P)),u:"",l:`Orders (unique invoices) vs the week before: ${inv(L)} vs ${inv(P)}`},
