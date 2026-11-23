@@ -17,10 +17,9 @@ added to this deck, not built as separate decks.
   (no both-teams trend, no "Teams at a glance"; the executive summary shows each team on its own). In each team section
   first the summary slide, the only slide that uses the 4 weeks: four deltas (sales last week vs the week before,
   sales vs the average of the 3 earlier weeks, orders = unique invoices vs the week before, orders vs the 3-week
-  average), a chart of total sales for the 4 weeks and the week-by-week table (no average row). Its yellow box says why sales
-  fell or rose vs the week before: fewer orders vs smaller orders, units, customers lost / returning / new, PICs
-  selling and who moved most, and the price tiers from the most expensive (Retail "Pupuk", Grosir, Toling) to the
-  cheapest (Khusus Petani). Every slide after it
+  average), a chart of total sales for the 4 weeks and the week-by-week table (no average row). Its yellow box says in 2-4 short
+  lines why sales fell or rose vs the week before (e.g. smaller average order, fewer customers, the category that
+  led last week vs the week before); never a long analysis. Every slide after it
   compares last week with the week before only. Then the sales slide (last week vs the week before), then
   "Product categories · bought most vs earned most" (units vs sales, last week vs the week before), the other sales slides, success
   story and rejection reasons. When last week's data stops 2+ days before Sunday, say so and add the like-for-like
