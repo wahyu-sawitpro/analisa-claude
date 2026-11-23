@@ -608,6 +608,9 @@ function weekSummary(L){
     catQty:(()=>{ const m=new Map(); L.forEach(l=>{ const k=l.category||(L.some(x=>x.category)?"(no category)":null); if(k) m.set(k,(m.get(k)||0)+(l.qty||0)); }); return m; })(),
     catOrders:(()=>{ const m=new Map(); L.forEach((l,i)=>{ const k=l.category||(L.some(x=>x.category)?"(no category)":null); if(!k) return; (m.get(k)||m.set(k,new Set()).get(k)).add(l.orderNo||l.invoice||i); }); return new Map([...m].map(([k,v])=>[k,v.size])); })(),
     newGmv:O.filter(o=>o.lines.some(l=>/new/i.test(l.custStatus||""))).reduce((s,o)=>s+o.gmv,0),
+    qty:L.reduce((t,l)=>t+(l.qty||0),0),
+    tierQty:(()=>{ const m=new Map(); L.forEach(l=>{ const k=priceTierOf(l.category); if(k) m.set(k,(m.get(k)||0)+(l.qty||0)); }); return m; })(),
+    picCust:(()=>{ const m=new Map(); O.forEach(o=>{ const f=o.lines[0]; if(!f.pic) return; (m.get(f.pic)||m.set(f.pic,new Set()).get(f.pic)).add(f.ph||f.nk||f.orderNo||f.invoice); }); return new Map([...m].map(([k,v])=>[k,v.size])); })(),
     lastDay:L.reduce((m,l)=>l.date&&+l.date>m?+l.date:m,0)};
 }
 
