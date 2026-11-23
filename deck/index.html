@@ -1207,8 +1207,8 @@ const ACQ_BANDS=[["Up to 2 ha",0,2],["2–5 ha",2,5],["5–10 ha",5,10],["10–2
 // channels where the farmer can buy on the spot: did they buy on the day they joined?
 const ACQ_BUY_CH=[["Toko Keliling",r=>/toko\s*keliling|^toling$/i.test(r.src||"")],["Duta",r=>r.under||/duta/i.test(r.src||"")],["Purchase Masker",r=>/purchase\s*masker|masker/i.test(r.src||"")]];
 // "organic" and "Organic" are one channel: an all-lowercase label takes a capital first letter
-// Organic is shown as "Other channel" (user request: no organic label on the slides)
-const srcName=v=>{ v=v&&v===v.toLowerCase()?v.replace(/^./,c=>c.toUpperCase()):v; return /^organic$/i.test(v||"")?"Other channel":v; };
+// Organic is shown as "Other channel"; the internal-team Dutas are the Smallholder Team (user request)
+const srcName=v=>{ v=v&&v===v.toLowerCase()?v.replace(/^./,c=>c.toUpperCase()):v; return /^organic$/i.test(v||"")?"Other channel":/^duta from internal team$/i.test(v||"")?"Duta from Internal Team (Smallholder Team)":v; };
 // Campaign name. When an Identified Campaigns row carries a generic name (petaniproapp, direct, organic or none), the real
 // campaign is in referral_utm (e.g. "Instagram_Boost_Oktober"); click ids such as "...BwE" are not campaign names.
 const GENERIC_CAMP=/^(petaniproapp|direct|organic|\(none\)|-)?$/i;
@@ -2119,33 +2119,29 @@ function acqOverviewSpec(Q,pre){
 }
 // Which channels worked: last week against the week before and the average week, with what the users did after joining.
 function acqChannelSpec(Q,pre){
-  const L=Q.L, P=Q.P, {weeks:pr}=acqPrior(Q), av=k=>pr.length?pr.reduce((t,w)=>t+(w.src.get(k)||0),0)/pr.length:0;
-  const U=(Q.rawRows||[]).filter(r=>r.w===L.w), keys=Q.srcs.filter(k=>(L.src.get(k)||0)||(P&&P.src.get(k))), none=Q.srcs.filter(k=>!keys.includes(k)&&av(k)>=.5);
-  const ch=keys.map(k=>{ const u=U.filter(r=>r.src===k), l=u.length, p=P?P.src.get(k)||0:0, a=av(k);
-    const verdict=isBulk(k)?"Bulk add":l>p&&l>a*1.1?"Worked":l>p?"Grew, below avg":l===p&&l?(l>=a*1.1?"Flat, above avg":"Flat"):l>=a*1.1?"Fell, above avg":l?"Fell, below avg":"None";
-    return {k,l,p,a,d:l-p,farm:u.filter(r=>r.hasFarm).length,phone:u.filter(r=>r.phone).length,buy:u.filter(r=>r.regSales>0).length,verdict}; })
-    .sort((x,y)=>y.l-x.l||y.p-x.p);
-  const win=ch.filter(c=>c.verdict==="Worked").sort((a,b)=>b.d-a.d), tot={l:L.total,p:P?P.total:0};
-  const sh=v=>!v?"–":v/L.total<.005?"<1%":`${pct(v,L.total)}%`;
-  const rows=ch.map(c=>[{v:c.k,bold:true},{v:nf.format(c.l),bold:true},sh(c.l),P?`${sg(c.d)}`:"–",nf.format(Math.round(c.a)),c.l?`${pct(c.farm,c.l)}%`:"–",c.l?`${pct(c.phone,c.l)}%`:"–",{v:c.verdict,bold:c.verdict==="Worked"}]);
-  rows.push([{v:"Total",bold:true},{v:nf.format(L.total),bold:true},"100%",P?{v:sg(L.total-tot.p),bold:true}:"–",{v:nf.format(Math.round(acqPrior(Q).avg||0)),bold:true},`${pct(L.withFarm,L.total)}%`,`${pct(L.total-L.noPhone,L.total)}%`,""]);
-  const cAll=[...Q.camps].sort((a,b)=>b.l-a.l||a.d-b.d), c3=cAll.slice(0,3), cRest=cAll.slice(3), icL=L.src.get("Identified Campaigns")||0;
-  const rowsK=c3.map(x=>[x.k,{v:nf.format(x.l),bold:true},icL?`${pct(x.l,icL)}%`:"–",P?nf.format(x.p):"–",P?sg(x.d):"–"]);
-  const oth=ch.find(c=>c.k==="Other channel"), ga=ch.find(c=>/google/i.test(c.k)), bestQ=[...ch].filter(c=>c.l>=10&&!isBulk(c.k)).sort((a,b)=>b.farm/b.l-a.farm/a.l)[0];
+  const L=Q.L, P=Q.P, keys=Q.srcs.filter(k=>(L.src.get(k)||0)||(P&&P.src.get(k)));
+  const ch=keys.map(k=>{ const l=L.src.get(k)||0, p=P?P.src.get(k)||0:0; return {k,l,p,d:l-p,r:p?(l-p)/p:null}; }).sort((x,y)=>y.l-x.l||y.p-x.p);
+  const sh=v=>!v?"–":v/L.total<.005?"<1%":`${pct(v,L.total)}%`, chg=(d,p)=>`${sg(d)}${p?` (${d>=0?"+":"−"}${Math.abs(Math.round(d/p*100))}%)`:d?" (new)":""}`;
+  const rows=ch.map(c=>[{v:c.k,bold:true},{v:nf.format(c.l),bold:true},sh(c.l),{v:chg(c.d,c.p),bold:c.d>0&&!isBulk(c.k)}]);
+  rows.push([{v:"Total",bold:true},{v:nf.format(L.total),bold:true},"100%",{v:chg(L.total-P.total,P.total),bold:true}]);
+  const real=ch.filter(c=>!isBulk(c.k)), byN=[...real].filter(c=>c.d>0).sort((a,b)=>b.d-a.d), byR=[...real].filter(c=>c.d>0&&c.p>=5).sort((a,b)=>b.r-a.r), fresh=real.filter(c=>!c.p&&c.l), dn=[...real].filter(c=>c.d<0).sort((a,b)=>a.d-b.d);
+  const cAll=[...Q.camps].sort((a,b)=>b.l-a.l||a.d-b.d), c3=cAll.slice(0,3), cRest=cAll.slice(3), icL=L.src.get("Identified Campaigns")||0, icD=[...Q.camps].sort((a,b)=>a.d-b.d)[0];
+  const rowsK=c3.map(x=>[x.k,{v:nf.format(x.l),bold:true},icL?`${pct(x.l,icL)}%`:"–",chg(x.d,x.p)]);
+  const bulk=ch.filter(c=>isBulk(c.k)&&(c.l||c.p)), f=c=>`${c.k} ${nf.format(c.p)} → ${nf.format(c.l)}`;
   return {kicker:pre+"Acquisition · which channels worked",
-    title:(()=>{ const real=ch.filter(c=>!isBulk(c.k)), up=[...real].sort((a,b)=>b.d-a.d)[0], dn=[...real].sort((a,b)=>a.d-b.d)[0];
-      const lead=up&&up.d>0?`${up.k} led (${sg(up.d)})`:"No channel grew"; const fell=dn&&dn.d<0?` while ${dn.k} fell ${sg(dn.d)}`:"";
-      const w=win.filter(c=>c!==up); return `${lead}${fell}${w.length?`; ${w.map(c=>`${c.k} ${sg(c.d)}`).join(", ")} beat ${w.length===1?"its":"their"} average`:""}`; })(),
+    title:byN[0]?`${byN[0].k} added the most users (${sg(byN[0].d)})${byR[0]&&byR[0]!==byN[0]?`; ${byR[0].k} grew fastest (+${Math.round(byR[0].r*100)}%)`:byR[0]?`, also the fastest growth (+${Math.round(byR[0].r*100)}%)`:""}`:`No channel grew last week${dn[0]?`; ${dn[0].k} fell ${sg(dn[0].d)}`:""}`,
     rows:[{cards:[
-      {w:1.75,title:"Channels last week",sub:`Change vs the week before; avg week over ${pr.length} weeks; farm / phone = % who added a farm / a phone`,
-        table:{colW:[27,9,8,9,9,8,9,21],head:["Channel","Last week","Share","Change","Avg week","Farm","Phone","Verdict"],align:["l","r","r","r","r","r","r","l"],rows}},
+      {w:1.15,title:"Channels last week",sub:`Users by utm source; change vs the week before (${P.label})`,
+        table:{colW:[46,16,13,25],head:["Channel","Last week","Share","Change vs week before"],align:["l","r","r","r"],rows}},
       {w:1,title:"Top 3 Identified Campaigns",sub:`${nf.format(icL)} Identified Campaigns users last week`,
-        table:{colW:[46,14,12,13,15],head:["Campaign","Last week","Share","Before","Change"],align:["l","r","r","r","r"],rows:rowsK.length?rowsK:[["No campaign last week","","","",""]]}}]}],
-    notes:[win.length&&`<b>What worked:</b> ${win.map(c=>`${c.k} ${nf.format(c.p)} → ${nf.format(c.l)} (avg ${nf.format(Math.round(c.a))})`).join("; ")}.${c3[0]&&win.some(c=>/identified/i.test(c.k))?` In Identified Campaigns, “${esc(c3[0].k)}” alone brought ${nf.format(c3[0].l)} (${pct(c3[0].l,icL)}%).`:""}`,
-      oth&&oth.l&&`<b>Other channel (utm source Organic), ${nf.format(oth.l)} users:</b> no campaign tag; it likely relates to social media activity. A UTM on each post would measure it.`,
-      bestQ&&`<b>Best quality:</b> ${bestQ.k}, where ${pct(bestQ.farm,bestQ.l)}% of users added a farm (all channels ${pct(L.withFarm,L.total)}%).${ga&&ga.l&&ga!==bestQ?` Google Ads: ${pct(ga.farm,ga.l)}% added a farm.`:""}`,
-      none.length&&`<b>No users either week:</b> ${none.join(", ")}.`,
-      cRest.length&&`<b>Other ${cRest.length} campaigns:</b> ${cRest.filter(x=>x.l).sort((a,b)=>b.l-a.l).slice(0,5).map(x=>`${esc(x.k)} ${nf.format(x.l)}`).join(", ")}${cRest.length>5?`; ${cRest.length-Math.min(5,cRest.filter(x=>x.l).length)} more with ${nf.format(cRest.reduce((t,x)=>t+x.l,0)-cRest.filter(x=>x.l).sort((a,b)=>b.l-a.l).slice(0,5).reduce((t,x)=>t+x.l,0))} users between them`:""}.`].filter(Boolean)};
+        table:{colW:[46,15,13,26],head:["Campaign","Last week","Share","Change vs week before"],align:["l","r","r","r"],rows:rowsK.length?rowsK:[["No campaign last week","","",""]]}}]}],
+    notes:[byN[0]&&`<b>Most users added:</b> ${byN.slice(0,3).map(c=>`${f(c)} (${sg(c.d)})`).join("; ")}.`,
+      byR[0]&&`<b>Fastest growth:</b> ${byR.slice(0,3).map(c=>`${f(c)} (+${Math.round(c.r*100)}%)`).join("; ")}${fresh.length?`; new last week: ${fresh.map(f).join(", ")}`:""}.`,
+      !byR[0]&&fresh.length&&`<b>New last week:</b> ${fresh.map(f).join(", ")}.`,
+      dn[0]&&`<b>Fell most:</b> ${dn.slice(0,2).map(c=>`${f(c)} (${sg(c.d)}, −${Math.round(-c.r*100)}%)`).join("; ")}${/identified/i.test(dn[0].k)&&icD&&icD.d<0?`; mostly “${esc(icD.k)}” ${nf.format(icD.p)} → ${nf.format(icD.l)}`:""}.`,
+      ch.find(c=>c.k==="Other channel"&&c.l)&&`<b>Other channel</b> is utm source Organic (no campaign tag); it likely relates to social media activity.`,
+      bulk.length&&`<b>Not counted as growth:</b> ${bulk.map(f).join(", ")}, users added in bulk.`,
+      cRest.length&&`<b>Other ${cRest.length} campaigns:</b> ${cRest.filter(x=>x.l).sort((a,b)=>b.l-a.l).slice(0,5).map(x=>`${esc(x.k)} ${nf.format(x.l)}`).join(", ")}${cRest.filter(x=>x.l).length>5?`; ${cRest.filter(x=>x.l).length-5} more with ${nf.format(cRest.filter(x=>x.l).sort((a,b)=>b.l-a.l).slice(5).reduce((t,x)=>t+x.l,0))} users between them`:""}.`].filter(Boolean)};
 }
 // When a table keeps an "Other" row, the note under it lists every campaign in it with its counts.
 const otherNote=(rest,P,lab="campaigns")=>{ if(!rest.length) return null; const on=[...rest].filter(x=>x.l).sort((a,b)=>b.l-a.l||b.p-a.p), off=rest.filter(x=>!x.l);

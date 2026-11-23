@@ -120,9 +120,9 @@ flagged as a likely bulk sign-up or import.
 
 The registration review is kept short: (1) last week at a glance (users acquired, farmers vs estate owners, change on
 the week before and on the average of every earlier complete week, the weekly chart with the running week left out, and
-last week's users by channel); (2) which channels worked (per channel: last week, share, change, average week, % who added
-a farm or a phone, and a verdict; "Worked" = up on the week before and over 10% above the average week; top 3 Identified
-Campaigns from `campaign_name`); (3) the weekly trend by channel; then same-day buying, farmers vs estate owners,
+last week's users by channel); (2) which channels worked (per channel: last week, share and change vs the week before; top 3
+Identified Campaigns from `campaign_name`; the note names the channels that added the most users and grew fastest, new
+channels and the largest drops); (3) the weekly trend by channel; then same-day buying, farmers vs estate owners,
 locations, users above 100 ha and next steps. Utm source Organic is shown as "Other channel" (likely social media
 activity); Injected User is a bulk add, not acquisition. No executive summary and no Duta vs non-Duta breakdown. The
 viral-content table is off for now; `deck/src/organic-content.json` is kept for when it is updated.
