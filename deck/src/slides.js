@@ -705,25 +705,6 @@ function forecastSpecs(F,pre){
 const dPct=(a,b)=>b?`${a>=b?"+":"−"}${Math.abs(Math.round((a-b)/b*100))}%`:(a?"new":"0%");
 const wkLab=(A,x,i)=>`${fds(x.start)}${A.lastDays<7&&i===A.weeks4.length-1?"*":""}`;
 const partialNote=(A,nm)=>A.lastDays<7?`<b>${nm?`${esc(nm)}: l`:"L"}ast week is partial:</b> the data stops on ${fds(A.dataEnd)} (${A.lastDays} of 7 days). Same first ${A.lastDays} days of each week: ${A.weeks4.map(x=>`${fds(x.start)} ${rp(x.lfl)}`).join(", ")}${A.avgPriorLfl!=null?`; last week is ${dPct(A.weeks4[A.weeks4.length-1].lfl,A.avgPriorLfl)} vs that average`:""}.`:"";
-// Deck-level: both teams over the last four weeks (shown after the executive summary)
-function overviewSpecs(T){
-  const TT=T.filter(t=>t.A.weeks4&&t.A.weeks4.length>=2&&t.A.has.sales); if(!TT.length) return [];
-  const n=Math.max(...TT.map(t=>t.A.weeks4.length)), ref=TT.find(t=>t.A.weeks4.length===n).A, TC=["#0B5A0B","#D9A21B","#6E8F5A","#5B7F95"];
-  const at=(t,i)=>{ const W=t.A.weeks4, k=i-(n-W.length); return k>=0?W[k].gmv:0; }, tot=i=>TT.reduce((s,t)=>s+at(t,i),0);
-  const last=tot(n-1), prev=tot(n-2), avg=[...Array(n-1).keys()].reduce((s,i)=>s+tot(i),0)/(n-1), partial=TT.some(t=>t.A.lastDays<7);
-  const end=new Date(Math.max(...TT.map(t=>+t.A.dataEnd)));
-  return [{kicker:"Sales trend · last 4 weeks",title:`Last week ${rp(last)} from both teams: ${dPct(last,prev)} vs the week before, ${dPct(last,avg)} vs the ${n-1}-week average${partial?` (data to ${fds(end)})`:""}`,
-    rows:[{h:84,cards:[{kpiRow:[{v:rpParts(last)[0],u:rpParts(last)[1],l:`Sales last week, both teams${partial?` (to ${fds(end)})`:""}`,hot:true},
-      {v:dPct(last,prev),u:"",l:`vs the week before (${rp(prev)})`},{v:dPct(last,avg),u:"",l:`vs the average of the ${n-1} weeks before (${rp(avg)})`},
-      ...TT.slice(0,1).map(t=>({v:rpParts(at(t,n-1))[0],u:rpParts(at(t,n-1))[1],l:`${t.name}: ${dPct(at(t,n-1),at(t,n-2))} vs the week before`}))]}]},
-    {cards:[{w:1,title:"Sales per week, by team",sub:`Weeks start on Monday${partial?"; * = partial week":""}`,chart:{type:"column",stacked:true,cats:ref.weeks4.map((x,i)=>wkLab(ref,x,i)),series:TT.map((t,j)=>({name:t.name,color:TC[j],values:[...Array(n).keys()].map(i=>at(t,i))})),fmt:rp,lblH:24}},
-      {w:1.1,title:"Week by week",sub:"Sales; change vs the week before and vs the average of the earlier weeks",table:{colW:[16,...Array(n).fill(12),11,11],head:["Team",...ref.weeks4.map((x,i)=>wkLab(ref,x,i)),"vs prev.","vs avg"],align:["l",...Array(n).fill("r"),"r","r"],
-        rows:[...TT.map(t=>{ const a=t.A.avgPrior; return [{v:t.name,bold:true},...[...Array(n).keys()].map(i=>rp(at(t,i))),dPct(at(t,n-1),at(t,n-2)),a!=null?dPct(at(t,n-1),a):"–"]; }),
-          [{v:"Total",bold:true},...[...Array(n).keys()].map(i=>({v:rp(tot(i)),bold:true})),dPct(last,prev),dPct(last,avg)]]}}]}],
-    notes:[...TT.map(t=>{ const W=t.A.weeks4, L=W[W.length-1], P=W[W.length-2], hi=W.slice().sort((a,b)=>b.gmv-a.gmv)[0];
-      return `<b>${esc(t.name)}:</b> ${rp(L.gmv)} from ${L.orders} orders last week (${dPct(L.gmv,P.gmv)} vs ${rp(P.gmv)}; ${dPct(L.gmv,t.A.avgPrior)} vs the ${W.length-1}-week average ${rp(t.A.avgPrior)}). Best week: ${fds(hi.start)} (${rp(hi.gmv)}).`; }),
-      ...TT.filter(t=>t.A.lastDays<7).map(t=>partialNote(t.A,t.name))].filter(Boolean)}];
-}
 function teamSpecs(A,N,pre){
   if(A.acq) return acqSpecs(A.acq,pre);
   if(A.dop) return doSpecs(A.dop,pre);
@@ -1120,11 +1101,13 @@ function deckNarrative0(T){
   const won=all.reduce((s,A)=>s+A.won.length,0), wonL=all.reduce((s,A)=>s+A.wonLinked.length,0);
   X.eyebrow="Weekly Sales Review"; X.title=`${andList(T.map(t=>t.name))} Last Week`;
   X.meta=[orders&&`${orders} orders`,crm&&`${crm} CRM engagements`,`${T.length} teams`].filter(Boolean).join(" · ");
-  X.headline=gmv?`${rp(gmv)} in sales last week: ${T.map(t=>!t.A.has.sales?`${t.name} no sales file`:`${t.name} ${rp(t.A.gmv)}${t.A.wow&&t.A.wow.pc!=null?` (${t.A.wow.flat?"flat":(t.A.wow.up?"+":"−")+t.A.wow.pc+"%"})`:""}`).join(", ")}`:`${crm} CRM engagements across ${T.length} teams`;
+  X.headline=gmv?`Sales last week: ${T.map(t=>!t.A.has.sales?`${t.name} no sales file`:`${t.name} ${rp(t.A.gmv)}${t.A.wow&&t.A.wow.pc!=null?` (${t.A.wow.flat?"flat":(t.A.wow.up?"+":"−")+t.A.wow.pc+"% vs the week before"})`:""}`).join("; ")}`:`${crm} CRM engagements across ${T.length} teams`;
   { const pt=T.filter(t=>t.A.lastDays<7); if(gmv&&pt.length) X.headline+=` (last week partial: data to ${andList(pt.map(t=>`${fds(t.A.dataEnd)} for ${t.name}`))})`; }
-  X.kpis=[{v:rpParts(gmv)[0],u:rpParts(gmv)[1],l:`Total sales from ${orders} orders`,hot:true},
-    ...T.slice(0,2).map(t=>t.A.has.sales?{v:rpParts(t.A.gmv)[0],u:rpParts(t.A.gmv)[1],l:`${t.name}: ${t.A.orders.length} orders, ${pct(t.A.gmv,gmv)}% of sales`}:{v:"–",u:"",l:`${t.name}: no sales file uploaded`}),
-    (()=>{ const c=all.reduce((s,A)=>s+(A.customers||0),0), nw=all.reduce((s,A)=>s+new Set((A.orders||[]).filter(o=>o.isNew).map(o=>o.ph||o.nk||o.no)).size,0); return {v:String(c),u:"",l:`customers bought${nw?`, ${nw} of them new`:""}`}; })()];
+  // Smallholder and Plantation are separate teams: one pair of KPIs per team, nothing summed across teams
+  X.kpis=T.filter(t=>t.A.has.sales).slice(0,2).flatMap((t,i)=>{ const A=t.A, av=A.avgPrior;
+    return [{v:rpParts(A.gmv)[0],u:rpParts(A.gmv)[1],l:`${t.name} sales last week, ${A.orders.length} orders${A.wow&&A.wow.p?` (${dPct(A.gmv,A.wow.p.gmv)} vs the week before)`:""}`,hot:i===0},
+      av!=null?{v:dPct(A.gmv,av),u:"",l:`${t.name} vs the ${A.weeks4.length-1}-week average (${rp(av)})`}:{v:String(A.customers),u:"",l:`${t.name} customers last week`}]; });
+  if(!X.kpis.length) X.kpis=[{v:String(crm),u:"",l:"CRM engagements",hot:true}];
   // two findings per team, labelled with the team
   X.findings=T.flatMap(t=>t.N.findings.slice(0,T.length>2?1:2).map(f=>[`${t.name}: ${f[0]}`,f[1]])).slice(0,4);
   X.bottom={p:`${T[0].name}: ${T[0].N.bottom.p}`,s:T.slice(1).map(t=>`${t.name}: ${t.N.bottom.p}`).join(" ")};
@@ -1201,8 +1184,7 @@ function buildDeck(T,X){
     <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin-top:18px">
       <div class="card"><div class="findings">${X.findings.map(f=>`<div class="find"><span class="mk"></span><div><b>${esc(f[0])}</b><p>${esc(f[1])}</p></div></div>`).join("")}</div></div>
       <div class="bottom"><span class="lb">Bottom line</span><p>${esc(X.bottom.p)}</p><small>${esc(X.bottom.s)}</small></div></div>`));
-  if(!X.trend&&!X.acq&&!X.dop&&!X.forecast) overviewSpecs(T).forEach(sp=>S.push(panelSlide(next(),sp)));
-  if(X.multi&&!X.trend){
+  if(X.teamsGlance){ // off: Smallholder and Plantation are separate teams, so no slide compares or sums them
     const tot=T.reduce((s,t)=>s+t.A.gmv,0), TC=["#274E13","#D9A21B","#6E8F5A","#5B7F95"];
     S.push(contentSlide(next(),"Teams at a glance",X.cmpTitle,`
       ${tot?`<div class="card" style="padding:14px 18px;margin-bottom:14px"><h3 style="margin-bottom:8px">Share of sales</h3><div class="stack-big">${T.map((t,i)=>`<div class="seg" style="flex:${t.A.gmv||0.0001};background:${TC[i]}" data-tip="${esc(`${t.name}: ${rp(t.A.gmv)}`)}">${t.A.gmv/tot>.12?`${esc(t.name)} · ${rp(t.A.gmv)} (${pct(t.A.gmv,tot)}%)`:""}</div>`).join("")}</div>

@@ -13,12 +13,13 @@ Never publish one review to the other's artifact. New analysis requests (sales, 
 added to this deck, not built as separate decks.
 
 ## Standing requests from the user
-- **Sales deck structure (composed):** after the executive summary, "Sales trend · last 4 weeks" for both teams; in each
-  team section first the 4-week trend (weekly sales, last week vs the week before, last week vs the average of the
-  earlier weeks, orders, customers, average order, new-customer sales, top category), then last week vs the week
-  before, then "Product categories · bought most vs earned most" (units vs sales, week by week), the other sales
-  slides, success story and rejection reasons. When last week's data stops before Sunday, say so and add the
-  like-for-like view (the same first days of each week).
+- **Sales deck structure (composed):** Smallholder and Plantation are separate teams: no slide compares or sums them
+  (no both-teams trend, no "Teams at a glance"; the executive summary shows each team on its own). In each team section
+  first the 4-week trend (weekly sales, last week vs the week before, last week vs the average of the earlier weeks,
+  orders, customers, average order, new-customer sales, top category), then last week vs the week before, then
+  "Product categories · bought most vs earned most" (units vs sales, week by week), the other sales slides, success
+  story and rejection reasons. When last week's data stops 2+ days before Sunday, say so and add the like-for-like
+  view (the same first days of each week).
 - **Always go deeper.** Don't stop at totals and the first explanation. For any change, break it down (volume vs
   price vs mix, customers lost vs returning vs new, accounts, PICs, products, regions, channels, timing), test whether
   one account or one deal explains it, and turn each finding into a concrete action with an owner.

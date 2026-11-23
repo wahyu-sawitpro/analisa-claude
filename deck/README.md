@@ -212,17 +212,16 @@ Months the data covers in full form the trend; a partial month is left out. The 
 - **Overdue prospects.** Prospects whose estimated closing date has passed by the end of the week become an action.
 
 ## Week of 16–22 Nov 2026 (sample data, four weeks of sales)
-The sample is `Smallholder Sales last four weeks.csv` and `Plantation Sales last four weeks.csv` (26 Oct – 22 Nov) and the
-Smallholder success-story and rejection exports for 16–21 Nov, uploaded 23 Nov. The Plantation CRM exports on `main`
-are still the 9–15 Nov ones, so they are left out. Last week is partial in both sales files: Smallholder data stops on
-Thu 19 Nov, Plantation on Fri 20 Nov.
-- Both teams: Rp654M → Rp731M → Rp1.02B → Rp254M (last week, partial): −75% vs the week before, −68% vs the 3-week
-  average (Rp802M).
-- Smallholder: Rp593M, Rp223M, Rp818M, Rp63.7M (8 orders, Mon–Thu). Like-for-like (Mon–Thu of each week): Rp465M,
-  Rp191M, Rp466M, Rp63.7M, so −83% vs that average. No Grosir or Khusus Petani order yet last week (Toko Keliling
-  Rp37.2M, Benih Rp26.4M). Over 4 weeks Pupuk Grosir led on units (1,474) and sales (Rp744M, 44%).
-- Plantation: Rp61M, Rp508M, Rp205M, Rp191M (4 orders, one Topaz order of Rp144M is 76%); −26% vs the 3-week average.
-  Benih is 100% of last week and 64% of the 4 weeks.
+The sample is the re-uploaded `Smallholder Sales last four weeks.csv` (26 Oct – 22 Nov) and `Plantation Sales last four
+weeks.csv` (26 Oct – 21 Nov), the Smallholder success-story and rejection exports for 16–21 Nov and the Plantation
+success story (16 Nov), uploaded 23 Nov. The Plantation rejection export on `main` is still the 9–14 Nov one, so it is
+left out. Smallholder and Plantation are reviewed separately (no combined slides).
+- Smallholder: Rp593M, Rp223M, Rp818M, Rp185M (20 orders, 17 customers): −77% vs the week before, −66% vs the 3-week
+  average (Rp544M); average order Rp34.1M → Rp9.3M. No Grosir order last week (Rp383M the week before) and Khusus Petani
+  only Rp8.3M (from Rp233M). Benih brought the most sales (Rp92.8M, 50%), Toko Keliling the most units (228). Over 4
+  weeks Toko Keliling sold the most units (1,536) and Pupuk Grosir the most sales (Rp744M, 41%).
+- Plantation: Rp61M, Rp508M, Rp205M, Rp209M (7 orders): +2% vs the week before, −19% vs the 3-week average (Rp258M);
+  100% Benih, one Topaz order of Rp144M is 69%.
 
 ## Findings for the week of 9–15 Nov 2026 (earlier sample)
 The sample is the six weekly exports on `main` uploaded 16 Nov: sales 2–15 Nov for both teams, success stories and

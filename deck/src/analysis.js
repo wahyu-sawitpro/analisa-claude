@@ -301,11 +301,11 @@ function analyse(sources,opt={}){
     const W=weeks.slice(0,4).reverse(), wl=w=>allLines.filter(l=>l.date&&wkOf(l.date)===w);
     A.weeks4=W.map(w=>({start:new Date(w),...weekSummary(wl(w))}));
     const last=A.weeks4[A.weeks4.length-1], end=Math.max(...allLines.filter(l=>l.date).map(l=>+l.date)), days=Math.floor((end-weeks[0])/864e5)+1;
-    A.lastDays=Math.min(7,days); A.dataEnd=new Date(end);
-    if(days<7) A.weeks4.forEach(x=>{ const cut=+x.start+days*864e5; x.lfl=wl(+x.start).filter(l=>+l.date<cut).reduce((t,l)=>t+(l.gmv||0),0); });
+    A.lastDays=days>=6?7:days; A.dataEnd=new Date(end); // no sales on Sunday alone doesn't make the week partial
+    if(A.lastDays<7) A.weeks4.forEach(x=>{ const cut=+x.start+days*864e5; x.lfl=wl(+x.start).filter(l=>+l.date<cut).reduce((t,l)=>t+(l.gmv||0),0); });
     const prior=A.weeks4.slice(0,-1); A.avgPrior=prior.length?prior.reduce((t,x)=>t+x.gmv,0)/prior.length:null;
     A.avgPriorOrders=prior.length?prior.reduce((t,x)=>t+x.orders,0)/prior.length:null;
-    if(days<7&&prior.length) A.avgPriorLfl=prior.reduce((t,x)=>t+x.lfl,0)/prior.length; }
+    if(A.lastDays<7&&prior.length) A.avgPriorLfl=prior.reduce((t,x)=>t+x.lfl,0)/prior.length; }
   if(!opt.trend&&weeks.length>=2){ prevLines=lines.filter(l=>l.date&&wkOf(l.date)===weeks[1]);
     const keep=lines.filter(l=>!l.date||wkOf(l.date)===weeks[0]); lines.splice(0,lines.length,...keep);
     A.weekStart=new Date(weeks[0]); A.prevStart=new Date(weeks[1]); A.olderWeeks=weeks.length-2; }
