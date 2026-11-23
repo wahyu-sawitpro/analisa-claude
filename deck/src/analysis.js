@@ -295,6 +295,17 @@ function analyse(sources,opt={}){
   // Trend review (a multi-month export): analyse every full month together instead of the latest week
   if(opt.trend){ A.mode="trend"; A.trend=monthTrend(lines);
     if(A.trend){ const mk=d=>d.getFullYear()*12+d.getMonth(); lines.splice(0,lines.length,...lines.filter(l=>l.date&&A.trend.months.includes(mk(l.date)))); } }
+  // Up to four weeks for the trend slide: weekly totals, the average of the earlier weeks, and a like-for-like view when
+  // the last week's data stops before Sunday (the same first days of each earlier week).
+  if(!opt.trend&&weeks.length>=2){
+    const W=weeks.slice(0,4).reverse(), wl=w=>allLines.filter(l=>l.date&&wkOf(l.date)===w);
+    A.weeks4=W.map(w=>({start:new Date(w),...weekSummary(wl(w))}));
+    const last=A.weeks4[A.weeks4.length-1], end=Math.max(...allLines.filter(l=>l.date).map(l=>+l.date)), days=Math.floor((end-weeks[0])/864e5)+1;
+    A.lastDays=Math.min(7,days); A.dataEnd=new Date(end);
+    if(days<7) A.weeks4.forEach(x=>{ const cut=+x.start+days*864e5; x.lfl=wl(+x.start).filter(l=>+l.date<cut).reduce((t,l)=>t+(l.gmv||0),0); });
+    const prior=A.weeks4.slice(0,-1); A.avgPrior=prior.length?prior.reduce((t,x)=>t+x.gmv,0)/prior.length:null;
+    A.avgPriorOrders=prior.length?prior.reduce((t,x)=>t+x.orders,0)/prior.length:null;
+    if(days<7&&prior.length) A.avgPriorLfl=prior.reduce((t,x)=>t+x.lfl,0)/prior.length; }
   if(!opt.trend&&weeks.length>=2){ prevLines=lines.filter(l=>l.date&&wkOf(l.date)===weeks[1]);
     const keep=lines.filter(l=>!l.date||wkOf(l.date)===weeks[0]); lines.splice(0,lines.length,...keep);
     A.weekStart=new Date(weeks[0]); A.prevStart=new Date(weeks[1]); A.olderWeeks=weeks.length-2; }
@@ -577,7 +588,11 @@ function weekSummary(L){
   return {orders:O.length,gmv,aov:O.length?gmv/O.length:0,customers:cust.size,cust,top:Math.max(0,...O.map(o=>o.gmv)),
     newOrders:O.filter(o=>o.lines.some(l=>/new/i.test(l.custStatus||""))).length,
     family:by(l=>l.family),tier:by(l=>priceTierOf(l.category)),region:by(l=>l.region),pic:by(l=>l.pic),app:by(l=>l.app),cat:by(l=>l.category||(L.some(x=>x.category)?"(no category)":null)),
-    days:by(l=>l.date?String((l.date.getDay()+6)%7):null)};
+    days:by(l=>l.date?String((l.date.getDay()+6)%7):null),
+    catQty:(()=>{ const m=new Map(); L.forEach(l=>{ const k=l.category||(L.some(x=>x.category)?"(no category)":null); if(k) m.set(k,(m.get(k)||0)+(l.qty||0)); }); return m; })(),
+    catOrders:(()=>{ const m=new Map(); L.forEach((l,i)=>{ const k=l.category||(L.some(x=>x.category)?"(no category)":null); if(!k) return; (m.get(k)||m.set(k,new Set()).get(k)).add(l.orderNo||l.invoice||i); }); return new Map([...m].map(([k,v])=>[k,v.size])); })(),
+    newGmv:O.filter(o=>o.lines.some(l=>/new/i.test(l.custStatus||""))).reduce((s,o)=>s+o.gmv,0),
+    lastDay:L.reduce((m,l)=>l.date&&+l.date>m?+l.date:m,0)};
 }
 
 // Month-by-month trend over every full month in the sales export: totals, the customer bridge from the first to the

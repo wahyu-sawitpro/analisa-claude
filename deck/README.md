@@ -211,7 +211,20 @@ Months the data covers in full form the trend; a partial month is left out. The 
   “Rejection reasons · potential loss” slide with the biggest leads at stake and any competitor price in the notes.
 - **Overdue prospects.** Prospects whose estimated closing date has passed by the end of the week become an action.
 
-## Week of 9–15 Nov 2026 (sample data)
+## Week of 16–22 Nov 2026 (sample data, four weeks of sales)
+The sample is `Smallholder Sales last four weeks.csv` and `Plantation Sales last four weeks.csv` (26 Oct – 22 Nov) and the
+Smallholder success-story and rejection exports for 16–21 Nov, uploaded 23 Nov. The Plantation CRM exports on `main`
+are still the 9–15 Nov ones, so they are left out. Last week is partial in both sales files: Smallholder data stops on
+Thu 19 Nov, Plantation on Fri 20 Nov.
+- Both teams: Rp654M → Rp731M → Rp1.02B → Rp254M (last week, partial): −75% vs the week before, −68% vs the 3-week
+  average (Rp802M).
+- Smallholder: Rp593M, Rp223M, Rp818M, Rp63.7M (8 orders, Mon–Thu). Like-for-like (Mon–Thu of each week): Rp465M,
+  Rp191M, Rp466M, Rp63.7M, so −83% vs that average. No Grosir or Khusus Petani order yet last week (Toko Keliling
+  Rp37.2M, Benih Rp26.4M). Over 4 weeks Pupuk Grosir led on units (1,474) and sales (Rp744M, 44%).
+- Plantation: Rp61M, Rp508M, Rp205M, Rp191M (4 orders, one Topaz order of Rp144M is 76%); −26% vs the 3-week average.
+  Benih is 100% of last week and 64% of the 4 weeks.
+
+## Findings for the week of 9–15 Nov 2026 (earlier sample)
 The sample is the six weekly exports on `main` uploaded 16 Nov: sales 2–15 Nov for both teams, success stories and
 rejection reasons 9–15 Nov. The Plantation CRM files were re-uploaded at 11:28 with Emima Pratiwi Siburian's engagements (45 rejections, 6 wins);
 the Smallholder sales re-upload names the sales column `total_sales` (sales_amount + shipping, read as sales) and the

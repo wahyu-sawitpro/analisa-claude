@@ -700,6 +700,30 @@ function forecastSpecs(F,pre){
     rows:[{cards:[{foot:`${notes.join(" ")} Stock required = tonnes to sell at today's list prices, rounded to whole bags; part months pro rata by day.`,table:{colW:[9,12,40,11,28],head:["Month","Area (province)","Stock required (MT)","Target sales (IDR)","Description"],align:["l","l","l","l","l"],rows}}]}]});
   return S;
 }
+
+// ---- Last four weeks: shared helpers for the deck-level overview and the per-team trend slide
+const dPct=(a,b)=>b?`${a>=b?"+":"−"}${Math.abs(Math.round((a-b)/b*100))}%`:(a?"new":"0%");
+const wkLab=(A,x,i)=>`${fds(x.start)}${A.lastDays<7&&i===A.weeks4.length-1?"*":""}`;
+const partialNote=(A,nm)=>A.lastDays<7?`<b>${nm?`${esc(nm)}: l`:"L"}ast week is partial:</b> the data stops on ${fds(A.dataEnd)} (${A.lastDays} of 7 days). Same first ${A.lastDays} days of each week: ${A.weeks4.map(x=>`${fds(x.start)} ${rp(x.lfl)}`).join(", ")}${A.avgPriorLfl!=null?`; last week is ${dPct(A.weeks4[A.weeks4.length-1].lfl,A.avgPriorLfl)} vs that average`:""}.`:"";
+// Deck-level: both teams over the last four weeks (shown after the executive summary)
+function overviewSpecs(T){
+  const TT=T.filter(t=>t.A.weeks4&&t.A.weeks4.length>=2&&t.A.has.sales); if(!TT.length) return [];
+  const n=Math.max(...TT.map(t=>t.A.weeks4.length)), ref=TT.find(t=>t.A.weeks4.length===n).A, TC=["#0B5A0B","#D9A21B","#6E8F5A","#5B7F95"];
+  const at=(t,i)=>{ const W=t.A.weeks4, k=i-(n-W.length); return k>=0?W[k].gmv:0; }, tot=i=>TT.reduce((s,t)=>s+at(t,i),0);
+  const last=tot(n-1), prev=tot(n-2), avg=[...Array(n-1).keys()].reduce((s,i)=>s+tot(i),0)/(n-1), partial=TT.some(t=>t.A.lastDays<7);
+  const end=new Date(Math.max(...TT.map(t=>+t.A.dataEnd)));
+  return [{kicker:"Sales trend · last 4 weeks",title:`Last week ${rp(last)} from both teams: ${dPct(last,prev)} vs the week before, ${dPct(last,avg)} vs the ${n-1}-week average${partial?` (data to ${fds(end)})`:""}`,
+    rows:[{h:84,cards:[{kpiRow:[{v:rpParts(last)[0],u:rpParts(last)[1],l:`Sales last week, both teams${partial?` (to ${fds(end)})`:""}`,hot:true},
+      {v:dPct(last,prev),u:"",l:`vs the week before (${rp(prev)})`},{v:dPct(last,avg),u:"",l:`vs the average of the ${n-1} weeks before (${rp(avg)})`},
+      ...TT.slice(0,1).map(t=>({v:rpParts(at(t,n-1))[0],u:rpParts(at(t,n-1))[1],l:`${t.name}: ${dPct(at(t,n-1),at(t,n-2))} vs the week before`}))]}]},
+    {cards:[{w:1,title:"Sales per week, by team",sub:`Weeks start on Monday${partial?"; * = partial week":""}`,chart:{type:"column",stacked:true,cats:ref.weeks4.map((x,i)=>wkLab(ref,x,i)),series:TT.map((t,j)=>({name:t.name,color:TC[j],values:[...Array(n).keys()].map(i=>at(t,i))})),fmt:rp,lblH:24}},
+      {w:1.1,title:"Week by week",sub:"Sales; change vs the week before and vs the average of the earlier weeks",table:{colW:[16,...Array(n).fill(12),11,11],head:["Team",...ref.weeks4.map((x,i)=>wkLab(ref,x,i)),"vs prev.","vs avg"],align:["l",...Array(n).fill("r"),"r","r"],
+        rows:[...TT.map(t=>{ const a=t.A.avgPrior; return [{v:t.name,bold:true},...[...Array(n).keys()].map(i=>rp(at(t,i))),dPct(at(t,n-1),at(t,n-2)),a!=null?dPct(at(t,n-1),a):"–"]; }),
+          [{v:"Total",bold:true},...[...Array(n).keys()].map(i=>({v:rp(tot(i)),bold:true})),dPct(last,prev),dPct(last,avg)]]}}]}],
+    notes:[...TT.map(t=>{ const W=t.A.weeks4, L=W[W.length-1], P=W[W.length-2], hi=W.slice().sort((a,b)=>b.gmv-a.gmv)[0];
+      return `<b>${esc(t.name)}:</b> ${rp(L.gmv)} from ${L.orders} orders last week (${dPct(L.gmv,P.gmv)} vs ${rp(P.gmv)}; ${dPct(L.gmv,t.A.avgPrior)} vs the ${W.length-1}-week average ${rp(t.A.avgPrior)}). Best week: ${fds(hi.start)} (${rp(hi.gmv)}).`; }),
+      ...TT.filter(t=>t.A.lastDays<7).map(t=>partialNote(t.A,t.name))].filter(Boolean)}];
+}
 function teamSpecs(A,N,pre){
   if(A.acq) return acqSpecs(A.acq,pre);
   if(A.dop) return doSpecs(A.dop,pre);
@@ -760,6 +784,41 @@ function teamSpecs(A,N,pre){
         multi.length&&`<b>Repeat buyers this week:</b> ${esc(multi.slice(0,3).map(os=>`${os.length} invoices, ${rp(sumG(os))} (${regionOf(os[0])})`).join("; "))}.`,
         `<b>PIC:</b> ${esc(A.byPic.slice(0,4).map(x=>`${x.p} ${rp(x.g)} (${pl(x.n,"order")})`).join(", "))}.`,
         A.partial.length&&`<b>${rp(A.outstanding||A.partial.reduce((s,o)=>s+o.gmv,0))} still to collect</b> on ${pl(A.partial.length,"partly paid order")}; ${A.openOrders.length} of ${O.length} orders are still open.`].filter(Boolean)});
+  }
+
+  // Sales trend over the last four weeks, and which product categories sell most (units) and earn most (sales)
+  if(A.weeks4&&A.weeks4.length>=2&&A.has.sales){
+    const W=A.weeks4, L=W[W.length-1], P=W[W.length-2], avg=A.avgPrior, ao=A.avgPriorOrders, nP=W.length-1;
+    const top=W.slice().sort((a,b)=>b.gmv-a.gmv)[0], cats=[...new Set(W.flatMap(x=>[...x.cat.keys()]))];
+    const mover=cats.map(k=>({k,d:(L.cat.get(k)||0)-(P.cat.get(k)||0)})).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d))[0];
+    const share=L.gmv?L.top/L.gmv:0;
+    S.push({kicker:pre+"Sales trend · last 4 weeks",title:`${rp(L.gmv)} last week${A.lastDays<7?` (to ${fds(A.dataEnd)})`:""}: ${dPct(L.gmv,P.gmv)} vs the week before, ${dPct(L.gmv,avg)} vs the ${nP}-week average (${rp(avg)})`,
+      rows:[{h:84,cards:[{kpiRow:[{v:rpParts(L.gmv)[0],u:rpParts(L.gmv)[1],l:`Sales last week${A.lastDays<7?` (${A.lastDays} of 7 days)`:""}`,hot:true},
+        {v:dPct(L.gmv,P.gmv),u:"",l:`vs the week before (${rp(P.gmv)})`},{v:dPct(L.gmv,avg),u:"",l:`vs the ${nP}-week average (${rp(avg)})`},
+        {v:String(L.orders),u:"",l:`orders, vs ${Math.round(ao*10)/10} a week before (${L.customers} customers)`}]}]},
+      {cards:[{w:.95,title:"Sales per week",sub:`Weeks start on Monday; orders in the label${A.lastDays<7?"; * = partial week":""}`,chart:{type:"column",cats:W.map((x,i)=>`${wkLab(A,x,i)}\n${x.orders} orders`),series:[{name:"Sales",color:CAT[0],values:W.map(x=>x.gmv),colors:W.map((x,i)=>i===W.length-1?CAT[1]:CAT[0])}],fmt:rp,lblH:38}},
+        {w:1.2,title:"Week by week",sub:"Avg order = sales ÷ orders; new = sales from new customers",table:{colW:[12,14,9,10,13,13,22],head:["Week","Sales","Orders","Cust.","Avg order","New cust.","Top category"],align:["l","r","r","r","r","r","l"],
+          rows:[...W.map((x,i)=>{ const tc=[...x.cat].sort((a,b)=>b[1]-a[1])[0]; return [{v:wkLab(A,x,i),bold:i===W.length-1},rp(x.gmv),String(x.orders),String(x.customers),rp(x.aov),rp(x.newGmv),tc?`${tc[0]} ${pct(tc[1],x.gmv)}%`:"–"]; }),
+            [{v:`Avg of ${nP}`,bold:true},rp(avg),String(Math.round(ao*10)/10),"–",rp(ao?avg/ao:0),"–","–"]]}}]}],
+      notes:[`<b>Last week vs the week before:</b> ${L.gmv>=P.gmv?"+":"−"}${rp(Math.abs(L.gmv-P.gmv))} (${dPct(L.gmv,P.gmv)}); orders ${P.orders} → ${L.orders}, average order ${rp(P.aov)} → ${rp(L.aov)}.`,
+        `<b>Last week vs the ${nP}-week average:</b> ${rp(L.gmv)} vs ${rp(avg)} (${dPct(L.gmv,avg)}); the best week was ${fds(top.start)} at ${rp(top.gmv)}.`,
+        mover&&mover.d&&`<b>Biggest category move:</b> ${esc(mover.k)} ${mover.d>0?"+":"−"}${rp(Math.abs(mover.d))} vs the week before.`,
+        share>=.3&&`<b>One order is ${Math.round(share*100)}% of last week</b> (${rp(L.top)}), so the week depends on a single deal.`,
+        partialNote(A)].filter(Boolean)});
+    // categories: units vs sales, last week, with the four-week totals
+    const C4=cats.map(k=>({k,q:L.catQty.get(k)||0,g:L.cat.get(k)||0,o:L.catOrders.get(k)||0,q4:W.reduce((t,x)=>t+(x.catQty.get(k)||0),0),g4:W.reduce((t,x)=>t+(x.cat.get(k)||0),0)}));
+    const byQ=C4.filter(c=>c.q).sort((a,b)=>b.q-a.q), byG=C4.filter(c=>c.g).sort((a,b)=>b.g-a.g), q4=C4.slice().sort((a,b)=>b.q4-a.q4)[0], g4=C4.slice().sort((a,b)=>b.g4-a.g4)[0];
+    if(byQ.length||byG.length){
+      const tq=byQ[0], tg=byG[0], ppu=c=>c.q?c.g/c.q:0;
+      S.push({kicker:pre+"Product categories · bought most vs earned most",title:tq&&tg&&tq.k===tg.k?`${tq.k} led last week on both units (${nf.format(tq.q)}) and sales (${rp(tg.g)})`:`${tq?`${tq.k} sold the most units (${nf.format(tq.q)})`:""}${tq&&tg?"; ":""}${tg?`${tg.k} brought the most sales (${rp(tg.g)}, ${pct(tg.g,L.gmv)}%)`:""}`,
+        rows:[{h:180,cards:[{w:1,title:"Bought most: units last week",sub:"Units (qty); orders and 4-week units in grey",chart:{type:"hbar",items:byQ.slice(0,4).map(c=>({k:c.k,v:c.q,r:`${pl(c.o,"order")} · 4 wk ${nf.format(c.q4)}`})),color:CAT[2]}},
+          {w:1,title:"Earned most: sales last week",sub:"Sales; 4-week sales in grey",chart:{type:"hbar",items:byG.slice(0,4).map(c=>({k:c.k,v:c.g,r:`4 wk ${rp(c.g4)}`})),fmt:rp}}]},
+          {cards:[{w:1,title:"Sales by category, week by week",sub:"Sorted by 4-week sales",table:{colW:[18,...W.map(()=>11),12],head:["Category",...W.map((x,i)=>wkLab(A,x,i)),"4 weeks"],align:["l",...W.map(()=>"r"),"r"],
+            rows:(()=>{ const o=C4.slice().sort((a,b)=>b.g4-a.g4), keep=o.filter(c=>c.g).slice(0,5); return [...keep,...o.filter(c=>!keep.includes(c))].slice(0,5).sort((a,b)=>b.g4-a.g4); })().map(c=>[{v:c.k,bold:true},...W.map(x=>x.cat.get(c.k)?rp(x.cat.get(c.k)):"–"),{v:rp(c.g4),bold:true}])}}]}],
+        notes:[tq&&tg&&tq.k!==tg.k&&`<b>Volume and value come from different categories:</b> ${esc(tq.k)} moved ${nf.format(tq.q)} units at about ${rp(ppu(tq))} a unit; ${esc(tg.k)} brought ${rp(tg.g)} at about ${rp(ppu(tg))} a unit.`,
+          q4&&g4&&`<b>Over 4 weeks:</b> ${q4.k===g4.k?`${esc(q4.k)} led on both units (${nf.format(q4.q4)}) and sales (${rp(g4.g4)}, ${pct(g4.g4,W.reduce((t,x)=>t+x.gmv,0))}%)`:`${esc(q4.k)} sold the most units (${nf.format(q4.q4)}) and ${esc(g4.k)} the most sales (${rp(g4.g4)}, ${pct(g4.g4,W.reduce((t,x)=>t+x.gmv,0))}%)`}.`,
+          A.lastDays<7&&`Last week runs to ${fds(A.dataEnd)} only.`].filter(Boolean)});
+    }
   }
 
   // Sales: last week vs the week before
@@ -1001,7 +1060,7 @@ function teamSpecs(A,N,pre){
   }
   // Fixed order in every team section (the user's request): sales vs the week before and the other sales slides,
   // then the success stories, then the rejection reasons, then everything else. The sort is stable.
-  const rank=k=>{ k=k.slice(pre.length); return /^Sales last week · vs/.test(k)?0:/^Sales /.test(k)?1:/^Success story/.test(k)?2:/^Rejection reasons|^Customer service/.test(k)?3:4; };
+  const rank=k=>{ k=k.slice(pre.length); return /^Sales trend · last 4 weeks/.test(k)?-1:/^Sales last week · vs/.test(k)?0:/^Product categories/.test(k)?.5:/^Sales /.test(k)?1:/^Success story/.test(k)?2:/^Rejection reasons|^Customer service/.test(k)?3:4; };
   return S.map((s,i)=>[rank(s.kicker||""),i,s]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).map(x=>x[2]);
 }
 function teamSlides(A,N,pre,S,next){ teamSpecs(A,N,pre).forEach(sp=>S.push(panelSlide(next(),sp))); }
@@ -1062,6 +1121,7 @@ function deckNarrative0(T){
   X.eyebrow="Weekly Sales Review"; X.title=`${andList(T.map(t=>t.name))} Last Week`;
   X.meta=[orders&&`${orders} orders`,crm&&`${crm} CRM engagements`,`${T.length} teams`].filter(Boolean).join(" · ");
   X.headline=gmv?`${rp(gmv)} in sales last week: ${T.map(t=>!t.A.has.sales?`${t.name} no sales file`:`${t.name} ${rp(t.A.gmv)}${t.A.wow&&t.A.wow.pc!=null?` (${t.A.wow.flat?"flat":(t.A.wow.up?"+":"−")+t.A.wow.pc+"%"})`:""}`).join(", ")}`:`${crm} CRM engagements across ${T.length} teams`;
+  { const pt=T.filter(t=>t.A.lastDays<7); if(gmv&&pt.length) X.headline+=` (last week partial: data to ${andList(pt.map(t=>`${fds(t.A.dataEnd)} for ${t.name}`))})`; }
   X.kpis=[{v:rpParts(gmv)[0],u:rpParts(gmv)[1],l:`Total sales from ${orders} orders`,hot:true},
     ...T.slice(0,2).map(t=>t.A.has.sales?{v:rpParts(t.A.gmv)[0],u:rpParts(t.A.gmv)[1],l:`${t.name}: ${t.A.orders.length} orders, ${pct(t.A.gmv,gmv)}% of sales`}:{v:"–",u:"",l:`${t.name}: no sales file uploaded`}),
     (()=>{ const c=all.reduce((s,A)=>s+(A.customers||0),0), nw=all.reduce((s,A)=>s+new Set((A.orders||[]).filter(o=>o.isNew).map(o=>o.ph||o.nk||o.no)).size,0); return {v:String(c),u:"",l:`customers bought${nw?`, ${nw} of them new`:""}`}; })()];
@@ -1141,6 +1201,7 @@ function buildDeck(T,X){
     <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:18px;margin-top:18px">
       <div class="card"><div class="findings">${X.findings.map(f=>`<div class="find"><span class="mk"></span><div><b>${esc(f[0])}</b><p>${esc(f[1])}</p></div></div>`).join("")}</div></div>
       <div class="bottom"><span class="lb">Bottom line</span><p>${esc(X.bottom.p)}</p><small>${esc(X.bottom.s)}</small></div></div>`));
+  if(!X.trend&&!X.acq&&!X.dop&&!X.forecast) overviewSpecs(T).forEach(sp=>S.push(panelSlide(next(),sp)));
   if(X.multi&&!X.trend){
     const tot=T.reduce((s,t)=>s+t.A.gmv,0), TC=["#274E13","#D9A21B","#6E8F5A","#5B7F95"];
     S.push(contentSlide(next(),"Teams at a glance",X.cmpTitle,`

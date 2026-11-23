@@ -4,13 +4,21 @@ The main deliverable is the deck in `deck/` (see `deck/README.md`): a single HTM
 Download PPTX and Google Slides export. It is published as two claude.ai artifacts, each refreshed by its own weekly
 routine:
 - "SawitPRO Sales Deck" (https://claude.ai/artifact/WFkx8cUiCoSgwT3Y5ooSEn): weekly sales and CRM review, built with
-  `TITLE="SawitPRO Sales Deck" python3 deck/build.py` from the six weekly exports; routine every Monday 13:00 WIB.
+  `TITLE="SawitPRO Sales Deck" python3 deck/build.py` from the weekly exports (sales: "Smallholder Sales last four
+  weeks.csv" and "Plantation Sales last four weeks.csv"; CRM: success story and rejection reasons, last week, both
+  teams); routine every Monday 13:00 WIB.
 - "SawitPRO Deck" (https://claude.ai/artifact/H73dmaq1yoCnzL2p2JMg5p): farmer registration review; routine every
   Tuesday 10:00 WIB (see "Weekly registration refresh" in `deck/README.md`).
 Never publish one review to the other's artifact. New analysis requests (sales, acquisition, forecasting, ...) are
 added to this deck, not built as separate decks.
 
 ## Standing requests from the user
+- **Sales deck structure (composed):** after the executive summary, "Sales trend · last 4 weeks" for both teams; in each
+  team section first the 4-week trend (weekly sales, last week vs the week before, last week vs the average of the
+  earlier weeks, orders, customers, average order, new-customer sales, top category), then last week vs the week
+  before, then "Product categories · bought most vs earned most" (units vs sales, week by week), the other sales
+  slides, success story and rejection reasons. When last week's data stops before Sunday, say so and add the
+  like-for-like view (the same first days of each week).
 - **Always go deeper.** Don't stop at totals and the first explanation. For any change, break it down (volume vs
   price vs mix, customers lost vs returning vs new, accounts, PICs, products, regions, channels, timing), test whether
   one account or one deal explains it, and turn each finding into a concrete action with an owner.

@@ -79,6 +79,7 @@ function buildPptx(T,DX){
     txt(sl,[{text:"BOTTOM LINE",options:{fontSize:9.5,bold:true,color:"FCD102",charSpacing:2,breakLine:true,paraSpaceAfter:8}},
       {text:DX.bottom.p,options:{fontSize:16,bold:true,color:"FFFFFF",breakLine:true,paraSpaceAfter:10}},{text:DX.bottom.s,options:{fontSize:10.5,color:"D8E3CF"}}],{x:X(774),y:X(290),w:X(362),h:X(326),fit:"shrink"}); }
 
+  if(!DX.trend&&!DX.acq&&!DX.dop&&!DX.forecast) overviewSpecs(T).forEach(panelSlide);
   // Teams at a glance
   if(DX.multi&&!DX.trend){ const sl=content("Teams at a glance",DX.cmpTitle), tot=T.reduce((s,t)=>s+t.A.gmv,0), TC=["0B5A0B","D9A21B","6E8F5A","5B7F95"];
     if(tot){ box(sl,80,132,1080,96); heading(sl,100,144,600,"Share of sales");
