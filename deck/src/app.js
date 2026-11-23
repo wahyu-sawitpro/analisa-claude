@@ -5,7 +5,7 @@ const roleOf=d=>d.role&&d.role!=="auto"?d.role:detectRole(d.headers);
 function analyzeNow(){
   const on=state.sources.filter(x=>x.on);
   state.dirty=false; renderSources(); note("");
-  if(!on.length){ deckEl.innerHTML=`<div class="card"><div class="empty">All data sources are switched off. Turn one on above, then click Analyze.</div></div>`; SLIDES=[]; state.A=null; return; }
+  if(!on.length){ deckEl.innerHTML=`<div class="card"><div class="empty">All data sources are switched off. <button class="analyze" type="button" id="allOn">Turn all on and analyze</button>&nbsp;<button class="analyze" type="button" id="useSample">Use sample data</button></div></div>`; SLIDES=[]; state.A=null; return; }
   const T=analyseTeams(on).map(t=>({...t,N:t.A.acq||t.A.dop?null:narrative(t.A),NC:t.C?narrative(t.C):null})), X=deckNarrative(T);
   state.T=T; state.X=X; state.A=T[0].A; state.N=T[0].N; renderSources();
   // the page title follows what was analysed (acquisition, stock forecast, sales review, ...)
@@ -97,6 +97,8 @@ src.addEventListener("click",e=>{ const t=e.target;
   if(t.id==="clearAll"){ state.sources=SAMPLE_SRCS.map(s=>({...s})); state.sample=true; analyzeNow(); }
   if(t.id==="analyzeBtn") analyzeNow(); });
 document.getElementById("staleGo").onclick=()=>analyzeNow();
+deckEl.addEventListener("click",e=>{ if(e.target.id==="allOn"){ state.sources.forEach(d=>d.on=true); analyzeNow(); save(); }
+  if(e.target.id==="useSample"){ state.sources=SAMPLE_SRCS.map(s=>({...s})); state.sample=true; analyzeNow(); save(); } });
 document.getElementById("uploadBtn").onclick=()=>{ addMode=false; document.getElementById("fileIn").click(); };
 document.getElementById("fileIn").onchange=e=>{ loadFiles(e.target.files); e.target.value=""; };
 let dragN=0; const hint=document.getElementById("dropHint");
