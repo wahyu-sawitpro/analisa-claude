@@ -118,12 +118,14 @@ With `total_sales_register_date`, a slide checks whether farmers who joined thro
 the day they joined (Rp0 = acquired but no sale that day); Purchase Masker is shown the same way. A one-hour batch of registrations with no campaign is
 flagged as a likely bulk sign-up or import.
 
-The registration review opens with an overview (farmers per complete week, the running week left out; last week vs the
-week before and vs the median of the earlier weeks; "Injected User" bulk adds called out), then channels in detail (channels
-next to Identified Campaigns by campaign name from `campaign_name`, and "Viral content that might boost Other channel
-acquisition", all on one page; campaign names are only shown for utm source Identified Campaigns). Utm source Organic is
-shown as "Other channel" on every slide (no UTM, so the exact effect of viral content cannot be measured). Viral content is listed by hand in
-`deck/src/organic-content.json` (date, platform, account, views); entries dated in last week are shown. Tables show every row when they fit; otherwise the "Other" row is listed name by name in the note under the slide.
+The registration review is kept short: (1) last week at a glance (users acquired, farmers vs estate owners, change on
+the week before and on the average of every earlier complete week, the weekly chart with the running week left out, and
+last week's users by channel); (2) which channels worked (per channel: last week, share, change, average week, % who added
+a farm or a phone, and a verdict; "Worked" = up on the week before and over 10% above the average week; top 3 Identified
+Campaigns from `campaign_name`); (3) the weekly trend by channel; then same-day buying, farmers vs estate owners,
+locations, users above 100 ha and next steps. Utm source Organic is shown as "Other channel" (likely social media
+activity); Injected User is a bulk add, not acquisition. No executive summary and no Duta vs non-Duta breakdown. The
+viral-content table is off for now; `deck/src/organic-content.json` is kept for when it is updated.
 
 ## Weekly registration refresh (every Tuesday, 10:00 WIB)
 A scheduled routine refreshes the farmer-registration review from `Farmer register for weekly farmer.csv` on `main`:

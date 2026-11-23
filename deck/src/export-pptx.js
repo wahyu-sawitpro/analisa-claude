@@ -71,7 +71,7 @@ function buildPptx(T,DX){
 
   (DX.preSpecs||[]).forEach(sp=>panelSlide(sp));
   // Executive summary
-  { const sl=content("Executive summary",DX.headline);
+  if(!DX.noSummary){ const sl=content("Executive summary",DX.headline);
     DX.kpis.forEach((k,i)=>kpi(sl,80+i*274,132,256,118,k));
     box(sl,80,268,650,370);
     txt(sl,DX.findings.flatMap((x,i)=>[{text:x[0],options:{fontSize:13,bold:true,color:"0B5A0B",bullet:{code:"25CF"},breakLine:true}},
