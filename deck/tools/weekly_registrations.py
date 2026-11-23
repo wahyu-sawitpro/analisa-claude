@@ -61,6 +61,14 @@ def main():
     if not fresh:
         info["status"] = "stale"; print(json.dumps(info, indent=1)); return 3
 
+    # social media posts: take deck/src/organic-content.json from origin/main when it was updated there
+    oc = git("show", "origin/main:deck/src/organic-content.json")
+    if not oc.returncode:
+        try:
+            json.loads(oc.stdout); (ROOT / "deck/src/organic-content.json").write_text(oc.stdout)
+        except ValueError:
+            info["organic_content"] = "origin/main copy is not valid JSON; kept the local file"
+
     # hashed sample (committed) and real sample (private build only)
     h = lambda s, n=5: hashlib.sha1(s.encode()).hexdigest()[:n]
     real, hashed = [], []

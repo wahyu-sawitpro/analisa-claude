@@ -124,8 +124,10 @@ last week's users by channel); (2) which channels worked (per channel: last week
 Identified Campaigns from `campaign_name`; the note names the channels that added the most users and grew fastest, new
 channels and the largest drops); (3) the weekly trend by channel; then same-day buying, farmers vs estate owners,
 locations, users above 100 ha and next steps. Utm source Organic is shown as "Other channel" (likely social media
-activity); Injected User is a bulk add, not acquisition. No executive summary and no Duta vs non-Duta breakdown. The
-viral-content table is off for now; `deck/src/organic-content.json` is kept for when it is updated.
+activity); Injected User is a bulk add, not acquisition. No executive summary and no Duta vs non-Duta breakdown. Social
+media: `deck/src/organic-content.json` (date, platform, account, views) is read from origin/main by the weekly script;
+when it has posts dated last week, the channels slide shows the top 3 accounts by views (best post each) under the top 3
+campaigns, otherwise the table is left out.
 
 ## Weekly registration refresh (every Tuesday, 10:00 WIB)
 A scheduled routine refreshes the farmer-registration review from `Farmer register for weekly farmer.csv` on `main`:
