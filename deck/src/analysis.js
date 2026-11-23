@@ -445,6 +445,17 @@ function analyse(sources,opt={}){
   // Success-story export reconciled with sales: matched, put on the CRM but not in sales yet, or still a prospect
   A.stories=C.filter(r=>/success|closing|already\s*order/i.test(r._src||"")||r.outcome==="Won").map(r=>({r,
     state:r.outcome==="Won"?(r.orders.length?"matched":"missing"):"prospect",orders:r.orders,sales:r.orders.reduce((s,o)=>s+o.gmv,0)}));
+  // Wins not in sales yet: value the sacks named in the notes at the median unit price of the same item over the uploaded
+  // weeks, and flag the ones dated after the sales data ends (their orders are most likely in the days the export misses)
+  { const med=a=>{ const v=a.filter(x=>x>0).sort((x,y)=>x-y); return v.length?v[Math.floor(v.length/2)]:null; };
+    const items=new Map(); allLines.forEach(l=>{ if(l.unit>0&&l.item&&/50\s*kg/i.test(l.item)){ const k=shortItem(l.item); (items.get(k)||items.set(k,[]).get(k)).push(l.unit); } });
+    const itemP=[...items].map(([k,v])=>[k,med(v)]), sackP=med([...items.values()].flat());
+    const priceOf=t=>{ t=norm(t); let best=null, bs=0; for(const [k,v] of itemP){ const kt=norm(k).split(" ").filter(w=>w.length>2&&!/^\d+kg$/.test(w)); if(!kt.length) continue; const sc=kt.filter(w=>t.includes(w)).length/kt.length; if(sc>bs){ bs=sc; best=v; } } return bs>=.5?best:null; };
+    const end=A.dataEnd||(allLines.length?new Date(Math.max(...allLines.filter(l=>l.date).map(l=>+l.date))):null);
+    A.stories.filter(x=>x.state==="missing").forEach(x=>{ const d=String(x.r.detail||""); let v=0, q=0;
+      for(const m of d.matchAll(/(\d+)\s*(sak|zak|karung|sack)s?\b/gi)){ const seg=d.slice(0,m.index).split(/,|\bdan\b|\+/i).pop(); const p=priceOf(seg)||sackP; if(p){ v+=+m[1]*p; q+=+m[1]; } }
+      x.estSacks=q; x.est=v||0; x.afterData=!!(end&&x.r.date&&+x.r.date>+end); });
+    A.storyEnd=end; }
   // the same customer, day, products and amount under two order numbers
   { const g=new Map(); O.forEach(o=>{ const k=[o.ph||o.nk,o.date&&+o.date,o.items.join("|"),Math.round(o.gmv)].join("~"); if(!g.has(k)) g.set(k,[]); g.get(k).push(o); });
     A.dupOrders=[...g.values()].filter(x=>x.length>1&&(x[0].ph||x[0].nk)); }
@@ -453,7 +464,11 @@ function analyse(sources,opt={}){
   // ---- Funnel: logged -> reached -> showed interest -> ordered
   // When the export logs call results, a lead counts as reached only with a logged result or a face-to-face visit;
   // a phone or WhatsApp engagement with no result is "not recorded", not reached.
-  const unable=r=>/unable|tidak bisa|not reach|no answer/i.test(r.callResp||""), hasResp=C.some(r=>r.callResp);
+  // notes that say the lead didn't pick up ("tidak mengangkat telepon kemudian saya chat") overrule a logged "Called"
+  const noPickup=r=>/tidak\s+(mengangkat|menjawab|angkat|diangkat|merespon)|tdk\s+(angkat|jawab)|nomor\s+tidak\s+aktif/i.test(r.detail||"");
+  const unable=r=>/unable|tidak bisa|not reach|no answer/i.test(r.callResp||"")||noPickup(r), hasResp=C.some(r=>r.callResp);
+  { const mm=C.filter(r=>r.kind==="lead"&&noPickup(r)&&!/unable|tidak bisa|not reach|no answer/i.test(r.callResp||""));
+    A.pickupMismatch=mm.length?{n:mm.length,warm:mm.filter(r=>r.outcome==="Warm").length,pics:countBy(mm,r=>r.pic||"–")}:null; }
   const inPerson=r=>/onsite|visit|kunjung|event/i.test(r.channel||"");
   const reached=r=>r.callResp||!hasResp?!unable(r):inPerson(r);
   A.noResult=hasResp?C.filter(r=>!r.callResp&&!inPerson(r)).length:0;

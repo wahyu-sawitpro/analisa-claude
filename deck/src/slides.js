@@ -132,12 +132,12 @@ function narrative(A){
   const NL=[], nlG=NL.reduce((s,g)=>s+g.gmv,0), nlO=NL.reduce((s,g)=>s+g.orders,0);
   const conv=A.picCard.filter(g=>g.leadEng>=3&&!A.templated.some(t=>t.p===g.p)).map(g=>({...g,eng:g.leadEng,won:g.leadWon})).sort((a,b)=>b.won/b.eng-a.won/a.eng||b.eng-a.eng), cHi=conv[0], cLo=conv[conv.length-1];
   N.pf=A.has.crm&&(n>=5||A.picCard.length>=2);
-  N.pfTitle=[n>=8&&drop&&`Only ${drop.to[1]} of ${drop.from[1]} ${drop.from[0]==="Engagements logged"?"engagements":lc(drop.from[0]).replace(/^reached the lead$/,"reached leads").replace(/^showed interest$/,"interested leads")} ${drop.to[0]==="Reached the lead"?"were reached":drop.to[0]==="Showed interest"?"showed interest":"ordered"}`,
+  N.pfTitle=[n>=8&&drop&&`${drop.to[1]?`Only ${drop.to[1]} of`:"None of the"} ${drop.from[1]} ${drop.from[0]==="Engagements logged"?"engagements":lc(drop.from[0]).replace(/^reached the lead$/,"reached leads").replace(/^showed interest$/,"interested leads")} ${drop.to[0]==="Reached the lead"?"were reached":drop.to[0]==="Showed interest"?"showed interest":"ordered"}`,
     NL.length&&`${NL.length} seller${NL.length>1?"s":""} with ${rp(nlG)} in orders log${NL.length>1?"":"s"} nothing in the CRM`,
     !NL.length&&cHi&&cLo&&cHi!==cLo&&cHi.won&&`${cHi.p} converts ${cHi.won} of ${cHi.eng}; ${cLo.p} ${cLo.won} of ${cLo.eng}`].filter(Boolean).slice(0,2).join("; ")||"Who sells, and how much of it the CRM sees";
   N.pfNotes=[
     A.noResult&&`<b>${A.noResult} phone or WhatsApp engagements have no call result logged,</b> so they are not counted as reached. Face-to-face visits count as reached.`,
-    A.calls.length>=5&&A.callsMissed&&`<b>${A.callsMissed} of ${A.calls.length} calls didn't connect.</b> Those leads never heard the offer; retry on WhatsApp before marking them.`,
+    A.calls.length>=5&&A.callsMissed&&`<b>${A.callsMissed} of ${A.calls.length} calls didn't connect.</b> Those leads never heard the offer; retry on WhatsApp before marking them.${A.pickupMismatch?` ${A.pickupMismatch.n} of them were logged “Called”${A.pickupMismatch.warm?` and “Considering”`:""} although the notes say the lead didn't pick up (mostly ${esc(A.pickupMismatch.pics[0][0])}), so they count as not reached here.`:""}`,
     cHi&&cLo&&cHi!==cLo&&cHi.won&&cHi.won/cHi.eng-cLo.won/cLo.eng>=.3&&`<b>${esc(cHi.p)} turns ${pct(cHi.won,cHi.eng)}% of engagements into orders${cHi.topCh?`, mostly by ${esc(lc(cHi.topCh))}`:""};</b> ${esc(cLo.p)} turns ${pct(cLo.won,cLo.eng)}%${cLo.topCh?` (mostly ${esc(lc(cLo.topCh))})`:""}${cLo.warm?`, with ${cLo.warm} still considering`:""}. ${cLo.eng>=cHi.eng*.8?`Similar effort (${cLo.eng} engagements vs ${cHi.eng}), different method.`:`${cLo.eng} engagements vs ${cHi.eng}.`}`,
     NL.length&&`<b>${esc(andList(NL.map(g=>g.p)))} closed ${nlO} order${nlO>1?"s":""} (${rp(nlG)}) with no CRM entry.</b> The CRM can't explain ${pct(nlG,A.gmv||1)}% of sales until they log their engagements.`,
     A.cycle.n>=3&&A.cycle.sameDay/A.cycle.n>=.7?`<b>${A.cycle.sameDay} of ${A.cycle.n} wins are dated the same day as their order.</b> The CRM records the sale, not the lead's journey, so it can't yet show how long leads take to buy.`
@@ -408,6 +408,7 @@ function narrative(A){
   if(A.wonFromNotes.length) g.push(`${A.wonFromNotes.length} closed deal${A.wonFromNotes.length>1?"s":""} still marked “${A.wonFromNotes[0].statusLogged||"blank"}”`);
   if(A.dupRows) g.unshift(`${A.dupRows} engagement${A.dupRows>1?"s":""} entered twice`);
   if(A.service.length) g.unshift(`${A.service.length} order-status question${A.service.length>1?"s":""} logged as leads`);
+  if(A.pickupMismatch){ const M=A.pickupMismatch; g.unshift(`${M.n} engagement${M.n>1?"s":""} logged “Called”${M.warm?` and “Considering”`:""} although the notes say the lead didn't pick up (${M.pics.slice(0,2).map(([p,k])=>`${p} ${k}`).join(", ")})`); }
   if(A.logGap){ const G=A.logGap; g.unshift(`logging fell off after Wednesday (${G.early} engagements Mon–Wed, ${G.late} Thu–Sun) while ${G.oLate} of ${G.orders} orders came Thu–Sun`); }
   if(false) g.unshift(`${won-A.wonLead.length} checkout sale${won-A.wonLead.length>1?"s":""} logged as wins`);
   N.gaps=n?g:[];
@@ -730,7 +731,8 @@ function teamSpecs(A,N,pre){
       V.length>1&&`<b>Ordered via:</b> ${esc(V.map(x=>`${x.k} ${pl(x.os.length,"order")} (${share(x.g)}%)`).join(", "))}.`,
       withCrm.length&&`<b>${pl(withCrm.length,"order")} came with a CRM engagement</b> (${rp(sumG(withCrm))})${crmT?`, mostly ${esc(lc(crmT[0]))}`:""}${A.wonPos&&A.wonPos.length?"; mobile-shop sales logged at checkout":""}.`,
     ].filter(Boolean);
-    if(stX.length) notes.splice(1,0,`<b>Team put on CRM however sales not reflected yet:</b> ${esc(stX.map(x=>`${x.r.id}${x.r.potential?` (${rp(x.r.potential)})`:""}${x.r.product||x.r.purpose?`, ${prodShort(x.r.product)||x.r.purpose}`:""}`).join("; "))}.`);
+    if(stX.length){ const est=stX.reduce((s,x)=>s+(x.est||0),0), sk=stX.reduce((s,x)=>s+(x.estSacks||0),0), aft=stX.filter(x=>x.afterData);
+      notes.splice(1,0,`<b>Team put on CRM however sales not reflected yet:</b> ${esc(stX.map(x=>`${x.r.id}${x.r.potential?` (${rp(x.r.potential)})`:""}${x.r.product||x.r.purpose?`, ${prodShort(x.r.product)||x.r.purpose}`:""}`).join("; "))}${est?` (${nf.format(sk)} sacks in the notes, about ${rp(est)} at this period's prices)`:""}.${aft.length&&A.storyEnd?` ${aft.length===stX.length?"All are":`${aft.length} are`} dated after the sales data ends (${fds(A.storyEnd)}), so check the next export.`:""}`); }
     notes.splice(4);
     S.push({kicker:pre+"Success story · who bought and where",title:`${pl(O.length,"order")} from ${pl(A.customers,"customer")}: ${Cg[0]?`${Cg[0].k} is ${share(Cg[0].g)}% of sales`:""}${R[0]&&R[0].k!=="Not recorded"?`, ${R[0].k} ${share(R[0].g)}%`:""}`,
       rows:[{cards:[
@@ -773,6 +775,11 @@ function teamSpecs(A,N,pre){
     const top=W.slice().sort((a,b)=>b.gmv-a.gmv)[0], cats=[...new Set(W.flatMap(x=>[...x.cat.keys()]))];
     const mover=cats.map(k=>({k,d:(L.cat.get(k)||0)-(P.cat.get(k)||0)})).sort((a,b)=>Math.abs(b.d)-Math.abs(a.d))[0];
     const share=L.gmv?L.top/L.gmv:0;
+    // categories that sell every other week (on, off, on, off): last week's drop is then the off week of a cycle
+    const alt=W.length>=4?cats.filter(k=>{ const v=W.map(x=>x.cat.get(k)||0), tot=W.reduce((t,x)=>t+x.gmv,0)||1, on=v.map(x=>x>0);
+      return v.reduce((t,x)=>t+x,0)/tot>=.15&&on.every((o,i)=>!i||o!==on[i-1])&&!on[on.length-1]; }):[];
+    const altG=w=>alt.reduce((t,k)=>t+(w.cat.get(k)||0),0);
+    const altNote=alt.length?`<b>${esc(andList(alt))} ${alt.length>1?"sell":"sells"} every other week</b> (${W.filter(x=>altG(x)>0).map(x=>`${fds(x.start)} ${rp(altG(x))}`).join(", ")}; nothing in the weeks between), so last week was an off week. Without ${alt.length>1?"them":"it"}: ${rp(P.gmv-altG(P))} → ${rp(L.gmv)} (${dPct(L.gmv,P.gmv-altG(P))}). If the cycle holds, the next ${alt.length>1?"orders are":"order is"} due this week; confirm ${alt.length>1?"them":"it"} with the accounts.`:null;
     S.push({kicker:pre+"Sales trend · last 4 weeks",title:`${rp(L.gmv)} last week${A.lastDays<7?` (to ${fds(A.dataEnd)})`:""}: ${dPct(L.gmv,P.gmv)} vs the week before, ${dPct(L.gmv,avg)} vs the ${nP}-week average (${rp(avg)})`,
       rows:[{h:84,cards:[{kpiRow:[{v:rpParts(L.gmv)[0],u:rpParts(L.gmv)[1],l:`Sales last week${A.lastDays<7?` (${A.lastDays} of 7 days)`:""}`,hot:true},
         {v:dPct(L.gmv,P.gmv),u:"",l:`vs the week before (${rp(P.gmv)})`},{v:dPct(L.gmv,avg),u:"",l:`vs the ${nP}-week average (${rp(avg)})`},
@@ -785,6 +792,7 @@ function teamSpecs(A,N,pre){
         `<b>Last week vs the ${nP}-week average:</b> ${rp(L.gmv)} vs ${rp(avg)} (${dPct(L.gmv,avg)}); the best week was ${fds(top.start)} at ${rp(top.gmv)}.`,
         mover&&mover.d&&`<b>Biggest category move:</b> ${esc(mover.k)} ${mover.d>0?"+":"−"}${rp(Math.abs(mover.d))} vs the week before.`,
         share>=.3&&`<b>One order is ${Math.round(share*100)}% of last week</b> (${rp(L.top)}), so the week depends on a single deal.`,
+        altNote,
         partialNote(A)].filter(Boolean)});
     // categories: units vs sales, last week, with the four-week totals
     const C4=cats.map(k=>({k,q:L.catQty.get(k)||0,g:L.cat.get(k)||0,o:L.catOrders.get(k)||0,q4:W.reduce((t,x)=>t+(x.catQty.get(k)||0),0),g4:W.reduce((t,x)=>t+(x.cat.get(k)||0),0)}));

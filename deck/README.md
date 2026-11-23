@@ -222,6 +222,13 @@ left out. Smallholder and Plantation are reviewed separately (no combined slides
   weeks Toko Keliling sold the most units (1,536) and Pupuk Grosir the most sales (Rp744M, 41%).
 - Plantation: Rp61M, Rp508M, Rp205M, Rp209M (7 orders): +2% vs the week before, −19% vs the 3-week average (Rp258M);
   100% Benih, one Topaz order of Rp144M is 69%.
+- Pupuk Grosir sells every other week (26 Oct Rp361M, 9 Nov Rp383M, nothing between), so last week was an off week;
+  without Grosir Smallholder went Rp434M → Rp185M (−57%). If the cycle holds, the next Grosir order is due this week.
+- CRM: 49 Smallholder engagements (all Merita Syarif) are logged "Called" and "Considering" although the notes say the
+  lead didn't pick up.
+- Added from the 23 Nov routine run (it published but could not push): wins not in sales yet are valued from the sacks
+  named in the notes; notes that say the lead didn't pick up overrule a logged "Called"; categories that sell every
+  other week are called out on the trend slide.
 
 ## Findings for the week of 9–15 Nov 2026 (earlier sample)
 The sample is the six weekly exports on `main` uploaded 16 Nov: sales 2–15 Nov for both teams, success stories and
