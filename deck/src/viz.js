@@ -202,7 +202,7 @@ function cellHtml(c){
   const I=c.inner; let body="";
   if(c.chart) body=`<div style="position:absolute;left:${I.x}px;top:${I.y}px">${svgChart(c.chart,I.w,I.h)}</div>`;
   else if(c.table){ const T=c.table, al=i=>T.align?.[i]==="r"?' class="num"':T.align?.[i]==="c"?' style="text-align:center"':"";
-    body=`<div style="position:absolute;left:${I.x}px;top:${I.y}px;width:${I.w}px"><table class="tbl pt" style="table-layout:fixed"><colgroup>${(()=>{ const w=colWeights(T), t=w.reduce((a,b)=>a+b,0); return w.map(x=>`<col style="width:${(x/t*100).toFixed(1)}%">`).join(""); })()}</colgroup><thead><tr>${T.head.map((h,i)=>`<th${al(i)}>${esc(h)}</th>`).join("")}</tr></thead><tbody>${
+    body=`<div style="position:absolute;left:${I.x}px;top:${I.y}px;width:${I.w}px"><table class="tbl pt${T.dense?" dense":""}" style="table-layout:fixed"><colgroup>${(()=>{ const w=colWeights(T), t=w.reduce((a,b)=>a+b,0); return w.map(x=>`<col style="width:${(x/t*100).toFixed(1)}%">`).join(""); })()}</colgroup><thead><tr>${T.head.map((h,i)=>`<th${al(i)}>${esc(h)}</th>`).join("")}</tr></thead><tbody>${
       T.rows.map(r=>`<tr>${r.map((v,i)=>{ const o=typeof v==="object"&&v?v:{v}; return `<td${al(i)}${o.fill?` style="background:${o.fill};color:${o.color||CINK}"`:""}>${o.pill?`<span class="pill">${esc(o.v)}</span>`:o.bold?`<b>${esc(o.v)}</b>`:esc(o.v)}</td>`; }).join("")}</tr>`).join("")}</tbody></table></div>`; }
   return `<div class="card pc" style="${st}">${c.title?`<h3>${esc(c.title)}</h3>`:""}${c.sub?`<p class="sub">${esc(c.sub)}</p>`:""}${body}${c.foot?`<p class="pfoot">${esc(c.foot)}</p>`:""}</div>`;
 }
