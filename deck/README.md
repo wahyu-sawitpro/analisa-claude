@@ -127,7 +127,7 @@ channels and the largest drops); (3) the weekly trend by channel; (4) who bought
 Topaz seed, `items_h7`; one row per buyer with name, channel, join date, last order date as H+n, amounts and items; names
 appear only in the private build); then farmers vs estate owners,
 locations, users above 100 ha and next steps. Utm source Organic is shown as "Other channel" (likely social media
-activity); Injected User is a bulk add, not acquisition; Purchasing Topaz = joined without an ad and bought Topaz on the join day. No executive summary and no Duta vs non-Duta breakdown. Social
+activity); Injected User is a bulk add, not acquisition; Purchasing Topaz = joined without an ad and bought Topaz on the join day, labelled "Purchasing Topaz (bought Topaz on join day)". No executive summary and no Duta vs non-Duta breakdown. Social
 media: `deck/src/organic-content.json` (date, platform, account, views) is read from origin/main by the weekly script;
 when it has posts dated last week, the channels slide shows the top 3 accounts by views (best post each) under the top 3
 campaigns, otherwise the table is left out.
