@@ -505,10 +505,11 @@ function acqSpecs(Q,pre){
     rows:[{cards:[
       {w:1.3,title:"Farmers registered per week, by channel",sub:`Registration weeks start on Monday${Q.dropped?`; the week of ${fds(new Date(Q.dropped.w))} is left out`:""}`,chart:{type:"column",stacked:true,cats:W.map(x=>x.short),
         series:Q.srcs.map((k,i)=>({name:k,color:srcC(k,i),values:W.map(x=>x.src.get(k)||0)})),lblH:24}},
-      P&&{w:1,title:"Farmers per day, last week vs the week before",sub:"By join date",chart:{type:"line",cats:DAYS,show:"all",max:Math.ceil(Math.max(...P.days,...L.days)*1.15/10)*10,axisFmt:v=>nf.format(Math.round(v)),
-        series:[{name:`Week before (${P.short})`,color:"#9AA592",values:P.days,show:[P.days.indexOf(Math.max(...P.days))]},{name:`Last week (${L.short})`,color:CAT[0],values:L.days}]}}].filter(Boolean)}],
+      P&&(()=>{ const d={title:"Farmers per day, last week vs the week before",sub:"By join date",chart:{type:"line",cats:DAYS,show:"all",max:Math.ceil(Math.max(...P.days,...L.days)*1.15/10)*10,axisFmt:v=>nf.format(Math.round(v)),
+        series:[{name:`Week before (${P.short})`,color:"#9AA592",values:P.days,show:[P.days.indexOf(Math.max(...P.days))]},{name:`Last week (${L.short})`,color:CAT[0],values:L.days}]}}, v=acqSocial(Q); return v.rows.length?{w:1,split:[{w:1,...d},{h:96+v.rows.length*30,title:"Social media posts last week",table:{colW:[16,38,30,16],head:["Date","Account","Activity","Views"],align:["l","l","l","r"],rows:v.rows}}]}:{w:1,...d}; })()].filter(Boolean)}],
     notes:[P&&(Math.max(...L.days)>=Math.max(...P.days)?`<b>Last week had a spike:</b> ${Math.max(...L.days)} farmers on ${DAYS[L.days.indexOf(Math.max(...L.days))]}, against a high of ${Math.max(...P.days)} on any day the week before; the other days ran ${Math.min(...L.days)}–${[...L.days].sort((a,b)=>b-a)[1]} a day.`:`<b>The week before had a mid-week spike:</b> ${Math.max(...P.days)} farmers on ${DAYS[P.days.indexOf(Math.max(...P.days))]}, against a high of ${Math.max(...L.days)} on any day last week. Last week's days were flatter (${Math.min(...L.days)}–${Math.max(...L.days)} a day).`),
       L.bulk&&`<b>One-hour batch:</b> ${nf.format(L.bulk.n)} of last week's registrations came within one hour (${L.bulk.at}); ${pct(L.bulk.noCamp,L.bulk.n)}% have no campaign and ${pct(L.bulk.farm,L.bulk.n)}% added a farm, so this looks like a bulk sign-up or import. Confirm the source before counting it as acquisition.`,
+      acqSocial(Q).top.length&&`<b>Social media:</b> ${acqSocial(Q).top.map(c=>`@${esc(c.account)} (${esc(c.activity||c.platform)}, ${fds(new Date(c.date+"T12:00:00"))}) ${nf.format(c.views)} views`).join("; ")}. Social media might boost acquisition; however, without a UTM the number can't be traced.`,
       `<b>Days:</b> the file's weeks run from Monday morning to the next Monday morning; registrations before the cut on the next Monday are counted as Monday, so each day is a full 24 hours.`].filter(Boolean)});
   // the weekly trend by channel follows the channel slides at the front
   const ti=S.findIndex(x=>/week trend/.test(x.kicker)); if(ti>0) S.unshift(S.splice(ti,1)[0]);
@@ -632,6 +633,11 @@ function acqBuyStats(Q){
   const im=new Map(); B.forEach(r=>[...new Set((r.itemsH7||[]).map(buyItem))].forEach(it=>{ const o=im.get(it)||{k:it,n:0}; o.n++; im.set(it,o); }));
   return {B,n:B.length,sales:sum(B,"salesH7"),topaz:sum(B,"benihH7"),byDay,cats,byCh,items:[...im.values()].sort((a,b)=>b.n-a.n),noDate:B.filter(r=>day(r)==null).length};
 }
+// Social media posts dated last week (deck/src/organic-content.json): the 3 accounts with the most views, best post each.
+function acqSocial(Q){ const L=Q.L, best=new Map();
+  (typeof ORGANIC_CONTENT!=="undefined"?ORGANIC_CONTENT:[]).forEach(c=>{ const x=+new Date(c.date+"T12:00:00"); if(x<L.w||x>=L.w+7*864e5) return; const o=best.get(c.account); if(!o||c.views>o.views) best.set(c.account,c); });
+  const top=[...best.values()].sort((a,b)=>b.views-a.views).slice(0,3);
+  return {top,rows:top.map(c=>[fds(new Date(c.date+"T12:00:00")),`@${c.account}`,c.activity||c.platform,{v:nf.format(c.views),bold:true}])}; }
 // The analysis under "Channels last week": which channels added the most users, grew fastest, fell most.
 function acqChannelNotes(Q){
   const L=Q.L, P=Q.P; if(!P) return [];
@@ -677,9 +683,9 @@ function acqChannelSpec(Q,pre){
   const bulk=ch.filter(c=>isBulk(c.k)&&(c.l||c.p)), f=c=>`${c.k} ${nf.format(c.p)} → ${nf.format(c.l)}`, topz=ch.find(c=>/purchasing\s*topaz/i.test(c.k)&&c.l);
   // social media posts dated last week (deck/src/organic-content.json): the 3 accounts with the most views, best post each
   const vBest=new Map(); (typeof ORGANIC_CONTENT!=="undefined"?ORGANIC_CONTENT:[]).forEach(c=>{ const x=+new Date(c.date+"T12:00:00"); if(x<L.w||x>=L.w+7*864e5) return; const o=vBest.get(c.account); if(!o||c.views>o.views) vBest.set(c.account,c); });
-  const vrows=[...vBest.values()].sort((a,b)=>b.views-a.views).slice(0,3).map(c=>[fds(new Date(c.date+"T12:00:00")),c.platform,`@${c.account}`,{v:nf.format(c.views),bold:true}]);
+  const vTop=[...vBest.values()].sort((a,b)=>b.views-a.views).slice(0,3), vrows=vTop.map(c=>[fds(new Date(c.date+"T12:00:00")),`@${c.account}`,c.activity||c.platform,{v:nf.format(c.views),bold:true}]);
   const campCard=big.length&&{title:`Campaigns, ${CMIN}+ users`,table:{colW:[38,20,12,11,19],head:["Campaign","Utm source","Last week","Share of source","Change vs week before"],align:["l","l","r","r","r"],rows:rowsK}};
-  const vCard=vrows.length&&{title:"Top 3 social media accounts by views",table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows}};
+  const vCard=vrows.length&&{title:`Social media last week${vrows.length>=3?": top 3 by views":""}`,table:{colW:[16,38,30,16],head:["Date","Account","Activity","Views"],align:["l","l","l","r"],rows:vrows}};
   const right=campCard&&vCard?{w:1,split:[{w:1,...campCard},{h:92+vrows.length*25,...vCard}]}:(campCard||vCard)?{w:1,...(campCard||vCard)}:null;
   return {kicker:pre+"Acquisition · which channels worked and who bought",
     title:(()=>{ const T=acqBuyStats(Q), t1=byN[0]?`${byN[0].k} added the most users (${sg(byN[0].d)})${byR[0]&&byR[0]!==byN[0]?`, ${byR[0].k} grew fastest (+${Math.round(byR[0].r*100)}%)`:""}`:`No channel grew last week`;
@@ -694,7 +700,7 @@ function acqChannelSpec(Q,pre){
       const chT={w:1.1,title:"Buyers by channel",table:{colW:[44,24,32],head:["Channel","Bought","Sales"],align:["l","r","r"],rows:T.byCh.map(c=>[{v:c.k,bold:true},`${c.b} of ${nf.format(c.n)}`,{v:rp(c.s),bold:true}])}};
       const itT={w:1,title:"Items bought",table:{colW:[74,26],head:["Item","Users"],align:["l","r"],rows:T.items.slice(0,6).map(x=>[x.k,{v:String(x.n),bold:true}])}};
       const camp=campCard&&{w:1,...campCard,table:{...campCard.table,colW:[46,18,36],head:["Campaign","Last week","Change"],align:["l","r","r"],rows:big.map(x=>[`${x.k} (${x.src})`,{v:nf.format(x.l),bold:true},acqChg(x.d,x.p)])}};
-      return [{h:84,cards:[{kpiRow:kp}]},{cards:[days,chT,itT,camp,vCard&&{w:1,...vCard}].filter(Boolean)}]; })(),
+      return [{h:84,cards:[{kpiRow:kp}]},{cards:[days,chT,itT,camp].filter(Boolean)}]; })(),
     notes:(()=>{ const T=acqBuyStats(Q), BP=P&&P.buyH7||[]; if(!T) return [!big.length&&cm.length&&`<b>Campaign names</b> are shown only for a campaign with ${CMIN}+ users in a week; none reached it last week.`].filter(Boolean);
       const conv=T.byCh.map(c=>({...c,r:c.n?c.b/c.n:0})).sort((a,b)=>b.r-a.r), d0=T.byDay[0], early=T.byDay.slice(0,4).reduce((a,b)=>a+b,0), topI=T.items[0];
       const camp=big[0]&&T.B.filter(r=>r.camp===big[0].k&&r.src===big[0].src), open=(Q.rawRows||[]).filter(r=>r.w===L.w&&r.jd&&dayN(r.jd,Q.lastDate)<7).length;

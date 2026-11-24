@@ -129,8 +129,9 @@ appear only in the private build); then farmers vs estate owners,
 locations, users above 100 ha and next steps. Utm source Organic is shown as "Other channel" (likely social media
 activity); Injected User is a bulk add, not acquisition; Purchasing Topaz = joined without an ad and bought Topaz on the join day, labelled "Purchasing Topaz (bought Topaz on join day)". No executive summary and no Duta vs non-Duta breakdown. Social
 media: `deck/src/organic-content.json` (date, platform, account, views) is read from origin/main by the weekly script;
-when it has posts dated last week, the channels slide shows the top 3 accounts by views (best post each) under the top 3
-campaigns, otherwise the table is left out.
+a trailing comma is tolerated. When it has posts dated last week, the trend slide shows the top 3 accounts by views (best
+post each, with the `activity` column, e.g. KOL or Participant Petani Juara) next to farmers per day, and the note says
+social media might boost acquisition but without a UTM the number can't be traced; otherwise the table is left out.
 
 ## Weekly registration refresh (every Tuesday, 10:00 WIB)
 A scheduled routine refreshes the farmer-registration review from `Farmer register for weekly farmer.csv` on `main`:

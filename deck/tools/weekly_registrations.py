@@ -10,7 +10,7 @@ branch GitHub's upload page committed it to; --ref <remote branch> forces one) a
 Usage: python3 deck/tools/weekly_registrations.py <out_dir> [--today YYYY-MM-DD] [--ref origin/<branch>]
 Exit code 0 = fresh, 2 = file missing, 3 = file does not cover last week yet (nothing rebuilt).
 """
-import csv, datetime as dt, hashlib, io, json, os, pathlib, subprocess, sys
+import csv, datetime as dt, hashlib, io, json, os, pathlib, re, subprocess, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CSV = "Farmer register for weekly farmer.csv"
@@ -64,8 +64,9 @@ def main():
     # social media posts: take deck/src/organic-content.json from origin/main when it was updated there
     oc = git("show", "origin/main:deck/src/organic-content.json")
     if not oc.returncode:
-        try:
-            json.loads(oc.stdout); (ROOT / "deck/src/organic-content.json").write_text(oc.stdout)
+        try:  # tolerate a trailing comma left by a hand edit on GitHub
+            posts = json.loads(re.sub(r",\s*([\]}])", r"\1", oc.stdout))
+            (ROOT / "deck/src/organic-content.json").write_text("[\n" + ",\n".join("  " + json.dumps(x, ensure_ascii=False) for x in posts) + "\n]\n")
         except ValueError:
             info["organic_content"] = "origin/main copy is not valid JSON; kept the local file"
 
