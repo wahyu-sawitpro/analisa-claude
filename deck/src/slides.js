@@ -495,7 +495,8 @@ const srcC=(k,i)=>SRC_C[k]||EXTRA[i%EXTRA.length];
 function acqSpecs(Q,pre){
   const S=[], L=Q.L, P=Q.P, W=Q.weeks, d=P?L.total-P.total:0, dn=P?L.non-P.non:0, du=P?L.under-P.under:0;
   const drops=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d), ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), top=drops[0];
-  if(L.buyDay&&L.buyDay.concat(P?P.buyDay||[]:[]).some(c=>c.n)) S.push(acqBuyDaySpec(Q,pre));
+  if(L.buyH7) S.push(...acqBuyersSpecs(Q,pre));
+  else if(L.buyDay&&L.buyDay.concat(P?P.buyDay||[]:[]).some(c=>c.n)) S.push(acqBuyDaySpec(Q,pre));
   if(Q.profile) S.push(...acqProfileSpecs(Q,pre));
   // Weekly trend by channel and the days of the week
   const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -585,6 +586,30 @@ function acqBuyDaySpec(Q,pre){
       {w:1.4,title:"Last week's farmers, one row each",sub:grp.size>10?`First 10 of ${grp.size} rows (${users.length} farmers)`:`${users.length} farmers; identical rows grouped`,table:{colW:[15,17,25,27,16],head:["Channel","Joined","Duta","Regency","Sales"],align:["l","l","l","l","r"],rows:urows.length?urows:[["None last week","","","",""]]}}]}],
     notes:notes.length?notes:undefined};
 }
+// Who bought within 7 days of joining (total_sales_h7): every buyer last week with join date, last order (H+n), amount and items.
+const buyItem=t=>{ const m=String(t).match(/^Benih Sawit Topaz.*?\((\d+ butir)\)\s*-\s*(.+)$/i); return m?`${m[2]} (${m[1]})`:String(t).replace(/^\[[^\]]*\]\s*/,""); };
+const dayN=(a,b)=>Math.round((new Date(b.getFullYear(),b.getMonth(),b.getDate())-new Date(a.getFullYear(),a.getMonth(),a.getDate()))/864e5);
+function acqBuyersSpecs(Q,pre){
+  const L=Q.L, P=Q.P; if(!L.buyH7) return [];
+  const sum=(u,f)=>u.reduce((t,r)=>t+(r[f]||0),0), B=[...L.buyH7].sort((a,b)=>(a.jd||0)-(b.jd||0)||b.salesH7-a.salesH7), BP=P&&P.buyH7||[];
+  const lastDay=Q.lastDate, open=B.filter(r=>r.jd&&dayN(r.jd,lastDay)<7).length, notYet=L.total&&Q.rawRows?(Q.rawRows.filter(r=>r.w===L.w&&r.jd&&dayN(r.jd,lastDay)<7).length):0;
+  const byCh=[...new Set(B.map(r=>r.src))].map(k=>({k,n:L.src.get(k)||0,b:B.filter(r=>r.src===k).length,s:sum(B.filter(r=>r.src===k),"salesH7")})).sort((a,b)=>b.s-a.s);
+  const row=r=>{ const h=r.lastOrd&&r.jd?dayN(r.jd,r.lastOrd):null;
+    return [{v:r.name||"–",bold:true},`${r.src}${r.camp&&r.camp!=="No campaign"&&!/identified/i.test(r.src)?` · ${r.camp}`:""}`,r.jd?fds(r.jd):"–",
+      r.lastOrd?`${fds(r.lastOrd)} (${h===0?"join day":`H+${h}`})`:"–",{v:rp(r.salesH7),bold:true},r.benihH7?rp(r.benihH7):"–",(r.itemsH7||[]).map(buyItem).join(", ")||"–"]; };
+  const cuts=[0]; for(let i=7;i<B.length;i+=12) cuts.push(i); const pages=cuts.length;  // page 1 carries the notes (7 rows), later pages 12 rows
+  const topz=B.filter(r=>/purchasing\s*topaz/i.test(r.src||""));
+  const notes=[`<b>By channel:</b> ${byCh.map(c=>`${c.k} ${c.b} of ${nf.format(c.n)} (${rp(c.s)})`).join("; ")}.`,
+    topz.length&&`<b>Purchasing Topaz:</b> users who joined without an ad and bought Topaz on the day they joined (${topz.length} last week, ${rp(sum(topz,"salesH7"))}).`,
+    `<b>Last order</b> is the user's latest order date in the export, so a user who ordered more than once shows the last one; sales are the first 7 days after joining (H+7).${open?` ${notYet} of last week's users joined less than 7 days before the data ends (${fds(lastDay)}), so their H+7 is not complete yet.`:""}`,
+    P&&`<b>Week before:</b> ${BP.length} of ${nf.format(P.total)} users bought within 7 days (${rp(sum(BP,"salesH7"))}; Topaz ${rp(sum(BP,"benihH7"))}).`].filter(Boolean);
+  const title=B.length?`${B.length} of ${nf.format(L.total)} users bought within 7 days of joining: ${rp(sum(B,"salesH7"))}, ${pct(sum(B,"benihH7"),sum(B,"salesH7"))}% of it Topaz seed${P?` (week before ${BP.length} users, ${rp(sum(BP,"salesH7"))})`:""}`:`No user who joined last week bought within 7 days`;
+  return Array.from({length:pages},(_,i)=>({kicker:pre+`Registrations · who bought within 7 days of joining${pages>1?` (${i+1}/${pages})`:""}`,title,
+    rows:[{cards:[{title:"Users who bought within 7 days (H+7) of joining",sub:`Last week's users; sales H+7 all items, Topaz = seed (benih) only`,
+      table:{colW:[15,27,7,12,9,9,21],head:["User","Channel","Joined","Last order","Sales H+7","Topaz H+7","Items bought"],align:["l","l","l","l","r","r","l"],
+        rows:B.length?B.slice(cuts[i],cuts[i+1]??B.length).map(row):[["None last week","","","","","",""]]}}]}],
+    notes:i===0?notes:undefined}));
+}
 // First page: weekly acquisition (the week in progress left out), last week vs the week before and vs the median week.
 // Average of every complete week before last week (the running week is already left out).
 const acqPrior=Q=>{ const pr=Q.weeks.slice(0,-1); return {weeks:pr,avg:pr.length?pr.reduce((t,w)=>t+w.total,0)/pr.length:null}; };
@@ -615,29 +640,31 @@ function acqChannelSpec(Q,pre){
   const rows=ch.map(c=>[{v:c.k,bold:true},{v:nf.format(c.l),bold:true},sh(c.l),{v:chg(c.d,c.p),bold:c.d>0&&!isBulk(c.k)}]);
   rows.push([{v:"Total",bold:true},{v:nf.format(L.total),bold:true},"100%",{v:chg(L.total-P.total,P.total),bold:true}]);
   const real=ch.filter(c=>!isBulk(c.k)), byN=[...real].filter(c=>c.d>0).sort((a,b)=>b.d-a.d), byR=[...real].filter(c=>c.d>0&&c.p>=5).sort((a,b)=>b.r-a.r), fresh=real.filter(c=>!c.p&&c.l), dn=[...real].filter(c=>c.d<0).sort((a,b)=>a.d-b.d);
-  const cAll=[...Q.camps].sort((a,b)=>b.l-a.l||a.d-b.d), c3=cAll.slice(0,3), cRest=cAll.slice(3), icL=L.src.get("Identified Campaigns")||0, icD=[...Q.camps].sort((a,b)=>a.d-b.d)[0];
-  const rowsK=c3.map(x=>[x.k,{v:nf.format(x.l),bold:true},icL?`${pct(x.l,icL)}%`:"–",chg(x.d,x.p)]);
-  const bulk=ch.filter(c=>isBulk(c.k)&&(c.l||c.p)), f=c=>`${c.k} ${nf.format(c.p)} → ${nf.format(c.l)}`;
+  // campaign names only for a campaign that brought 100+ users in a week (any utm source)
+  const CMIN=100, cm=[...new Set([...(L.campAll||new Map()).keys(),...(P&&P.campAll||new Map()).keys()])].map(key=>{ const [k,src]=key.split("|"); return {k,src,l:L.campAll.get(key)||0,p:P&&P.campAll?P.campAll.get(key)||0:0}; }).map(o=>({...o,d:o.l-o.p}));
+  const big=cm.filter(x=>x.l>=CMIN).sort((a,b)=>b.l-a.l), bigAny=cm.filter(x=>x.l>=CMIN||x.p>=CMIN);
+  const rowsK=big.map(x=>[x.k,x.src,{v:nf.format(x.l),bold:true},`${pct(x.l,L.src.get(x.src)||1)}%`,chg(x.d,x.p)]);
+  const dnC=dn[0]&&bigAny.filter(x=>x.src===dn[0].k&&x.d<0).sort((a,b)=>a.d-b.d)[0], upC=byN[0]&&bigAny.filter(x=>x.src===byN[0].k&&x.d>0).sort((a,b)=>b.d-a.d)[0];
+  const bulk=ch.filter(c=>isBulk(c.k)&&(c.l||c.p)), f=c=>`${c.k} ${nf.format(c.p)} → ${nf.format(c.l)}`, topz=ch.find(c=>/purchasing\s*topaz/i.test(c.k)&&c.l);
   // social media posts dated last week (deck/src/organic-content.json): the 3 accounts with the most views, best post each
   const vBest=new Map(); (typeof ORGANIC_CONTENT!=="undefined"?ORGANIC_CONTENT:[]).forEach(c=>{ const x=+new Date(c.date+"T12:00:00"); if(x<L.w||x>=L.w+7*864e5) return; const o=vBest.get(c.account); if(!o||c.views>o.views) vBest.set(c.account,c); });
   const vrows=[...vBest.values()].sort((a,b)=>b.views-a.views).slice(0,3).map(c=>[fds(new Date(c.date+"T12:00:00")),c.platform,`@${c.account}`,{v:nf.format(c.views),bold:true}]);
+  const campCard=big.length&&{title:`Campaigns with ${CMIN}+ users last week`,table:{colW:[38,20,12,11,19],head:["Campaign","Utm source","Last week","Share of source","Change vs week before"],align:["l","l","r","r","r"],rows:rowsK}};
+  const vCard=vrows.length&&{title:"Top 3 social media accounts by views",table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows}};
+  const right=campCard&&vCard?{w:1,split:[{w:1,...campCard},{h:92+vrows.length*25,...vCard}]}:(campCard||vCard)?{w:1,...(campCard||vCard)}:null;
   return {kicker:pre+"Acquisition · which channels worked",
     title:byN[0]?`${byN[0].k} added the most users (${sg(byN[0].d)})${byR[0]&&byR[0]!==byN[0]?`; ${byR[0].k} grew fastest (+${Math.round(byR[0].r*100)}%)`:byR[0]?`, also the fastest growth (+${Math.round(byR[0].r*100)}%)`:""}`:`No channel grew last week${dn[0]?`; ${dn[0].k} fell ${sg(dn[0].d)}`:""}`,
     rows:[{cards:[
-      {w:1.15,title:"Channels last week",sub:`Users by utm source; change vs the week before (${P.label})`,
-        table:{colW:[53,13,11,23],head:["Channel","Last week","Share","Change vs week before"],align:["l","r","r","r"],rows}},
-      (()=>{ const camp={title:"Top 3 Identified Campaigns",sub:`${nf.format(icL)} Identified Campaigns users last week`,
-        table:{colW:[46,15,13,26],head:["Campaign","Last week","Share","Change vs week before"],align:["l","r","r","r"],rows:rowsK.length?rowsK:[["No campaign last week","","",""]]}};
-        return vrows.length?{w:1,split:[{w:1,...camp,sub:null},{h:92+vrows.length*25,title:"Top 3 social media accounts by views",
-          table:{colW:[18,20,38,24],head:["Date","Platform","Account","Views"],align:["l","l","l","r"],rows:vrows}}]}:{w:1,...camp}; })()]}],
-    notes:[byN[0]&&`<b>Most users added:</b> ${byN.slice(0,3).map(c=>`${f(c)} (${sg(c.d)})`).join("; ")}.`,
+      {w:right?1.15:1,title:"Channels last week",sub:`Users by utm source; change vs the week before (${P.label})`,
+        table:{colW:[53,13,11,23],head:["Channel","Last week","Share","Change vs week before"],align:["l","r","r","r"],rows}},right].filter(Boolean)}],
+    notes:[byN[0]&&`<b>Most users added:</b> ${byN.slice(0,3).map(c=>`${f(c)} (${sg(c.d)})`).join("; ")}${upC?`; in ${byN[0].k}, “${esc(upC.k)}” ${nf.format(upC.p)} → ${nf.format(upC.l)}`:""}.`,
       byR[0]&&`<b>Fastest growth:</b> ${byR.slice(0,3).map(c=>`${f(c)} (+${Math.round(c.r*100)}%)`).join("; ")}${fresh.length?`; new last week: ${fresh.map(f).join(", ")}`:""}.`,
       !byR[0]&&fresh.length&&`<b>New last week:</b> ${fresh.map(f).join(", ")}.`,
-      dn[0]&&`<b>Fell most:</b> ${dn.slice(0,2).map(c=>`${f(c)} (${sg(c.d)}, −${Math.round(-c.r*100)}%)`).join("; ")}${/identified/i.test(dn[0].k)&&icD&&icD.d<0?`; mostly “${esc(icD.k)}” ${nf.format(icD.p)} → ${nf.format(icD.l)}`:""}.`,
+      dn[0]&&`<b>Fell most:</b> ${dn.slice(0,2).map(c=>`${f(c)} (${sg(c.d)}, −${Math.round(-c.r*100)}%)`).join("; ")}${dnC?`; mostly “${esc(dnC.k)}” ${nf.format(dnC.p)} → ${nf.format(dnC.l)}`:""}.`,
       ch.find(c=>c.k==="Other channel"&&c.l)&&`<b>Other channel</b> is a channel without a UTM. It could be organic and/or likely relates to social media activity.`,
+      topz&&`<b>Purchasing Topaz</b> (${topz.l} last week): users who joined without an ad and bought Topaz on the day they joined.`,
       bulk.length&&`<b>Not counted as growth:</b> ${bulk.map(f).join(", ")}, users added in bulk.`,
-      cRest.length&&(()=>{ const on=cRest.filter(x=>x.l).sort((a,b)=>b.l-a.l), n=vrows.length?3:5;
-        return `<b>Other ${cRest.length} campaigns:</b> ${on.slice(0,n).map(x=>`${esc(x.k)} ${nf.format(x.l)}`).join(", ")}${on.length>n?`; ${on.length-n} more with ${nf.format(on.slice(n).reduce((t,x)=>t+x.l,0))} users between them`:""}.`; })()].filter(Boolean)};
+      !big.length&&cm.length&&`<b>Campaign names</b> are shown only for a campaign with ${CMIN}+ users in a week; none reached it last week.`].filter(Boolean)};
 }
 // When a table keeps an "Other" row, the note under it lists every campaign in it with its counts.
 const otherNote=(rest,P,lab="campaigns")=>{ if(!rest.length) return null; const on=[...rest].filter(x=>x.l).sort((a,b)=>b.l-a.l||b.p-a.p), off=rest.filter(x=>!x.l);
@@ -686,10 +713,11 @@ function acqNarrative(T){
     Q.profile&&(L.src.get("Other channel")||0)&&{t:"Tag social media posts with a UTM",d:`${nf.format(L.src.get("Other channel"))} users last week came through Other channel (utm source Organic), likely from social media activity. A UTM on each post shows which one brought them.`,o:"",w:""},
     mv&&(rise?{t:`Find out what drove ${mv.k} ${sg(mv.d)} and repeat it`,d:`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)}${mvC?`, mostly “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)})`:""}. Check what happened that week (a broadcast, a post, an app release, a field event) and plan it again.`,o:"",w:""}
       :(/injected/i.test(mv.k)?{t:`Confirm the ${mv.k} batches and look at growth without them`,d:`${mv.k} (users added in bulk) went ${nf.format(mv.p)} → ${nf.format(mv.l)}, so the total fell. Without it, farmers went ${nf.format(P.total-mv.p)} → ${nf.format(L.total-mv.l)}. Agree when the next batch is due and report the total with and without it.`,o:"",w:""}
-      :{t:`Find out why ${mv.k} fell ${sg(mv.d)}`,d:`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)}${mvC?`, mostly “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)})`:""}. Check what drove the ${P?P.short:""} peak (a broadcast, a post, an app release) and repeat it.`,o:"",w:""})),
+      :{t:`Find out why ${mv.k} fell ${sg(mv.d)}`,d:`${mv.k} went ${nf.format(mv.p)} → ${nf.format(mv.l)}${(()=>{ const c=[...new Set([...(L.campAll||new Map()).keys(),...(P&&P.campAll||new Map()).keys()])].filter(k=>k.endsWith("|"+mv.k)).map(k=>({k:k.split("|")[0],p:P.campAll.get(k)||0,l:L.campAll.get(k)||0})).filter(x=>x.p>=100||x.l>=100).sort((a,b)=>(a.l-a.p)-(b.l-b.p))[0]; return c?`, mostly “${c.k}” (${nf.format(c.p)} → ${nf.format(c.l)})`:mvC?`, mostly “${mvC.k}” (${nf.format(mvC.p)} → ${nf.format(mvC.l)})`:""; })()}. ${/google|meta|ads/i.test(mv.k)?"Check the campaign's budget, bids and status in the ads manager, and whether it was paused or capped.":`Check what drove the ${P?P.short:""} peak (a broadcast, a post, an app release) and repeat it.`}`,o:"",w:""})),
     Q.profile&&L.big.length&&{t:`Verify and call the ${L.big.length} users above 100 ha`,d:`They declared ${haF(L.big.reduce((t,r)=>t+r.ha,0))} ha between them; the area is as entered by the user and not yet validated. Confirm it on the call, then hand real estates to the plantation team.`,o:"",w:""},
     !Q.profile&&{t:"Set a weekly farmer target per Duta",d:`Dutas brought ${nf.format(L.under)} farmers last week${P?` (${nf.format(P.under)} the week before)`:""}. ${idle.length?`${idle.map(x=>x.k).join(", ")} registered none last week.`:""} Agree a weekly number per Duta and track it in this deck.`,o:"",w:""},
     !Q.profile&&{t:"Grow the external Duta network",d:`${intD.length} of the ${D.length} Dutas with farmers are internal team; external Dutas brought ${extAll} farmer${extAll===1?"":"s"} in ${Q.weeks.length} weeks. Recruit and activate external Dutas in the main areas.`,o:"",w:""},
+    L.buyH7&&L.buyH7.length&&{t:`Call the ${L.buyH7.length} users who bought within 7 days`,d:`They spent ${rp(L.buyH7.reduce((t,r)=>t+r.salesH7,0))} in their first week, mostly Topaz seed. Ask how they found SawitPRO and offer the next order; use what they say to sharpen the ads.`,o:"",w:""},
     ...(L.buyDay||[]).filter(c=>c.n&&!c.buyers).map(c=>({t:`Follow up the ${c.n} ${c.k} farmer${c.n===1?"":"s"} who joined without buying`,d:`They joined through ${c.k} last week and spent Rp0 on the day they joined${c.sameMin?` (${c.sameMin.n} registered at ${c.sameMin.at})`:""}. Check what was offered that day and call them with an offer this week.`,o:"",w:""})),
     {t:"Make the phone number required at registration",d:`${pct(L.noPhone,L.total)}% of last week's farmers (${nf.format(L.noPhone)}) have no phone number, so they cannot be followed up by sales or a Duta.`,o:"",w:""},
     Q.profile&&{t:`Get ${nf.format(L.total-L.withFarm)} new users to add a farm`,d:`${pct(L.total-L.withFarm,L.total)}% of last week's users have no farm, so location and hectares are unknown. Prompt them in the app and on the first call.`,o:"",w:""}].filter(Boolean).slice(0,6);

@@ -120,11 +120,13 @@ flagged as a likely bulk sign-up or import.
 
 The registration review is kept short: (1) last week at a glance (users acquired, farmers vs estate owners, change on
 the week before and on the average of every earlier complete week, the weekly chart with the running week left out, and
-last week's users by channel); (2) which channels worked (per channel: last week, share and change vs the week before; top 3
-Identified Campaigns from `campaign_name`; the note names the channels that added the most users and grew fastest, new
-channels and the largest drops); (3) the weekly trend by channel; then same-day buying, farmers vs estate owners,
+last week's users by channel); (2) which channels worked (per channel: last week, share and change vs the week before; campaign
+names from `campaign_name` only for a campaign with 100+ users in a week, any utm source; the note names the channels that added the most users and grew fastest, new
+channels and the largest drops); (3) the weekly trend by channel; (4) who bought within 7 days of joining (`total_sales_h7`, `total_sales_benih_h7` =
+Topaz seed, `items_h7`; one row per buyer with name, channel, join date, last order date as H+n, amounts and items; names
+appear only in the private build); then farmers vs estate owners,
 locations, users above 100 ha and next steps. Utm source Organic is shown as "Other channel" (likely social media
-activity); Injected User is a bulk add, not acquisition. No executive summary and no Duta vs non-Duta breakdown. Social
+activity); Injected User is a bulk add, not acquisition; Purchasing Topaz = joined without an ad and bought Topaz on the join day. No executive summary and no Duta vs non-Duta breakdown. Social
 media: `deck/src/organic-content.json` (date, platform, account, views) is read from origin/main by the weekly script;
 when it has posts dated last week, the channels slide shows the top 3 accounts by views (best post each) under the top 3
 campaigns, otherwise the table is left out.

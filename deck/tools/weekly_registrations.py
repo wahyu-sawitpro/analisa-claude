@@ -108,6 +108,11 @@ def main():
                                                  ("Duta", [x for x in w if x[I["akuisisi_type"]] == "Under Duta" or x[I["utm_source"]] == "Duta"]),
                                                  ("Purchase Masker", [x for x in w if "masker" in x[I["utm_source"]].lower()]))}
                 if "total_sales_register_date" in I else None,
+                "bought_h7": {"users": sum(1 for x in w if num(x[I["total_sales_h7"]]) > 0),
+                              "sales": round(sum(num(x[I["total_sales_h7"]]) for x in w)),
+                              "topaz": round(sum(num(x[I["total_sales_benih_h7"]]) for x in w)) if "total_sales_benih_h7" in I else None,
+                              "by_source": cnt(lambda x: x[I["utm_source"]] if num(x[I["total_sales_h7"]]) > 0 else None)}
+                if "total_sales_h7" in I else None,
                 "per_day": {str(d): sum(1 for x in w if joined(x).date() == d) for d in (mon + dt.timedelta(days=k) for k in range(7))}}
     info.update(status="ok", last=stat(last_mon), before=stat(prev_mon), private_html=str(out / "index.html"))
     print(json.dumps(info, indent=1, ensure_ascii=False)); return 0
