@@ -317,3 +317,5 @@ Exports whose first row is already data (dates, order numbers, amounts, attachme
 their content. A row with only an order number and amount continues the closing above it. A closing that names an order
 is placed in that order's week; other closings use their own date. Rows from other weeks are left out and counted on
 the success-story slide.
+
+Every registration slide: the title is the takeaway in one sentence; the yellow box has at most 2-3 short points (why it happened, so what / what to do) about the charts and tables on that slide.
