@@ -640,30 +640,30 @@ function acqSocial(Q){ const L=Q.L, best=new Map();
   return {top,rows:top.map(c=>[fds(new Date(c.date+"T12:00:00")),`@${c.account}`,c.activity||c.platform,{v:nf.format(c.views),bold:true}])}; }
 // Group last week's and the week before's users by source and campaign (or, without a campaign, the utm source name).
 function acqGroups(Q){
-  const L=Q.L, P=Q.P, R=(Q.rawRows||[]).filter(r=>r.w===L.w||(P&&r.w===P.w)&&!isBulk(r.src)), key=r=>`${r.src}|${r.camp&&r.camp!=="No campaign"?r.camp:(r.srcLabel||"no source name")}`;
+  const L=Q.L, P=Q.P, R=(Q.rawRows||[]).filter(r=>r.w===L.w||(P&&r.w===P.w)&&!isBulk(r.src)), hasCamp=k=>/google\s*ads|identified\s*campaign/i.test(k||""), key=r=>hasCamp(r.src)?`${r.src}|${r.camp&&r.camp!=="No campaign"?r.camp:"no campaign name"}`:`${r.src}|`;  // campaign names only for Google Ads and Identified Campaigns
   const st=(u,w)=>{ const x=u.filter(r=>r.w===w); return {n:x.length,farm:x.filter(r=>r.hasFarm).length,b:x.filter(r=>r.salesH7>0).length,s:x.reduce((t,r)=>t+(r.salesH7||0),0),t:x.reduce((t,r)=>t+(r.benihH7||0),0)}; };
   const by=new Map(); R.filter(r=>!isBulk(r.src)).forEach(r=>{ const k=key(r); (by.get(k)||by.set(k,[]).get(k)).push(r); });
   return [...by].map(([k,u])=>{ const [src,name]=k.split("|"); const l=st(u,L.w), p=P?st(u,P.w):{n:0};
     const ags=new Map(); u.forEach(r=>{ if(r.adGroup) (ags.get(r.adGroup)||ags.set(r.adGroup,[]).get(r.adGroup)).push(r); });
-    return {src,name,camp:u[0].camp&&u[0].camp!=="No campaign",l,p,d:l.n-p.n,ad:[...ags].map(([g,v])=>({g,l:st(v,L.w),p:P?st(v,P.w):{n:0}})).sort((a,b)=>b.l.n-a.l.n)}; }).sort((a,b)=>b.l.n-a.l.n);
+    return {src,name,label:name?`${src} · ${name}`:src,camp:hasCamp(src)&&u[0].camp&&u[0].camp!=="No campaign",l,p,d:l.n-p.n,ad:!hasCamp(src)?[]:[...ags].map(([g,v])=>({g,l:st(v,L.w),p:P?st(v,P.w):{n:0}})).sort((a,b)=>b.l.n-a.l.n)}; }).sort((a,b)=>b.l.n-a.l.n);
 }
 // Campaigns that worked and why: volume first (20+ users a week), then what those users did (farm, buyers, sales H+7).
 function acqCampaignWorkSpec(Q,pre){
   const L=Q.L, P=Q.P, G=acqGroups(Q).filter(g=>g.l.n>=20||g.p.n>=20), rows=[], pc=(a,b)=>b?`${pct(a,b)}%`:"–";
   const line=(lab,x,p,bold,sub)=>[{v:lab,bold},{v:nf.format(x.n),bold:true},nf.format(p.n),{v:acqChg(x.n-p.n,p.n),bold:x.n>p.n},pc(x.farm,x.n),x.b?{v:`${x.b}`,bold:true}:"0",x.s?{v:rp(x.s),bold:true}:"–"];
-  G.forEach(g=>{ rows.push(line(`${g.src} · ${g.name}`,g.l,g.p,true)); if(g.l.n>=100||g.p.n>=100) g.ad.filter(a=>a.l.n>=20||a.p.n>=20).slice(0,3).forEach(a=>rows.push(line(`   ad group: ${a.g}`,a.l,a.p,false))); });
+  G.forEach(g=>{ rows.push(line(g.label,g.l,g.p,true)); if(g.l.n>=100||g.p.n>=100) g.ad.filter(a=>a.l.n>=20||a.p.n>=20).slice(0,3).forEach(a=>rows.push(line(`   ad group: ${a.g}`,a.l,a.p,false))); });
   const top=G.filter(g=>g.camp).sort((a,b)=>b.l.n-a.l.n)[0], buyAd=top&&top.ad.filter(a=>a.l.b).sort((a,b)=>b.l.b-a.l.b||b.l.s-a.l.s)[0], noAd=top&&top.ad.filter(a=>a.l.n>=50&&!a.l.b).sort((a,b)=>b.l.n-a.l.n)[0];
   const grow=G.filter(g=>g.d>0&&g.l.n>=20).sort((a,b)=>b.d-a.d).slice(0,3), idle=G.filter(g=>g.l.n>=50&&!g.l.b&&g!==top);
   const oth=G.filter(g=>g.src==="Other channel"), othL=L.src.get("Other channel")||0, othP=P?P.src.get("Other channel")||0:0;
   const days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], od=[0,1,2,3,4,5,6].map(i=>(Q.rawRows||[]).filter(r=>r.w===L.w&&r.src==="Other channel"&&r.jd&&dayN(new Date(L.w),r.jd)===i).length), pk=od.indexOf(Math.max(...od)), soc=acqSocial(Q).top;
   return {kicker:pre+"Acquisition · campaigns that worked and why",
     title:top?`${top.name} is the volume engine (${nf.format(top.l.n)} users, ${top.l.b} buyers, ${rp(top.l.s)})${buyAd?`; its “${buyAd.g}” ad group brought the buyers`:""}`:`Campaigns and sources with 20+ users`,
-    rows:[{cards:[{title:"Campaigns and sources with 20+ users a week",sub:`Last week vs the week before (${P?P.label:"–"}); ad groups for campaigns with 100+ users; farm = % who added a farm; bought and sales = within 7 days of joining`,
+    rows:[{cards:[{title:"Campaigns and sources with 20+ users a week",sub:`Vs ${P?P.label:"–"}; campaign names only for Google Ads and Identified Campaigns; farm = % with a farm; bought, sales = within 7 days`,
       table:{dense:true,colW:[40,9,9,13,8,8,13],head:["Source · campaign / ad group","Last week","Before","Change","Farm","Bought","Sales H+7"],align:["l","r","r","r","r","r","r"],rows}}]}],
     notes:[top&&`<b>Works on volume and sales: ${esc(top.name)}</b> (${top.src}) brought ${nf.format(top.l.n)} users (${pct(top.l.n,L.total)}% of last week) and ${top.l.b} buyers (${rp(top.l.s)}).${buyAd?` The reason is its purchase-intent ad group “${esc(buyAd.g)}”: ${buyAd.l.b} buyer${buyAd.l.b===1?"":"s"}, ${rp(buyAd.l.s)} from ${buyAd.l.n} users.`:""}${noAd?` “${esc(noAd.g)}” brings volume (${noAd.l.n}) but no buyer yet.`:""}${top.d<0?` Volume fell ${nf.format(top.p.n)} → ${nf.format(top.l.n)}: check its budget and status.`:""}`,
-      grow.length&&`<b>Growing with volume:</b> ${grow.map(g=>`${g.src} · ${esc(g.name)} ${nf.format(g.p.n)} → ${nf.format(g.l.n)} (${acqChg(g.d,g.p.n)})`).join("; ")}.`,
-      idle.length&&`<b>Volume without buyers yet:</b> ${idle.slice(0,3).map(g=>`${g.src} · ${esc(g.name)} ${nf.format(g.l.n)}`).join("; ")}; they register but have not ordered within 7 days.`,
-      othL&&`<b>Other channel and social media:</b> ${nf.format(othP)} → ${nf.format(othL)} users${oth.length?` (${oth.slice(0,2).map(g=>`“${esc(g.name)}” ${g.p.n} → ${g.l.n}`).join(", ")})`:""}, peak ${days[pk]} (${od[pk]} a day).${soc.length?` Social media posts last week: ${soc.map(c=>`@${esc(c.account)} (${esc(c.activity||c.platform)}, ${fds(new Date(c.date+"T12:00:00"))}, ${nf.format(c.views)} views)`).join(", ")}.`:""} Social media might boost organic acquisition; however, without a UTM the number can't be traced.`].filter(Boolean)};
+      grow.length&&`<b>Growing with volume:</b> ${grow.map(g=>`${esc(g.label)} ${nf.format(g.p.n)} → ${nf.format(g.l.n)} (${acqChg(g.d,g.p.n)})`).join("; ")}.`,
+      idle.length&&`<b>Volume without buyers yet:</b> ${idle.slice(0,3).map(g=>`${esc(g.label)} ${nf.format(g.l.n)}`).join("; ")}; they register but have not ordered within 7 days.`,
+      othL&&`<b>Other channel (organic) and social media:</b> ${nf.format(othP)} → ${nf.format(othL)} users (${acqChg(othL-othP,othP)}), the largest source, peak ${days[pk]} (${od[pk]} a day).${soc.length?` Social media posts last week: ${soc.map(c=>`@${esc(c.account)} (${esc(c.activity||c.platform)}, ${fds(new Date(c.date+"T12:00:00"))}, ${nf.format(c.views)} views)`).join(", ")}.`:""} Hypothesis: part of the organic users joined after seeing SawitPRO on social media. Social media might boost organic acquisition; however, without a UTM the number can't be traced.`].filter(Boolean)};
 }
 // Topaz seed bought by new accounts within 7 days of joining, per registration week, and what it means per new account.
 function acqTopazSpec(Q,pre){

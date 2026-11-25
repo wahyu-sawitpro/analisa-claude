@@ -123,7 +123,7 @@ the week before and on the average of every earlier complete week, the weekly ch
 the "Channels last week" table: last week, share and change vs the week before); (2) which channels worked and who bought
 (buyers within 7 days, H+7 sales and Topaz share, users by day of last order, buyers by channel, items bought; the note there analyses those buyers, while the channel growth note sits under "Channels last week" on the overview; campaign
 names from `campaign_name` only for a campaign with 100+ users in a week, any utm source; the note names the channels that added the most users and grew fastest, new
-channels and the largest drops); (3) campaigns that worked and why (every source · campaign, or utm source name when there is no campaign, with 20+
+channels and the largest drops); (3) campaigns that worked and why (sources with 20+ users a week; campaign names only for Google Ads and Identified Campaigns, Other channel and Meta as one row each; with 20+
 users a week; ad groups (`stslc_ad_group_name`) for campaigns with 100+ users; farm %, buyers and sales H+7; the note
 names the volume engine and the ad group that brought buyers, what grew, volume without buyers, and Other channel with
 the social media posts); (3b) Topaz seed from new accounts (Topaz H+7 per registration week, per new account, by source
