@@ -7,7 +7,7 @@ branch GitHub's upload page committed it to; --ref <remote branch> forces one) a
   3. writes the real rows to <out_dir>/real-sample.json and builds <out_dir>/index.html (published privately, never committed);
   4. prints a JSON summary of last week vs the week before (the reference numbers the deck must match).
 
-Usage: python3 deck/tools/weekly_registrations.py <out_dir> [--today YYYY-MM-DD] [--ref origin/<branch>]
+Usage: python3 deck/tools/weekly_registrations.py <out_dir> [--today YYYY-MM-DD] [--ref origin/<branch>] [--csv <local export>]
 Exit code 0 = fresh, 2 = file missing, 3 = file does not cover last week yet (nothing rebuilt).
 """
 import csv, datetime as dt, hashlib, io, json, os, pathlib, re, subprocess, sys
@@ -41,9 +41,12 @@ def main():
         dated = [(int(t), b) for t, b in dated if t]
         ref = max(dated)[1] if dated else "origin/main"
     r = git("show", f"{ref}:{CSV}")
+    if "--csv" in sys.argv:  # a local export the user sent in chat, newer than the one in the repo
+        path = pathlib.Path(sys.argv[sys.argv.index("--csv") + 1])
+        r = subprocess.CompletedProcess([], 0, path.read_text(encoding="utf-8-sig"), ""); ref = f"local file {path.name}"
     if r.returncode:
         print(json.dumps({"status": "missing", "file": CSV})); return 2
-    commit = ref + " " + git("log", "-1", "--format=%h %ci", ref, "--", CSV).stdout.strip()
+    commit = ref + ("" if ref.startswith("local file") else " " + git("log", "-1", "--format=%h %ci", ref, "--", CSV).stdout.strip())
     rows = list(csv.reader(io.StringIO(r.stdout.lstrip("﻿"))))
     H, body = rows[0], [x + [""] * (len(rows[0]) - len(x)) for x in rows[1:] if any(v.strip() for v in x)]
     I = {k: i for i, k in enumerate(H)}
