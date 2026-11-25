@@ -123,7 +123,7 @@ the week before and on the average of every earlier complete week, the weekly ch
 the "Channels last week" table: last week, share and change vs the week before); (2) which channels worked and who bought
 (buyers within 7 days, H+7 sales and Topaz share, users by day of last order, buyers by channel, items bought; the note there analyses those buyers, while the channel growth note sits under "Channels last week" on the overview; campaign
 names from `campaign_name` only for a campaign with 100+ users in a week, any utm source; the note names the channels that added the most users and grew fastest, new
-channels and the largest drops); (3) campaigns that worked and why (sources with 20+ users a week; campaign names only for Google Ads and Identified Campaigns, Other channel and Meta as one row each; with 20+
+channels and the largest drops); (3) campaigns that worked and why (only Google Ads / Identified Campaigns campaigns with 100+ farmers last week and their ad groups, else the top utm sources; next to them the social media posts of last week and Other channel users per day, post days darker; earlier rule: campaign names only for Google Ads and Identified Campaigns, Other channel and Meta as one row each; with 20+
 users a week; ad groups (`stslc_ad_group_name`) for campaigns with 100+ users; farm %, buyers and sales H+7; the note
 names the volume engine and the ad group that brought buyers, what grew, volume without buyers, and Other channel with
 the social media posts); (3b) Topaz seed from new accounts (Topaz H+7 per registration week, per new account, by source
@@ -135,7 +135,7 @@ appear only in the private build); then farmers vs estate owners,
 locations, users above 100 ha and next steps. Utm source Organic is shown as "Other channel" (likely social media
 activity); Injected User is a bulk add, not acquisition; Purchasing Topaz = joined without an ad and bought Topaz on the join day, labelled "Purchasing Topaz (bought Topaz on join day)". No executive summary and no Duta vs non-Duta breakdown. Social
 media: `deck/src/organic-content.json` (date, platform, account, views) is read from origin/main by the weekly script;
-a trailing comma is tolerated. When it has posts dated last week, the trend slide shows the top 3 accounts by views (best
+a trailing comma is tolerated. When it has posts dated last week, the campaigns slide shows the top 3 accounts by views (best
 post each, with the `activity` column, e.g. KOL or Participant Petani Juara) next to farmers per day, and the note says
 social media might boost acquisition but without a UTM the number can't be traced; otherwise the table is left out.
 
