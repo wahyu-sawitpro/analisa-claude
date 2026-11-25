@@ -14,6 +14,7 @@ import csv, datetime as dt, hashlib, io, json, os, pathlib, re, subprocess, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CSV = "Farmer register for weekly farmer.csv"
+LTV = "Median LTV Farmer - B2C.csv"
 WIB = dt.timezone(dt.timedelta(hours=7))
 
 
@@ -84,7 +85,16 @@ def main():
             y[I["farm_name"]] = "[" + ", ".join(f"Farm {k + 1}" for k in range(y[I["farm_name"]].count(",") + 1)) + "]"
         if "referral_utm" in I: y[I["referral_utm"]] = y[I["referral_utm"]][:40]
         hashed.append({k: (y[i] or None) for i, k in enumerate(H)})
-    src = lambda rows_: {"sources": [{"name": CSV, "sheet": None, "headers": H, "rows": rows_}]}
+    # the B2C LTV export (aggregate numbers only, no customer data): added as a second source when present
+    ltv = git("show", f"{ref}:{LTV}")
+    if ltv.returncode: ltv = git("show", f"origin/main:{LTV}")
+    extra = []
+    if not ltv.returncode:
+        lr = list(csv.reader(io.StringIO(ltv.stdout.lstrip("\ufeff"))))
+        if len(lr) > 1:
+            extra = [{"name": LTV, "sheet": None, "headers": lr[0], "rows": [{k: (v or None) for k, v in zip(lr[0], lr[1])}]}]
+            info["ltv"] = dict(zip(lr[0], lr[1]))
+    src = lambda rows_: {"sources": [{"name": CSV, "sheet": None, "headers": H, "rows": rows_}] + extra}
     (ROOT / "deck/src/sample-data.json").write_text(json.dumps(src(hashed), ensure_ascii=False))
     (out / "real-sample.json").write_text(json.dumps(src(real), ensure_ascii=False))
     subprocess.run([sys.executable, str(ROOT / "deck/build.py")], check=True, stdout=subprocess.DEVNULL)

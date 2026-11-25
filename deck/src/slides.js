@@ -638,6 +638,76 @@ function acqSocial(Q){ const L=Q.L, best=new Map();
   (typeof ORGANIC_CONTENT!=="undefined"?ORGANIC_CONTENT:[]).forEach(c=>{ const x=+new Date(c.date+"T12:00:00"); if(x<L.w||x>=L.w+7*864e5) return; const o=best.get(c.account); if(!o||c.views>o.views) best.set(c.account,c); });
   const top=[...best.values()].sort((a,b)=>b.views-a.views).slice(0,3);
   return {top,rows:top.map(c=>[fds(new Date(c.date+"T12:00:00")),`@${c.account}`,c.activity||c.platform,{v:nf.format(c.views),bold:true}])}; }
+// Group last week's and the week before's users by source and campaign (or, without a campaign, the utm source name).
+function acqGroups(Q){
+  const L=Q.L, P=Q.P, R=(Q.rawRows||[]).filter(r=>r.w===L.w||(P&&r.w===P.w)&&!isBulk(r.src)), key=r=>`${r.src}|${r.camp&&r.camp!=="No campaign"?r.camp:(r.srcLabel||"no source name")}`;
+  const st=(u,w)=>{ const x=u.filter(r=>r.w===w); return {n:x.length,farm:x.filter(r=>r.hasFarm).length,b:x.filter(r=>r.salesH7>0).length,s:x.reduce((t,r)=>t+(r.salesH7||0),0),t:x.reduce((t,r)=>t+(r.benihH7||0),0)}; };
+  const by=new Map(); R.filter(r=>!isBulk(r.src)).forEach(r=>{ const k=key(r); (by.get(k)||by.set(k,[]).get(k)).push(r); });
+  return [...by].map(([k,u])=>{ const [src,name]=k.split("|"); const l=st(u,L.w), p=P?st(u,P.w):{n:0};
+    const ags=new Map(); u.forEach(r=>{ if(r.adGroup) (ags.get(r.adGroup)||ags.set(r.adGroup,[]).get(r.adGroup)).push(r); });
+    return {src,name,camp:u[0].camp&&u[0].camp!=="No campaign",l,p,d:l.n-p.n,ad:[...ags].map(([g,v])=>({g,l:st(v,L.w),p:P?st(v,P.w):{n:0}})).sort((a,b)=>b.l.n-a.l.n)}; }).sort((a,b)=>b.l.n-a.l.n);
+}
+// Campaigns that worked and why: volume first (20+ users a week), then what those users did (farm, buyers, sales H+7).
+function acqCampaignWorkSpec(Q,pre){
+  const L=Q.L, P=Q.P, G=acqGroups(Q).filter(g=>g.l.n>=20||g.p.n>=20), rows=[], pc=(a,b)=>b?`${pct(a,b)}%`:"–";
+  const line=(lab,x,p,bold,sub)=>[{v:lab,bold},{v:nf.format(x.n),bold:true},nf.format(p.n),{v:acqChg(x.n-p.n,p.n),bold:x.n>p.n},pc(x.farm,x.n),x.b?{v:`${x.b}`,bold:true}:"0",x.s?{v:rp(x.s),bold:true}:"–"];
+  G.forEach(g=>{ rows.push(line(`${g.src} · ${g.name}`,g.l,g.p,true)); if(g.l.n>=100||g.p.n>=100) g.ad.filter(a=>a.l.n>=20||a.p.n>=20).slice(0,3).forEach(a=>rows.push(line(`   ad group: ${a.g}`,a.l,a.p,false))); });
+  const top=G.filter(g=>g.camp).sort((a,b)=>b.l.n-a.l.n)[0], buyAd=top&&top.ad.filter(a=>a.l.b).sort((a,b)=>b.l.b-a.l.b||b.l.s-a.l.s)[0], noAd=top&&top.ad.filter(a=>a.l.n>=50&&!a.l.b).sort((a,b)=>b.l.n-a.l.n)[0];
+  const grow=G.filter(g=>g.d>0&&g.l.n>=20).sort((a,b)=>b.d-a.d).slice(0,3), idle=G.filter(g=>g.l.n>=50&&!g.l.b&&g!==top);
+  const oth=G.filter(g=>g.src==="Other channel"), othL=L.src.get("Other channel")||0, othP=P?P.src.get("Other channel")||0:0;
+  const days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], od=[0,1,2,3,4,5,6].map(i=>(Q.rawRows||[]).filter(r=>r.w===L.w&&r.src==="Other channel"&&r.jd&&dayN(new Date(L.w),r.jd)===i).length), pk=od.indexOf(Math.max(...od)), soc=acqSocial(Q).top;
+  return {kicker:pre+"Acquisition · campaigns that worked and why",
+    title:top?`${top.name} is the volume engine (${nf.format(top.l.n)} users, ${top.l.b} buyers, ${rp(top.l.s)})${buyAd?`; its “${buyAd.g}” ad group brought the buyers`:""}`:`Campaigns and sources with 20+ users`,
+    rows:[{cards:[{title:"Campaigns and sources with 20+ users a week",sub:`Last week vs the week before (${P?P.label:"–"}); ad groups for campaigns with 100+ users; farm = % who added a farm; bought and sales = within 7 days of joining`,
+      table:{dense:true,colW:[40,9,9,13,8,8,13],head:["Source · campaign / ad group","Last week","Before","Change","Farm","Bought","Sales H+7"],align:["l","r","r","r","r","r","r"],rows}}]}],
+    notes:[top&&`<b>Works on volume and sales: ${esc(top.name)}</b> (${top.src}) brought ${nf.format(top.l.n)} users (${pct(top.l.n,L.total)}% of last week) and ${top.l.b} buyers (${rp(top.l.s)}).${buyAd?` The reason is its purchase-intent ad group “${esc(buyAd.g)}”: ${buyAd.l.b} buyer${buyAd.l.b===1?"":"s"}, ${rp(buyAd.l.s)} from ${buyAd.l.n} users.`:""}${noAd?` “${esc(noAd.g)}” brings volume (${noAd.l.n}) but no buyer yet.`:""}${top.d<0?` Volume fell ${nf.format(top.p.n)} → ${nf.format(top.l.n)}: check its budget and status.`:""}`,
+      grow.length&&`<b>Growing with volume:</b> ${grow.map(g=>`${g.src} · ${esc(g.name)} ${nf.format(g.p.n)} → ${nf.format(g.l.n)} (${acqChg(g.d,g.p.n)})`).join("; ")}.`,
+      idle.length&&`<b>Volume without buyers yet:</b> ${idle.slice(0,3).map(g=>`${g.src} · ${esc(g.name)} ${nf.format(g.l.n)}`).join("; ")}; they register but have not ordered within 7 days.`,
+      othL&&`<b>Other channel and social media:</b> ${nf.format(othP)} → ${nf.format(othL)} users${oth.length?` (${oth.slice(0,2).map(g=>`“${esc(g.name)}” ${g.p.n} → ${g.l.n}`).join(", ")})`:""}, peak ${days[pk]} (${od[pk]} a day).${soc.length?` Social media posts last week: ${soc.map(c=>`@${esc(c.account)} (${esc(c.activity||c.platform)}, ${fds(new Date(c.date+"T12:00:00"))}, ${nf.format(c.views)} views)`).join(", ")}.`:""} Social media might boost organic acquisition; however, without a UTM the number can't be traced.`].filter(Boolean)};
+}
+// Topaz seed bought by new accounts within 7 days of joining, per registration week, and what it means per new account.
+function acqTopazSpec(Q,pre){
+  const L=Q.L, P=Q.P, W=Q.weeks; if(!L.buyH7) return null;
+  const tz=w=>(w.buyH7||[]).filter(r=>r.benihH7>0), tS=w=>tz(w).reduce((t,r)=>t+r.benihH7,0), T=tz(L), TP=P?tz(P):[], s=tS(L), sp=P?tS(P):0;
+  const byG=new Map(); T.forEach(r=>{ const k=`${r.src}${r.camp&&r.camp!=="No campaign"?` · ${r.camp}`:""}`; const o=byG.get(k)||{k,b:0,s:0,n:0}; o.b++; o.s+=r.benihH7; byG.set(k,o); });
+  const byI=new Map(); T.forEach(r=>[...new Set((r.itemsH7||[]).filter(i=>/topaz/i.test(i)).map(buyItem))].forEach(i=>byI.set(i,(byI.get(i)||0)+1)));
+  const kp=[{v:rpParts(s)[0],u:rpParts(s)[1],l:`Topaz bought in 7 days by last week's new accounts${P?` (${rp(sp)} before)`:""}`,hot:true},
+    {v:nf.format(T.length),u:`/${nf.format(L.total)}`,l:`new accounts bought Topaz (${(T.length/L.total*100).toFixed(1)}%)${P?`; ${TP.length} the week before`:""}`},
+    {v:`Rp${nf.format(Math.round(s/L.total))}`,u:"",l:`Topaz per new account${P?` (Rp${nf.format(Math.round(sp/P.total))} the week before)`:""}`},
+    {v:rpParts(T.length?s/T.length:0)[0],u:rpParts(T.length?s/T.length:0)[1],l:`average Topaz order per buying account`}];
+  const all=L.buyH7.reduce((t,r)=>t+r.salesH7,0);
+  return {kicker:pre+"Sales · Topaz seed from new farmer accounts",
+    title:`Last week's new accounts bought ${rp(s)} of Topaz within 7 days${P?` (${sp?`${(s/sp).toFixed(1)}×`:"up from Rp0"} the week before)`:""}: ${T.length} of ${nf.format(L.total)} accounts, Rp${nf.format(Math.round(s/L.total))} per new account`,
+    rows:[{h:84,cards:[{kpiRow:kp}]},{cards:[
+      {w:1,title:"Topaz H+7 by registration week",sub:"Topaz (benih) bought within 7 days by each week's new accounts",chart:{type:"column",cats:W.map(w=>w.short),series:[{name:"Topaz",values:W.map(tS),colors:W.map((w,i)=>i===W.length-1?CAT[0]:"#A9B7A0")}],fmt:v=>v?rp(v).replace("Rp",""):"0",lblH:22}},
+      {w:1.1,title:"Topaz buyers by source",table:{colW:[56,14,30],head:["Source · campaign","Buyers","Topaz H+7"],align:["l","r","r"],rows:[...byG.values()].sort((a,b)=>b.s-a.s).map(o=>[o.k,{v:String(o.b),bold:true},{v:rp(o.s),bold:true}])}},
+      {w:.8,title:"Topaz variants",table:{colW:[72,28],head:["Item","Accounts"],align:["l","r"],rows:[...byI].sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,{v:String(v),bold:true}])}}]}],
+    notes:[`<b>Translation to new accounts:</b> ${T.length} of ${nf.format(L.total)} new accounts (${(T.length/L.total*100).toFixed(1)}%) bought Topaz within 7 days, ${rp(s)} or Rp${nf.format(Math.round(s/L.total))} per new account; Topaz is ${pct(s,all||1)}% of their first-week sales.`,
+      `<b>Trend:</b> ${W.slice(-4).map(w=>`${w.short} ${rp(tS(w))} (${tz(w).length})`).join(" → ")}.`,
+      `<b>Bibit:</b> the export has no bibit (seedling) item; Topaz seed (benih) is the only seed product new accounts bought.`,
+      `<b>H+7</b> is not complete yet for accounts that joined after ${fds(new Date(Q.lastDate-7*864e5))}, so last week's Topaz can still grow.`]};
+}
+// LTV from the B2C LTV export, against what last week's new accounts did in their first 7 days.
+function acqLtvSpec(Q,pre){
+  const V=Q.ltv, L=Q.L, W=Q.weeks; if(!V||!V.registered) return null;
+  const B=L.buyH7||[], s=B.reduce((t,r)=>t+r.salesH7,0), perNew=s/L.total, perCust=V.gmv/(V.customers||1), rate=V.customers/V.registered;
+  const per=w=>w.buyH7?w.buyH7.reduce((t,r)=>t+r.salesH7,0)/w.total:0;
+  const kp=[{v:`Rp${nf.format(Math.round(V.ltvGmv))}`,u:"",l:`LTV per registered farmer (B2C GMV ÷ ${nf.format(V.registered)} registered farmers)`,hot:true},
+    {v:`${(rate*100).toFixed(2)}%`,u:"",l:`of registered farmers have bought B2C (${nf.format(V.customers)} customers)`},
+    {v:rpParts(perCust)[0],u:rpParts(perCust)[1],l:`GMV per B2C customer (${rp(V.gmv)} in total)`},
+    {v:`Rp${nf.format(Math.round(perNew))}`,u:"",l:`first-7-day sales per new account last week (${pct(perNew,V.ltvGmv)}% of the LTV)`}];
+  const rows=[["Users",nf.format(V.registered),nf.format(L.total)],["Buyers",nf.format(V.customers),nf.format(B.length)],["Buyer rate",`${(rate*100).toFixed(2)}%`,`${(B.length/L.total*100).toFixed(2)}%`],
+    ["Sales (GMV)",rp(V.gmv),rp(s)],[{v:"Sales per user",bold:true},{v:`Rp${nf.format(Math.round(V.ltvGmv))}`,bold:true},{v:`Rp${nf.format(Math.round(perNew))}`,bold:true}],["Sales per buyer",rp(perCust),rp(B.length?s/B.length:0)]];
+  return {kicker:pre+"LTV · what a new farmer is worth",
+    title:`A registered farmer is worth Rp${nf.format(Math.round(V.ltvGmv))} in B2C GMV; last week's new accounts reached Rp${nf.format(Math.round(perNew))} (${pct(perNew,V.ltvGmv)}%) in their first 7 days`,
+    rows:[{h:84,cards:[{kpiRow:kp}]},{cards:[
+      {w:1,title:"All registered farmers vs last week's new accounts",sub:"Lifetime B2C (LTV export) vs the first 7 days after joining",table:{dense:true,colW:[34,33,33],head:["","All farmers, lifetime","New accounts, 7 days"],align:["l","r","r"],rows}},
+      {w:1,title:"First-7-day sales per new account, by registration week",sub:`Rupiah per new account; LTV per registered farmer Rp${nf.format(Math.round(V.ltvGmv))}`,chart:{type:"column",cats:W.map(w=>w.short),series:[{name:"Per account",values:W.map(per),colors:W.map((w,i)=>i===W.length-1?CAT[0]:"#A9B7A0")}],fmt:v=>nf.format(Math.round(v/1000))+"k",lblH:22}}]}],
+    notes:[`<b>Average, not median:</b> the file is called Median LTV, but the query divides total B2C GMV by every registered farmer. Only ${(rate*100).toFixed(2)}% have bought, so the median farmer is worth Rp0; the value sits in ${nf.format(V.customers)} customers.`,
+      `<b>New accounts start faster:</b> last week's buyer rate in 7 days (${(B.length/L.total*100).toFixed(1)}%) is already above the lifetime rate (${(rate*100).toFixed(2)}%), driven by Topaz. Each extra buyer adds about ${rp(B.length?s/B.length:0)} in the first week and ${rp(perCust)} over a lifetime.`,
+      `<b>Use it for spend:</b> the cost to acquire a farmer should stay below the LTV × gross margin (Rp${nf.format(Math.round(V.ltvGmv))} GMV per farmer before margin); a buyer is worth ${rp(perCust)} of GMV.`,
+      V.net>V.gmv&&`<b>Check:</b> net sales (${rp(V.net)}) is above GMV (${rp(V.gmv)}) in the export; confirm the net_sales definition.`].filter(Boolean)};
+}
 // The analysis under "Channels last week": which channels added the most users, grew fastest, fell most.
 function acqChannelNotes(Q){
   const L=Q.L, P=Q.P; if(!P) return [];
@@ -729,7 +799,7 @@ function acqNarrative(T){
   const Q=T[0].A.acq, L=Q.L, P=Q.P, d=P?L.total-P.total:0, top=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d)[0], ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), extAll=Q.weeks.reduce((s,x)=>s+x.real,0);
   const D=Q.dutas, act=D.filter(x=>x.l), intD=D.filter(x=>x.internal), extD=D.filter(x=>!x.internal), lead=[...D].sort((a,b)=>b.tot-a.tot)[0];
   const topC=Q.camps[0], gainC=Q.camps[Q.camps.length-1], X={multi:false,acq:true,gaps:[],dates:Q.dates};
-  X.preSpecs=[Q.weeks.length>1&&acqOverviewSpec(Q,""),Q.P&&acqChannelSpec(Q,"")].filter(Boolean); X.noSummary=true;
+  X.preSpecs=[Q.weeks.length>1&&acqOverviewSpec(Q,""),Q.P&&acqChannelSpec(Q,""),Q.P&&acqCampaignWorkSpec(Q,""),Q.P&&acqTopazSpec(Q,""),acqLtvSpec(Q,"")].filter(Boolean); X.noSummary=true;
   X.eyebrow="Farmer Acquisition"; X.title=`Duta vs Non-Duta, ${L.label}`; X.period=`Week of ${L.label} ${new Date(L.w).getFullYear()}`; X.meta=P?`vs ${P.label}`:`${nf.format(L.total)} farmers`;
   X.headline=P?`${nf.format(L.total)} farmers joined last week, ${sg(d)} (${spc(L.total,P.total)}): ${nf.format(L.under)} through Dutas (${sg(L.under-P.under)}) and ${nf.format(L.non)} without (${sg(L.non-P.non)})`:`${nf.format(L.total)} farmers joined in the week of ${L.label}`;
   X.kpis=[{v:nf.format(L.total),u:"",l:`farmers registered ${L.label}${P?`, ${sg(d)} (${spc(L.total,P.total)}) on ${P.label}`:""}`,hot:true},

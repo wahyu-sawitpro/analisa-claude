@@ -123,7 +123,13 @@ the week before and on the average of every earlier complete week, the weekly ch
 the "Channels last week" table: last week, share and change vs the week before); (2) which channels worked and who bought
 (buyers within 7 days, H+7 sales and Topaz share, users by day of last order, buyers by channel, items bought; the note there analyses those buyers, while the channel growth note sits under "Channels last week" on the overview; campaign
 names from `campaign_name` only for a campaign with 100+ users in a week, any utm source; the note names the channels that added the most users and grew fastest, new
-channels and the largest drops); (3) the weekly trend by channel; (4) who bought within 7 days of joining (`total_sales_h7`, `total_sales_benih_h7` =
+channels and the largest drops); (3) campaigns that worked and why (every source · campaign, or utm source name when there is no campaign, with 20+
+users a week; ad groups (`stslc_ad_group_name`) for campaigns with 100+ users; farm %, buyers and sales H+7; the note
+names the volume engine and the ad group that brought buyers, what grew, volume without buyers, and Other channel with
+the social media posts); (3b) Topaz seed from new accounts (Topaz H+7 per registration week, per new account, by source
+and variant); (3c) LTV from `Median LTV Farmer - B2C.csv` (the weekly script adds it as a second source; it is an
+average per registered farmer, not a median) against last week's first-7-day sales per new account; (3d) the weekly
+trend by channel; (4) who bought within 7 days of joining (`total_sales_h7`, `total_sales_benih_h7` =
 Topaz seed, `items_h7`; one row per buyer with name, channel, join date, last order date as H+n, amounts and items; names
 appear only in the private build); then farmers vs estate owners,
 locations, users above 100 ha and next steps. Utm source Organic is shown as "Other channel" (likely social media

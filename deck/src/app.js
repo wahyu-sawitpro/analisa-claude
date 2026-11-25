@@ -60,7 +60,7 @@ async function loadFiles(list,add=addMode){
   note(""); const failed=[], added=[];
   for(const f of files){ try{ added.push(...await readFile(f)); }catch(e){ failed.push(`“${f.name}”: ${e.message}`); } }
   // the Farmer Registrations deck only takes the farmer-register export
-  if(DECK_MODE==="registrations"){ const other=added.filter(d=>detectRole(d.headers)!=="acq"); other.forEach(d=>failed.push(`“${d.name}”: this deck only analyses the farmer register export (Farmer register for weekly farmer.csv)`));
+  if(DECK_MODE==="registrations"){ const other=added.filter(d=>!["acq","ltv"].includes(detectRole(d.headers))); other.forEach(d=>failed.push(`“${d.name}”: this deck only analyses the farmer register export (Farmer register for weekly farmer.csv) and the B2C LTV export (Median LTV Farmer - B2C.csv)`));
     for(let i=added.length-1;i>=0;i--) if(other.includes(added[i])) added.splice(i,1); }
   if(added.length){
     if(state.sample||!add){ state.sources=[]; state.sample=false; }

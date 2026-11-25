@@ -70,7 +70,7 @@ const detectCrm=h=>detectWith(CRM_FIELDS,h), detectSales=h=>detectWith(SALES_FIE
 // A farmer acquisition export: one row per registered farmer, with the registration week and Duta / non-Duta type.
 const ACQ_FIELDS=[["week",[/minggu_?register|register_?week|week_?register|^minggu$|^week$/]],["type",[/akuisisi_?type|acquisition_?type/]],["joined",[/join_?date_?farmer|register_?date|join_?date|tanggal_?daftar/]],
   ["source",[/^utm_?source$/]],["campaign",[/^campaign_?name$/,/^utm_?source_?name$|utm_?campaign/]],["referral",[/^referral_?utm$/]],["status",[/status_?under_?duta/]],["duta",[/^duta_?id$|^duta_?name$/]],["dutaName",[/^duta_?name$/]],
-  ["test",[/is_?test_?duta|is_?test/]],["role",[/user_?role|^role$/]],["farms",[/jumlah_?farm|farm_?count|num_?farms/]],["ha",[/total_?area_?hectare|area_?hectare|^hectare|luas/]],["prov",[/^province$|^provinsi$/]],["regency",[/^regency$|^kabupaten$/]],["farmHa",[/detail_?hectare|farm_?hectares?$/]],["name",[/farmer_?name|^name$|user_?name/]],["farmName",[/^farm_?name$/]],["lastSale",[/last_?sale_?order_?date|last_?order_?date/]],["regSales",[/total_?sales_?register_?date|sales_?(on_?)?register/]],["benihH7",[/^total_?sales_?benih_?h_?7$/]],["salesH7",[/^total_?sales_?h_?7$/]],["itemsH7",[/^items_?h_?7$/]],["lastBenih",[/last_?benih_?order_?date/]],["lastToling",[/last_?toling_?order_?date/]],["lastMasker",[/last_?masker_?order_?date/]],["email",[/farmer_?email|^e-?mail$/]],["farmLoc",[/^location$|farm_?location/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
+  ["test",[/is_?test_?duta|is_?test/]],["role",[/user_?role|^role$/]],["farms",[/jumlah_?farm|farm_?count|num_?farms/]],["ha",[/total_?area_?hectare|area_?hectare|^hectare|luas/]],["prov",[/^province$|^provinsi$/]],["regency",[/^regency$|^kabupaten$/]],["farmHa",[/detail_?hectare|farm_?hectares?$/]],["name",[/farmer_?name|^name$|user_?name/]],["farmName",[/^farm_?name$/]],["lastSale",[/last_?sale_?order_?date|last_?order_?date/]],["regSales",[/total_?sales_?register_?date|sales_?(on_?)?register/]],["adGroup",[/ad_?group_?name|^ad_?group$/]],["srcLabel",[/^utm_?source_?name$/]],["benihH7",[/^total_?sales_?benih_?h_?7$/]],["salesH7",[/^total_?sales_?h_?7$/]],["itemsH7",[/^items_?h_?7$/]],["lastBenih",[/last_?benih_?order_?date/]],["lastToling",[/last_?toling_?order_?date/]],["lastMasker",[/last_?masker_?order_?date/]],["email",[/farmer_?email|^e-?mail$/]],["farmLoc",[/^location$|farm_?location/]],["phone",[/farmer_?phone|^phone$|no_?hp/]],["id",[/farmer_?id/]]];
 const detectAcq=h=>detectWith(ACQ_FIELDS,h);
 const isAcqList=headers=>{ const m=detectAcq(headers); return !!(m.type||m.week&&m.joined&&(m.id||m.duta)); };
 // A DO (FFB supplier) pipeline export from the CRM: one row per DO lead, with area, potential FFB and the nearest mill.
@@ -82,7 +82,12 @@ const isDoList=headers=>{ const m=detectDo(headers); return !!(m.doName||m.ffb&&
 // A price list: item names and a price column, no order or quantity columns.
 const isPriceList=headers=>{ const h=headers.map(norm);
   return h.some(x=>/nama barang|item|product|produk/.test(x))&&h.some(x=>/harga|price/.test(x))&&!h.some(x=>/^qty$|quantity|order|invoice|gmv/.test(x)); };
+// The B2C LTV export: one row with registered farmers, B2C customers, total GMV / net sales and LTV per registered farmer.
+const isLtv=headers=>{ const h=headers.map(x=>String(x).toLowerCase().trim()); return h.includes("registered_user")&&h.some(x=>/^ltv_/.test(x)); };
+function ltvOf(d){ const r=d.rows[0]||{}, g=k=>toNum(r[Object.keys(r).find(x=>x.toLowerCase().trim()===k)]);
+  return {name:d.name,registered:g("registered_user"),customers:g("customer"),gmv:g("total_gmv_b2c"),net:g("total_net_sales_b2c"),ltvGmv:g("ltv_gmv"),ltvNet:g("ltv_net_sales")}; }
 function detectRole(headers){
+  if(isLtv(headers)) return "ltv";
   if(isAcqList(headers)) return "acq";
   if(isDoList(headers)) return "do";
   if(isPriceList(headers)) return "price";
@@ -766,7 +771,8 @@ function analyseTeams(sources){
   const acq=sources.filter(d=>(d.role&&d.role!=="auto"?d.role:detectRole(d.headers))==="acq");
   const dop=sources.filter(d=>(d.role&&d.role!=="auto"?d.role:detectRole(d.headers))==="do");
   if(dop.length&&!acq.length){ const Q=doPipeline(dop); return [{name:"DO pipeline",A:{dop:Q,crm:[],orders:[],won:[],has:{},dates:Q.dates,gmv:0},C:null,sources:dop,left:sources.length-dop.length}]; }
-  if(acq.length){ const Q=acquisition(acq); return [{name:"Farmer acquisition",A:{acq:Q,crm:[],orders:[],won:[],has:{},dates:Q.dates,gmv:0},C:null,sources:acq,left:sources.length-acq.length}]; }
+  const ltv=sources.filter(d=>(d.role&&d.role!=="auto"?d.role:detectRole(d.headers))==="ltv");
+  if(acq.length){ const Q=acquisition(acq); if(ltv.length) Q.ltv=ltvOf(ltv[0]); return [{name:"Farmer acquisition",A:{acq:Q,crm:[],orders:[],won:[],has:{},dates:Q.dates,gmv:0},C:null,sources:acq,left:sources.length-acq.length}]; }
   const TR=trendMode(sources), parts=new Map(), add=(t,d)=>{ if(!parts.has(t)) parts.set(t,[]); parts.get(t).push(d); };
   const prices=[];
   for(const d of sources){
@@ -954,7 +960,7 @@ function acqProfile(r,m){ if(!m.role&&!m.ha&&!m.prov) return {};
   const farmList=fh.map((h,i)=>({name:fn[i]||null,ha:Math.round(h*100)/100,district:fl[i]?.[0]||null,regency:fl[i]?.[1]||null,prov:fl[i]?.[2]||null}));
   const lastOrd=["lastSale","lastBenih","lastToling","lastMasker"].map(k=>m[k]?toDate(r[m[k]]):null).filter(Boolean).sort((a,b)=>b-a)[0]||null;
   const items=m.itemsH7?String(r[m.itemsH7]??"").trim().replace(/^\[|\]$/g,"").split(/,\s+(?=[A-Z\[])/).map(x=>x.trim()).filter(Boolean):[];
-  return {salesH7:m.salesH7?(toNum(r[m.salesH7])||0):null,benihH7:m.benihH7?(toNum(r[m.benihH7])||0):null,itemsH7:items,lastOrd,regSales:m.regSales?(toNum(r[m.regSales])||0):null,jraw:clean(r[m.joined]),ordered:m.lastSale?!blank(r[m.lastSale]):null,farmList,name:m.name?clean(r[m.name]):null,contact:(m.phone&&clean(r[m.phone]))||(m.email&&clean(r[m.email]))||null,role:m.role?ROLE_OF(r[m.role]):null,roleRaw:clean(r[m.role]),ha:ha||0,farms:farms||0,hasFarm:(farms||0)>0||(ha||0)>0,prov:m.prov?firstOf(r[m.prov]):null,regency:m.regency?firstOf(r[m.regency]):null}; }
+  return {adGroup:m.adGroup?clean(r[m.adGroup]):null,srcLabel:m.srcLabel?clean(r[m.srcLabel]):null,salesH7:m.salesH7?(toNum(r[m.salesH7])||0):null,benihH7:m.benihH7?(toNum(r[m.benihH7])||0):null,itemsH7:items,lastOrd,regSales:m.regSales?(toNum(r[m.regSales])||0):null,jraw:clean(r[m.joined]),ordered:m.lastSale?!blank(r[m.lastSale]):null,farmList,name:m.name?clean(r[m.name]):null,contact:(m.phone&&clean(r[m.phone]))||(m.email&&clean(r[m.email]))||null,role:m.role?ROLE_OF(r[m.role]):null,roleRaw:clean(r[m.role]),ha:ha||0,farms:farms||0,hasFarm:(farms||0)>0||(ha||0)>0,prov:m.prov?firstOf(r[m.prov]):null,regency:m.regency?firstOf(r[m.regency]):null}; }
 // Weekly registrations from the export: the last full week against the week before, split by Duta / non-Duta, channel and campaign.
 // A week that is still in progress (its data stops before the Sunday) is left out.
 function acquisition(sources){
