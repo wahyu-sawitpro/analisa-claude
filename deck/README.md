@@ -326,3 +326,4 @@ constants at the top of `acqLtvSpec` in `deck/src/slides.js`; 3x LTV / CAC is tr
 last order date (sale, Topaz/benih, Toko Keliling, masker).
 Users above 50 ha: a slide after "where users are" with the count per week, by province and regency (no names), total
 hectares and a Good/Bad verdict against the week before and the average week.
+Topaz slide: "When they bought Topaz" shows days from joining to the latest Topaz order (last_benih_order_date): join day, H+1, H+2 ...
