@@ -2018,7 +2018,7 @@ function acqSpecs(Q,pre){
   const drops=Q.dSrc.filter(x=>x.d<0).sort((a,b)=>a.d-b.d), ups=Q.dSrc.filter(x=>x.d>0).sort((a,b)=>b.d-a.d), top=drops[0];
   if(L.buyH7) S.push(...acqBuyersSpecs(Q,pre));
   else if(L.buyDay&&L.buyDay.concat(P?P.buyDay||[]:[]).some(c=>c.n)) S.push(acqBuyDaySpec(Q,pre));
-  if(Q.profile) S.push(...acqProfileSpecs(Q,pre));
+  if(Q.profile){ const ps=acqProfileSpecs(Q,pre), wi=ps.findIndex(x=>/where users are/.test(x.kicker)); ps.splice(wi+1,0,acqBigFarmSpec(Q,pre)); S.push(...ps); }
   // Weekly trend by channel and the days of the week
   const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   S.push({kicker:pre+`Acquisition · ${W.length}-week trend`,
@@ -2193,6 +2193,28 @@ function acqCampaignWorkSpec(Q,pre){
       {w:1.2,title:"Other channel (organic) users per day",sub:soc.length?`Post days: ${[...new Set(soc.map(c=>days[dayN(new Date(L.w),new Date(c.date+"T12:00:00"))]))].join(", ")} (darker)`:"Last week",chart:{type:"column",cats:days,series:[{name:"Other channel",values:od,colors:days.map((d,i)=>soc.some(c=>dayN(new Date(L.w),new Date(c.date+"T12:00:00"))===i)?CAT[0]:"#A9B7A0")}],lblH:20}}]}],
     notes:[(()=>{ const pd=[...new Set(soc.map(c=>dayN(new Date(L.w),new Date(c.date+"T12:00:00"))))].filter(i=>i>=0&&i<7).sort(), lp=Math.max(...pd), aft=od.slice(lp+1), bef=od.filter((v,i)=>i<=lp); return pd.length&&aft.length?`<b>Good:</b> after the posts ${Math.round(aft.reduce((a,b)=>a+b,0)/aft.length)} users a day vs ${Math.round(bef.reduce((a,b)=>a+b,0)/bef.length)} before; peak ${days[pk]} (${od[pk]}).`:`<b>Peak:</b> ${days[pk]} (${od[pk]} users).`; })(),
       `<b>Watch:</b> social media may boost organic sign-ups, but without a UTM the number can't be traced. Add a UTM to each post.`].filter(Boolean)}];
+}
+// Users with more than 50 ha (total area as entered by the user): how many, where, and whether that is up or down.
+function acqBigFarmSpec(Q,pre,MIN=50){
+  const L=Q.L, P=Q.P, W=Q.weeks, R=Q.rawRows||[], big=w=>R.filter(r=>r.w===w&&r.ha>MIN), U=big(L.w), UP=P?big(P.w):[], ha=u=>u.reduce((t,r)=>t+r.ha,0);
+  const prior=W.slice(0,-1).map(w=>big(w.w).length), avg=prior.length?prior.reduce((a,b)=>a+b,0)/prior.length:0;
+  const pv=new Map(); U.forEach(r=>{ const k=r.prov||"No province"; const o=pv.get(k)||{k,n:0,ha:0}; o.n++; o.ha+=r.ha; pv.set(k,o); });
+  const rg=new Map(); U.forEach(r=>{ const k=`${r.regency||"–"}|${r.prov||"–"}`; const o=rg.get(k)||{k,n:0,ha:0}; o.n++; o.ha+=r.ha; rg.set(k,o); });
+  const provs=[...pv.values()].sort((a,b)=>b.n-a.n||b.ha-a.ha), regs=[...rg.values()].sort((a,b)=>b.n-a.n||b.ha-a.ha), d=U.length-UP.length, o100=U.filter(r=>r.ha>100).length;
+  const good=U.length>=avg&&d>=0, kal=U.filter(r=>/kalimantan/i.test(r.prov||"")).length;
+  const kp=[{v:nf.format(U.length),u:"",l:`users above ${MIN} ha last week${P?` (${UP.length} the week before, ${sg(d)})`:""}`,hot:true},
+    {v:nf.format(Math.round(ha(U))),u:" ha",l:`declared between them${P?` (${nf.format(Math.round(ha(UP)))} ha the week before)`:""}`},
+    {v:`${pct(U.length,L.withFarm||1)}%`,u:"",l:`of the ${nf.format(L.withFarm)} new users who added a farm`},
+    {v:nf.format(Math.round(avg)),u:"",l:`a week on average before (${prior.length} weeks); ${o100} of last week's are above 100 ha`}];
+  return {kicker:pre+`Registrations · users above ${MIN} ha`,
+    title:`${U.length} users above ${MIN} ha last week${P?` (${UP.length} the week before)`:""}, ${good?"up":"down"} on the average week of ${Math.round(avg)}; ${provs[0]?`most in ${provs[0].k}`:"no location"}`,
+    rows:[{h:84,cards:[{kpiRow:kp}]},{cards:[
+      {w:.9,title:`Users above ${MIN} ha per week`,sub:"Complete weeks; last week in green",chart:{type:"column",cats:W.map(w=>w.short),series:[{name:"Users",values:W.map(w=>big(w.w).length),colors:W.map((w,i)=>i===W.length-1?CAT[0]:"#A9B7A0")}],lblH:22}},
+      {w:.9,title:"By province, last week",chart:{type:"hbar",items:provs.slice(0,7).map(x=>({k:x.k,v:x.n,color:CAT[0],r:`${nf.format(Math.round(x.ha))} ha`})),rowH:30}},
+      {w:1.1,title:"By regency, last week",table:{dense:true,colW:[34,34,12,20],head:["Regency","Province","Users","Hectares"],align:["l","l","r","r"],rows:regs.slice(0,8).map(x=>{ const [r,p]=x.k.split("|"); return [r,p,{v:String(x.n),bold:true},nf.format(Math.round(x.ha))]; })}}]}],
+    notes:[`<b>${good?"Good":"Bad"}:</b> ${U.length} users above ${MIN} ha vs ${UP.length} the week before and ${Math.round(avg)} on average; ${good?"more large farmers are joining":"fewer large farmers joined"}.`,
+      `<b>Where:</b> ${provs.slice(0,3).map(x=>`${x.k} ${x.n}`).join(", ")}${kal&&!provs.slice(0,3).every(x=>!/kalimantan/i.test(x.k))&&kal===provs.slice(0,3).filter(x=>/kalimantan/i.test(x.k)).reduce((t,x)=>t+x.n,0)?"":kal?`; all Kalimantan ${kal}`:""}. These are the users worth a call from the plantation team.`,
+      `<b>Watch:</b> hectares are as entered by the user and not yet validated; confirm on the call.`]};
 }
 // Topaz seed bought by new accounts within 7 days of joining, per registration week, and what it means per new account.
 function acqTopazSpec(Q,pre){

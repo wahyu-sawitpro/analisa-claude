@@ -324,3 +324,5 @@ Every yellow box says whether a result is good or bad (labels Good / Bad / Watch
 in GMV turned into profit with `ACQ_ROI` (2% of GMV) and set against `ACQ_CAC` (Rp3,000 per acquired farmer), both
 constants at the top of `acqLtvSpec` in `deck/src/slides.js`; 3x LTV / CAC is treated as healthy. "Ordered" counts any
 last order date (sale, Topaz/benih, Toko Keliling, masker).
+Users above 50 ha: a slide after "where users are" with the count per week, by province and regency (no names), total
+hectares and a Good/Bad verdict against the week before and the average week.
