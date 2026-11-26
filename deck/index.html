@@ -1243,7 +1243,7 @@ function acqProfile(r,m){ if(!m.role&&!m.ha&&!m.prov) return {};
   const farmList=fh.map((h,i)=>({name:fn[i]||null,ha:Math.round(h*100)/100,district:fl[i]?.[0]||null,regency:fl[i]?.[1]||null,prov:fl[i]?.[2]||null}));
   const lastOrd=["lastSale","lastBenih","lastToling","lastMasker"].map(k=>m[k]?toDate(r[m[k]]):null).filter(Boolean).sort((a,b)=>b-a)[0]||null;
   const items=m.itemsH7?String(r[m.itemsH7]??"").trim().replace(/^\[|\]$/g,"").split(/,\s+(?=[A-Z\[])/).map(x=>x.trim()).filter(Boolean):[];
-  return {adGroup:m.adGroup?clean(r[m.adGroup]):null,srcLabel:m.srcLabel?clean(r[m.srcLabel]):null,salesH7:m.salesH7?(toNum(r[m.salesH7])||0):null,benihH7:m.benihH7?(toNum(r[m.benihH7])||0):null,itemsH7:items,lastOrd,regSales:m.regSales?(toNum(r[m.regSales])||0):null,jraw:clean(r[m.joined]),ordered:m.lastSale?!blank(r[m.lastSale]):null,farmList,name:m.name?clean(r[m.name]):null,contact:(m.phone&&clean(r[m.phone]))||(m.email&&clean(r[m.email]))||null,role:m.role?ROLE_OF(r[m.role]):null,roleRaw:clean(r[m.role]),ha:ha||0,farms:farms||0,hasFarm:(farms||0)>0||(ha||0)>0,prov:m.prov?firstOf(r[m.prov]):null,regency:m.regency?firstOf(r[m.regency]):null}; }
+  return {adGroup:m.adGroup?clean(r[m.adGroup]):null,srcLabel:m.srcLabel?clean(r[m.srcLabel]):null,salesH7:m.salesH7?(toNum(r[m.salesH7])||0):null,benihH7:m.benihH7?(toNum(r[m.benihH7])||0):null,itemsH7:items,lastOrd,regSales:m.regSales?(toNum(r[m.regSales])||0):null,jraw:clean(r[m.joined]),ordered:(m.lastSale||m.lastBenih||m.lastToling||m.lastMasker)?!!lastOrd:null,farmList,name:m.name?clean(r[m.name]):null,contact:(m.phone&&clean(r[m.phone]))||(m.email&&clean(r[m.email]))||null,role:m.role?ROLE_OF(r[m.role]):null,roleRaw:clean(r[m.role]),ha:ha||0,farms:farms||0,hasFarm:(farms||0)>0||(ha||0)>0,prov:m.prov?firstOf(r[m.prov]):null,regency:m.regency?firstOf(r[m.regency]):null}; }
 // Weekly registrations from the export: the last full week against the week before, split by Duta / non-Duta, channel and campaign.
 // A week that is still in progress (its data stops before the Sunday) is left out.
 function acquisition(sources){
@@ -2052,8 +2052,8 @@ function acqProfileSpecs(Q,pre){
     rows:[{cards:[
       {w:1.15,title:"By user role, last week vs the week before",sub:P?`${P.label} vs ${L.label}`:L.label,table:{colW:[31,13,13,12,11,10],head:["Users",P?`Week of ${P.short}`:"Week before",`Week of ${L.short}`,"Change","Change %","Share"],align:["l","r","r","r","r","r"],rows}},
       {w:1,title:"Registrations by role, per week",sub:"Estate owner = the ESTATE_OWNER role; every other role is a farmer",chart:{type:"column",stacked:true,cats:W.map(w=>w.short),series:ROLES.map(k=>({name:k,color:ROLE_C[k],values:W.map(w=>g(w,k))})),lblH:24}}]}],
-    notes:[`<b>Estate owners are rare:</b> ${ownAll} in ${W.length} weeks; every other role counts as a farmer.`,
-      `${L.ordered!=null?`<b>Orders:</b> ${L.ordered} of ${nf.format(L.total)} new users have ordered so far${P?` (${P.ordered||0} of ${nf.format(P.total)} the week before)`:""}. `:""}<b>Farm details:</b> ${nf.format(L.total-L.withFarm)} of ${nf.format(L.total)} (${pct(L.total-L.withFarm,L.total)}%) registered without a farm, so their location and hectares are unknown${P?` (week before ${pct(P.total-P.withFarm,P.total)}%)`:""}.`]});
+    notes:[`<b>${pct(L.withFarm,L.total)<50?"Bad":"Good"}:</b> only ${pct(L.withFarm,L.total)}% added a farm, so location and hectares are unknown for the rest.`,`<b>Estate owners are rare:</b> ${ownAll} in ${W.length} weeks; every other role counts as a farmer.`,
+      L.ordered!=null&&`<b>${L.ordered/L.total<0.05?"Bad":"Good"}:</b> ${L.ordered} of ${nf.format(L.total)} new users have ordered so far (${(L.ordered/L.total*100).toFixed(1)}%)${P?`; ${P.ordered||0} of ${nf.format(P.total)} the week before`:""}.`].filter(Boolean)});
   // where they are (users who added a farm)
   const provs=[...new Set([...L.prov.keys(),...(P?P.prov.keys():[])])].filter(Boolean).map(k=>({k,l:L.prov.get(k)||0,p:P?P.prov.get(k)||0:0})).sort((a,b)=>b.l-a.l||b.p-a.p);
   const regs=[...L.regency].filter(([k])=>k).slice(0,10).map(([k,v])=>{ const [r,pv]=k.split("|"); const pp=P?P.regency.get(k)||0:0; return [{v:r,bold:true},pv||"–",P?nf.format(pp):"–",{v:nf.format(v),bold:true},P?sg(v-pp):"–"]; });
@@ -2186,13 +2186,13 @@ function acqCampaignWorkSpec(Q,pre){
     title:camps.length&&top?`${top.name} works: the biggest source of both users (${nf.format(top.l.n)}) and buyers (${top.l.b}, ${rp(top.l.s)})`:`No campaign reached ${CMIN} farmers; ${G[0]?`${G[0].label} led with ${nf.format(G[0].l.n)}`:"no source"}`,
     rows:[{cards:[{w:1.15,...{title:camps.length?`Campaigns with ${CMIN}+ farmers last week`:"Top utm sources last week",sub:`${camps.length?"Google Ads / Identified Campaigns and ad groups":`No campaign reached ${CMIN} farmers`}; vs ${P?P.label:"–"}; bought within 7 days`,
       table:{dense:true,colW:[38,9,9,14,8,9,13],head:[camps.length?"Campaign / ad group":"Utm source","Last week","Before","Change","Farm","Bought","Sales H+7"],align:["l","r","r","r","r","r","r"],rows}}},why&&{w:1,title:`Why ${top.name} works`,table:{colW:[22,78],head:["Reason","Evidence last week"],align:["l","l"],rows:why}}].filter(Boolean)}],
-    notes:[camps.length&&top&&`<b>Why:</b> it reaches people ready to buy and sells them Topaz; buyers ${top.l.b&&L.buyH7?((top.l.b/top.l.n)/(L.buyH7.length/L.total)).toFixed(1):"–"}× the average rate.`,camps.length&&top&&`<b>Do:</b> ${buyAd?`shift spend to “${esc(buyAd.g)}”`:"keep it running"}${top.d<0?` and restore volume (${nf.format(top.p.n)} → ${nf.format(top.l.n)})`:""}.`].filter(Boolean)},
+    notes:[camps.length&&top&&`<b>Good, because</b> it reaches people ready to buy and sells them Topaz; buyers ${top.l.b&&L.buyH7?((top.l.b/top.l.n)/(L.buyH7.length/L.total)).toFixed(1):"–"}× the average rate.`,camps.length&&top&&`<b>Watch:</b> ${buyAd?`shift spend to “${esc(buyAd.g)}”`:"keep it running"}${top.d<0?` and restore volume (${nf.format(top.p.n)} → ${nf.format(top.l.n)})`:""}.`].filter(Boolean)},
   {kicker:pre+"Acquisition · Other channel and social media",
     title:`Other channel (organic) grew to ${nf.format(othL)} (${spc(othL,othP)}), higher in the days after ${soc.length?`${soc.length} social media post${soc.length===1?"":"s"}`:"last week's posts"}`,
     rows:[{cards:[{w:1,title:"Social media last week",table:{colW:[16,38,30,16],head:["Date","Account","Activity","Views"],align:["l","l","l","r"],rows:soc.length?acqSocial(Q).rows:[["No post listed for last week","","",""]]}},
       {w:1.2,title:"Other channel (organic) users per day",sub:soc.length?`Post days: ${[...new Set(soc.map(c=>days[dayN(new Date(L.w),new Date(c.date+"T12:00:00"))]))].join(", ")} (darker)`:"Last week",chart:{type:"column",cats:days,series:[{name:"Other channel",values:od,colors:days.map((d,i)=>soc.some(c=>dayN(new Date(L.w),new Date(c.date+"T12:00:00"))===i)?CAT[0]:"#A9B7A0")}],lblH:20}}]}],
-    notes:[(()=>{ const pd=[...new Set(soc.map(c=>dayN(new Date(L.w),new Date(c.date+"T12:00:00"))))].filter(i=>i>=0&&i<7).sort(), lp=Math.max(...pd), aft=od.slice(lp+1), bef=od.filter((v,i)=>i<=lp); return pd.length&&aft.length?`<b>After the posts:</b> ${Math.round(aft.reduce((a,b)=>a+b,0)/aft.length)} users a day vs ${Math.round(bef.reduce((a,b)=>a+b,0)/bef.length)} before; peak ${days[pk]} (${od[pk]}).`:`<b>Peak:</b> ${days[pk]} (${od[pk]} users).`; })(),
-      `<b>Hypothesis:</b> social media may boost organic sign-ups, but without a UTM the number can't be traced. Add a UTM to each post.`].filter(Boolean)}];
+    notes:[(()=>{ const pd=[...new Set(soc.map(c=>dayN(new Date(L.w),new Date(c.date+"T12:00:00"))))].filter(i=>i>=0&&i<7).sort(), lp=Math.max(...pd), aft=od.slice(lp+1), bef=od.filter((v,i)=>i<=lp); return pd.length&&aft.length?`<b>Good:</b> after the posts ${Math.round(aft.reduce((a,b)=>a+b,0)/aft.length)} users a day vs ${Math.round(bef.reduce((a,b)=>a+b,0)/bef.length)} before; peak ${days[pk]} (${od[pk]}).`:`<b>Peak:</b> ${days[pk]} (${od[pk]} users).`; })(),
+      `<b>Watch:</b> social media may boost organic sign-ups, but without a UTM the number can't be traced. Add a UTM to each post.`].filter(Boolean)}];
 }
 // Topaz seed bought by new accounts within 7 days of joining, per registration week, and what it means per new account.
 function acqTopazSpec(Q,pre){
@@ -2200,39 +2200,42 @@ function acqTopazSpec(Q,pre){
   const tz=w=>(w.buyH7||[]).filter(r=>r.benihH7>0), tS=w=>tz(w).reduce((t,r)=>t+r.benihH7,0), T=tz(L), TP=P?tz(P):[], s=tS(L), sp=P?tS(P):0;
   const byG=new Map(); T.forEach(r=>{ const k=`${r.src}${r.camp&&r.camp!=="No campaign"?` · ${r.camp}`:""}`; const o=byG.get(k)||{k,b:0,s:0,n:0}; o.b++; o.s+=r.benihH7; byG.set(k,o); });
   const byI=new Map(); T.forEach(r=>[...new Set((r.itemsH7||[]).filter(i=>/topaz/i.test(i)).map(buyItem))].forEach(i=>byI.set(i,(byI.get(i)||0)+1)));
-  const kp=[{v:rpParts(s)[0],u:rpParts(s)[1],l:`Topaz bought in 7 days by last week's new accounts${P?` (${rp(sp)} before)`:""}`,hot:true},
-    {v:nf.format(T.length),u:`/${nf.format(L.total)}`,l:`new accounts bought Topaz (${(T.length/L.total*100).toFixed(1)}%)${P?`; ${TP.length} the week before`:""}`},
-    {v:`Rp${nf.format(Math.round(s/L.total))}`,u:"",l:`Topaz per new account${P?` (Rp${nf.format(Math.round(sp/P.total))} the week before)`:""}`},
-    {v:rpParts(T.length?s/T.length:0)[0],u:rpParts(T.length?s/T.length:0)[1],l:`average Topaz order per buying account`}];
+  const rateT=T.length/L.total, none=L.total-T.length, perBuyer=T.length?s/T.length:0, lt=Q.ltv&&Q.ltv.customers/Q.ltv.registered;
+  const kp=[{v:`${(rateT*100).toFixed(1)}%`,u:"",l:`bought Topaz: ${T.length} of ${nf.format(L.total)} new accounts. Low: ${nf.format(none)} did not`,hot:true},
+    {v:rpParts(s)[0],u:rpParts(s)[1],l:`Topaz in 7 days${P?`, ${sp?`${(s/sp).toFixed(1)}×`:"up from Rp0"} the week before. Good`:""}`},
+    {v:rpParts(perBuyer)[0],u:rpParts(perBuyer)[1],l:`per buying account. Good: big orders`},
+    {v:`Rp${nf.format(Math.round(s/L.total))}`,u:"",l:`per new account; at ${(ACQ_ROI*100).toFixed(0)}% ROI Rp${nf.format(Math.round(s/L.total*ACQ_ROI))} vs Rp${nf.format(ACQ_CAC)} CAC`}];
   const all=L.buyH7.reduce((t,r)=>t+r.salesH7,0);
   return {kicker:pre+"Sales · Topaz seed from new farmer accounts",
-    title:`New accounts bought ${rp(s)} of Topaz in 7 days${P?` (${sp?`${(s/sp).toFixed(1)}×`:"up from Rp0"} the week before)`:""}, Rp${nf.format(Math.round(s/L.total))} per new account`,
+    title:`Topaz conversion is low: only ${T.length} of ${nf.format(L.total)} new accounts bought (${(rateT*100).toFixed(1)}%), but each spent ${rp(perBuyer)}`,
     rows:[{h:84,cards:[{kpiRow:kp}]},{cards:[
       {w:1,title:"Topaz H+7 by registration week",sub:"Topaz (benih) bought within 7 days by each week's new accounts",chart:{type:"column",cats:W.map(w=>w.short),series:[{name:"Topaz",values:W.map(tS),colors:W.map((w,i)=>i===W.length-1?CAT[0]:"#A9B7A0")}],fmt:v=>v?rp(v).replace("Rp",""):"0",lblH:22}},
       {w:1.1,title:"Topaz buyers by source",table:{colW:[56,14,30],head:["Source · campaign","Buyers","Topaz H+7"],align:["l","r","r"],rows:[...byG.values()].sort((a,b)=>b.s-a.s).map(o=>[o.k,{v:String(o.b),bold:true},{v:rp(o.s),bold:true}])}},
       {w:.8,title:"Topaz variants",table:{colW:[72,28],head:["Item","Accounts"],align:["l","r"],rows:[...byI].sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,{v:String(v),bold:true}])}}]}],
-    notes:[`<b>Per new account:</b> ${T.length} of ${nf.format(L.total)} bought Topaz (${(T.length/L.total*100).toFixed(1)}%); Topaz is ${pct(s,all||1)}% of their first-week sales.`,
-      `<b>Bibit:</b> no seedling item in the export. H+7 is still open for users who joined after ${fds(new Date(Q.lastDate-7*864e5))}.`]};
+    notes:[`<b>Bad:</b> ${(rateT*100).toFixed(1)}% conversion; ${nf.format(none)} of ${nf.format(L.total)} new accounts did not buy Topaz in their first week${lt?` (lifetime buyer rate of all farmers ${(lt*100).toFixed(2)}%, so this is typical, not a fix)`:""}.`,
+      `<b>Good:</b> ${rp(perBuyer)} per buyer and ${sp?`${(s/sp).toFixed(1)}×`:"up from Rp0"} the week before; at ${(ACQ_ROI*100).toFixed(0)}% ROI, Topaz alone earns Rp${nf.format(Math.round(s/L.total*ACQ_ROI))} per new account in week 1, ${pct(s/L.total*ACQ_ROI,ACQ_CAC)}% of the Rp${nf.format(ACQ_CAC)} CAC.`,
+      `<b>Watch:</b> ${(()=>{ const t=[...byG.values()].sort((a,b)=>b.s-a.s)[0]; return t?`${pct(t.s,s)}% came from ${esc(t.k)}, so Topaz depends on one source`:""; })()}; no bibit item in the export.`]};
 }
-// LTV from the B2C LTV export, against what last week's new accounts did in their first 7 days.
+// LTV from the B2C LTV export, turned into profit with the margin (ROI) and set against the cost to acquire a farmer.
+const ACQ_CAC=3000, ACQ_ROI=0.02;  // cost per acquired farmer (Rp) and return on GMV, as given by the user
 function acqLtvSpec(Q,pre){
-  const V=Q.ltv, L=Q.L, W=Q.weeks; if(!V||!V.registered) return null;
-  const B=L.buyH7||[], s=B.reduce((t,r)=>t+r.salesH7,0), perNew=s/L.total, perCust=V.gmv/(V.customers||1), rate=V.customers/V.registered;
-  const per=w=>w.buyH7?w.buyH7.reduce((t,r)=>t+r.salesH7,0)/w.total:0;
-  const kp=[{v:`Rp${nf.format(Math.round(V.ltvGmv))}`,u:"",l:`LTV per registered farmer (B2C GMV ÷ ${nf.format(V.registered)} registered farmers)`,hot:true},
-    {v:`${(rate*100).toFixed(2)}%`,u:"",l:`of registered farmers have bought B2C (${nf.format(V.customers)} customers)`},
-    {v:rpParts(perCust)[0],u:rpParts(perCust)[1],l:`GMV per B2C customer (${rp(V.gmv)} in total)`},
-    {v:`Rp${nf.format(Math.round(perNew))}`,u:"",l:`first-7-day sales per new account last week (${pct(perNew,V.ltvGmv)}% of the LTV)`}];
-  const rows=[["Users",nf.format(V.registered),nf.format(L.total)],["Buyers",nf.format(V.customers),nf.format(B.length)],["Buyer rate",`${(rate*100).toFixed(2)}%`,`${(B.length/L.total*100).toFixed(2)}%`],
-    ["Sales (GMV)",rp(V.gmv),rp(s)],[{v:"Sales per user",bold:true},{v:`Rp${nf.format(Math.round(V.ltvGmv))}`,bold:true},{v:`Rp${nf.format(Math.round(perNew))}`,bold:true}],["Sales per buyer",rp(perCust),rp(B.length?s/B.length:0)]];
+  const V=Q.ltv; if(!V||!V.registered) return null;
+  const rate=V.customers/V.registered, perCust=V.gmv/(V.customers||1), lp=V.ltvGmv*ACQ_ROI, ratio=lp/ACQ_CAC, cacBuyer=ACQ_CAC/(rate||1), pBuyer=perCust*ACQ_ROI;
+  const verdict=r=>r>=3?"Good (3×+)":r>=1?"Thin: pays back, little margin":"Bad: loses money";
+  const kp=[{v:`Rp${nf.format(Math.round(V.ltvGmv))}`,u:"",l:`LTV in GMV per registered farmer (B2C GMV ÷ ${nf.format(V.registered)} farmers)`,hot:true},
+    {v:`Rp${nf.format(Math.round(lp))}`,u:"",l:`LTV in profit at ${(ACQ_ROI*100).toFixed(0)}% ROI on GMV`},
+    {v:`Rp${nf.format(ACQ_CAC)}`,u:"",l:`cost to acquire one farmer today`},
+    {v:`${ratio.toFixed(1)}×`,u:"",l:`LTV ÷ CAC at ${(ACQ_ROI*100).toFixed(0)}% ROI: ${verdict(ratio).toLowerCase()}`}];
+  const rows=[0.01,0.02,0.03,0.05].map(m=>{ const x=V.ltvGmv*m/ACQ_CAC; return [{v:`${(m*100).toFixed(0)}%`,bold:m===ACQ_ROI},{v:`Rp${nf.format(Math.round(V.ltvGmv*m))}`,bold:m===ACQ_ROI},{v:`${x.toFixed(1)}×`,bold:m===ACQ_ROI},`Rp${nf.format(Math.round(V.ltvGmv*m))}`,{v:verdict(x),bold:m===ACQ_ROI}]; });
+  const rowsB=[["Farmers who ever bought",`${nf.format(V.customers)} of ${nf.format(V.registered)} (${(rate*100).toFixed(2)}%)`],["GMV per buyer",rp(perCust)],[`Profit per buyer at ${(ACQ_ROI*100).toFixed(0)}%`,{v:rp(pBuyer),bold:true}],["Cost to get one buyer",{v:rp(cacBuyer),bold:true},],["Profit ÷ cost per buyer",{v:`${(pBuyer/cacBuyer).toFixed(1)}×`,bold:true}]];
   return {kicker:pre+"LTV · what a new farmer is worth",
-    title:`A farmer is worth Rp${nf.format(Math.round(V.ltvGmv))}; new accounts reach ${pct(perNew,V.ltvGmv)}% of it in their first 7 days`,
+    title:`At ${(ACQ_ROI*100).toFixed(0)}% ROI a farmer returns Rp${nf.format(Math.round(lp))} on a Rp${nf.format(ACQ_CAC)} acquisition cost: ${ratio.toFixed(1)}× (${ratio>=3?"good":ratio>=1?"thin":"bad"})`,
     rows:[{h:84,cards:[{kpiRow:kp}]},{cards:[
-      {w:1,title:"All registered farmers vs last week's new accounts",sub:"Lifetime B2C (LTV export) vs the first 7 days after joining",table:{dense:true,colW:[34,33,33],head:["","All farmers, lifetime","New accounts, 7 days"],align:["l","r","r"],rows}},
-      {w:1,title:"First-7-day sales per new account, by registration week",sub:`Rupiah per new account; LTV per registered farmer Rp${nf.format(Math.round(V.ltvGmv))}`,chart:{type:"column",cats:W.map(w=>w.short),series:[{name:"Per account",values:W.map(per),colors:W.map((w,i)=>i===W.length-1?CAT[0]:"#A9B7A0")}],fmt:v=>nf.format(Math.round(v/1000))+"k",lblH:22}}]}],
-    notes:[`<b>Average, not median:</b> only ${(rate*100).toFixed(2)}% ever bought, so the median farmer is Rp0.`,
-      `<b>So what:</b> one more buyer ≈ ${rp(B.length?s/B.length:0)} in week 1 and ${rp(perCust)} lifetime; raise the buyer rate.`,
-      V.net>V.gmv&&`<b>Check:</b> net sales (${rp(V.net)}) is above GMV (${rp(V.gmv)}) in the export.`].filter(Boolean)};
+      {w:1.15,title:"LTV vs acquisition cost at different ROI",sub:`ROI = profit as % of GMV; CAC Rp${nf.format(ACQ_CAC)} per farmer; max CAC = break-even`,table:{dense:true,colW:[12,22,16,22,28],head:["ROI","LTV profit","LTV ÷ CAC","Max CAC","Verdict"],align:["l","r","r","r","l"],rows}},
+      {w:1,title:"Per buyer: where the value sits",sub:"Only buyers create value; the cost is spread over every farmer acquired",table:{dense:true,colW:[55,45],head:["",""],align:["l","r"],rows:rowsB}}]}],
+    notes:[`<b>${ratio>=3?"Good":ratio>=1?"Thin":"Bad"}:</b> at ${(ACQ_ROI*100).toFixed(0)}% ROI each farmer returns ${ratio.toFixed(1)}× its Rp${nf.format(ACQ_CAC)} cost; a 3× LTV ÷ CAC is the usual healthy bar.`,
+      `<b>Risk:</b> the margin for error is small; below ${(ACQ_CAC/V.ltvGmv*100).toFixed(1)}% ROI, or above Rp${nf.format(Math.round(lp))} CAC, acquisition loses money. Only ${(rate*100).toFixed(2)}% of farmers ever buy, so the buyer rate drives LTV.`,
+      `<b>Note:</b> average, not median (the median farmer is Rp0)${V.net>V.gmv?`; net sales (${rp(V.net)}) is above GMV in the export, check it`:""}.`]};
 }
 // The analysis under "Channels last week": which channels added the most users, grew fastest, fell most.
 function acqChannelNotes(Q){
@@ -2242,9 +2245,10 @@ function acqChannelNotes(Q){
   const f=c=>`${c.k} ${nf.format(c.p)} → ${nf.format(c.l)}`, bulk=ch.filter(c=>isBulk(c.k)&&(c.l||c.p)), inj=bulk.reduce((t,c)=>({p:t.p+c.p,l:t.l+c.l}),{p:0,l:0});
   const cm=k=>[...new Set([...(L.campAll||new Map()).keys(),...(P.campAll||new Map()).keys()])].filter(x=>x.endsWith("|"+k)).map(x=>({k:x.split("|")[0],p:P.campAll.get(x)||0,l:L.campAll.get(x)||0})).filter(x=>x.p>=100||x.l>=100);
   const dnC=dn[0]&&cm(dn[0].k).sort((a,b)=>(a.l-a.p)-(b.l-b.p))[0];
-  return [byN[0]&&`<b>Grew:</b> ${byN.slice(0,3).map(c=>`${c.k} ${sg(c.d)}`).join(", ")}${fresh.length?` (new: ${fresh.map(c=>c.k).join(", ")})`:""}${byR[0]?`; fastest ${byR[0].k} +${Math.round(byR[0].r*100)}%`:""}.`,
-    dn[0]&&`<b>Fell:</b> ${dn.slice(0,2).map(c=>`${c.k} ${sg(c.d)} (−${Math.round(-c.r*100)}%)`).join(", ")}${dnC?`, mostly “${esc(dnC.k)}” ${nf.format(dnC.p)} → ${nf.format(dnC.l)}`:""}.`,
-    bulk.length&&`<b>Not real growth:</b> Injected User ${nf.format(inj.p)} → ${nf.format(inj.l)} is a bulk add; without it ${spc(L.total-inj.l,P.total-inj.p)}. Other channel = organic (no UTM).`].filter(Boolean);
+  const d=L.total-P.total, ex=spc(L.total-inj.l,P.total-inj.p);
+  return [`<b>${d<0?"Bad":"Good"}:</b> total ${sg(d)} (${spc(L.total,P.total)}) on the week before${bulk.length?`; without bulk adds ${ex}`:""}${dn[0]?`. ${dn[0].k} ${sg(dn[0].d)}${dnC?`, mostly “${esc(dnC.k)}” ${nf.format(dnC.p)} → ${nf.format(dnC.l)}`:""}`:""}.`,
+    byN[0]&&`<b>Good:</b> ${byN.slice(0,3).map(c=>`${c.k} ${sg(c.d)}`).join(", ")}${byR[0]?`; fastest ${byR[0].k} +${Math.round(byR[0].r*100)}%`:""}${fresh.length?`; new: ${fresh.map(c=>c.k).join(", ")}`:""}.`,
+    bulk.length&&`<b>Watch:</b> Injected User ${nf.format(inj.p)} → ${nf.format(inj.l)} is a bulk add, not growth. Other channel = organic (no UTM).`].filter(Boolean);
 }
 function acqOverviewSpec(Q,pre){
   const L=Q.L, P=Q.P, W=Q.weeks, {weeks:pr,avg}=acqPrior(Q), d=P?L.total-P.total:0;
@@ -2299,9 +2303,10 @@ function acqChannelSpec(Q,pre){
     notes:(()=>{ const T=acqBuyStats(Q), BP=P&&P.buyH7||[]; if(!T) return [!big.length&&cm.length&&`<b>Campaign names</b> are shown only for a campaign with ${CMIN}+ users in a week; none reached it last week.`].filter(Boolean);
       const conv=T.byCh.map(c=>({...c,r:c.n?c.b/c.n:0})).sort((a,b)=>b.r-a.r), d0=T.byDay[0], early=T.byDay.slice(0,4).reduce((a,b)=>a+b,0), topI=T.items[0];
       const camp=big[0]&&T.B.filter(r=>r.camp===big[0].k&&r.src===big[0].src), open=(Q.rawRows||[]).filter(r=>r.w===L.w&&r.jd&&dayN(r.jd,Q.lastDate)<7).length;
-      return [T.n&&`<b>Fast:</b> ${d0} of ${T.n} bought on the join day, ${early} by H+3.`,
-        T.n&&`<b>Best rate:</b> ${conv.slice(0,2).map(c=>`${c.k} ${c.b} of ${nf.format(c.n)}`).join(", ")} vs ${(T.n/L.total*100).toFixed(1)}% overall.`,
-        topI&&`<b>Topaz drives it:</b> ${pct(T.topaz,T.sales||1)}% of first-week sales.${open?` H+7 still open for users who joined after ${fds(new Date(Q.lastDate-7*864e5))}.`:""}`].filter(Boolean); })()};
+      const sP=(P&&P.buyH7||[]).reduce((t,r)=>t+r.salesH7,0);
+      return [T.n&&`<b>Good:</b> ${rp(T.sales)} in 7 days${sP?` (${(T.sales/sP).toFixed(1)}× the week before)`:""}; ${d0} of ${T.n} bought on the join day, all ${early===T.n?"":`but ${T.n-early} `}by H+3.`,
+        `<b>Bad:</b> only ${T.n} of ${nf.format(L.total)} new users bought (${(T.n/L.total*100).toFixed(1)}%); best rates ${conv.slice(0,2).map(c=>`${c.k} ${c.b} of ${nf.format(c.n)}`).join(", ")}.`,
+        topI&&`<b>Watch:</b> ${pct(T.topaz,T.sales||1)}% of the sales is Topaz, so one product carries it.${open?` H+7 still open for users who joined after ${fds(new Date(Q.lastDate-7*864e5))}.`:""}`].filter(Boolean); })()};
 }
 // When a table keeps an "Other" row, the note under it lists every campaign in it with its counts.
 const otherNote=(rest,P,lab="campaigns")=>{ if(!rest.length) return null; const on=[...rest].filter(x=>x.l).sort((a,b)=>b.l-a.l||b.p-a.p), off=rest.filter(x=>!x.l);

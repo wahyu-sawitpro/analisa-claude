@@ -114,7 +114,7 @@ def main():
         return {"total": len(w), "role": cnt(role), "duta": cnt(lambda x: x[I["akuisisi_type"]]), "utm_source": cnt(lambda x: x[I["utm_source"]]),
                 "province": dict(list(cnt(prov).items())[:10]), "with_farm": sum(1 for x in w if num(x[I["jumlah_farm"]]) > 0),
                 "above_100ha": len(big), "above_100ha_total_ha": round(sum(num(x[I["total_area_hectare"]]) for x in big)),
-                "ordered": sum(1 for x in w if "last_sale_order_date" in I and x[I["last_sale_order_date"]]),
+                "ordered": sum(1 for x in w if any(c in I and x[I[c]] for c in ("last_sale_order_date", "last_benih_order_date", "last_toling_order_date", "last_masker_order_date"))),
                 "no_phone": sum(1 for x in w if not x[I["farmer_phone"]]),
                 "same_day_sales": {ch: {"farmers": len(u), "buyers": sum(1 for x in u if num(x[I["total_sales_register_date"]]) > 0),
                                         "sales": round(sum(num(x[I["total_sales_register_date"]]) for x in u))}

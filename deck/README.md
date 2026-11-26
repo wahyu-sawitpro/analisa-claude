@@ -319,3 +319,8 @@ is placed in that order's week; other closings use their own date. Rows from oth
 the success-story slide.
 
 Every registration slide: the title is the takeaway in one sentence; the yellow box has at most 2-3 short points (why it happened, so what / what to do) about the charts and tables on that slide.
+
+Every yellow box says whether a result is good or bad (labels Good / Bad / Watch), not only the numbers. LTV slide: LTV
+in GMV turned into profit with `ACQ_ROI` (2% of GMV) and set against `ACQ_CAC` (Rp3,000 per acquired farmer), both
+constants at the top of `acqLtvSpec` in `deck/src/slides.js`; 3x LTV / CAC is treated as healthy. "Ordered" counts any
+last order date (sale, Topaz/benih, Toko Keliling, masker).
